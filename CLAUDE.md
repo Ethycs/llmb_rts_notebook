@@ -1,0 +1,1 @@
+read ./pixi_guide.md to properly use the python env including pip

@@ -1,0 +1,84 @@
+{
+  "phases": [
+    {
+      "phase_id": "01",
+      "slug": "vega-rendering-substrate",
+      "name": "Vega-as-RTS rendering evaluation",
+      "merged_turn_range": ["001", "005"],
+      "summary": "Evaluates Vega/Vega-Lite visualization grammar as a substrate for an RTS game engine, surfaces scaling and animation limits, and proposes three architecture options. Ends when the user pivots away from Vega-specific design toward agent orchestration.",
+      "decision_ids": [],
+      "source_proposals": ["A.phase-1"],
+      "notes": "Kept as standalone exploratory phase; no formal lock-in decision but it frames the whole project."
+    },
+    {
+      "phase_id": "02",
+      "slug": "agent-orchestration-pivot",
+      "name": "RTS reframed as agent orchestration interface",
+      "merged_turn_range": ["006", "017"],
+      "summary": "User reframes the project: rather than a literal game, build an RTS-style operator interface for autonomous coding agents, with 2D/3D multimodal views, NATO symbology, and integration targets like Claude Code and OpenCode. Establishes the core 'fleet of agents under operator command' metaphor.",
+      "decision_ids": ["DR-0001", "DR-0002"],
+      "source_proposals": ["A.phase-2"],
+      "notes": "Direct adoption of Agent A's phase 2."
+    },
+    {
+      "phase_id": "03",
+      "slug": "hypergraph-observability",
+      "name": "Hypergraph observability architecture",
+      "merged_turn_range": ["018", "028"],
+      "summary": "Models agents as hypergraph authors of interaction edges, designs a temporal multiplex visualization layer, integrates real agent APIs, and introduces filesystem isolation. Culminates in a 6-tier architecture diagram that crystallizes the full design stack.",
+      "decision_ids": ["DR-0003"],
+      "source_proposals": ["A.phase-3"],
+      "notes": "Direct adoption of Agent A's phase 3; the 6-tier architecture in turn 028 is the pre-V1 high-water mark."
+    },
+    {
+      "phase_id": "04",
+      "slug": "isolation-and-mcp-placement",
+      "name": "Zone isolation primitives and MCP placement",
+      "merged_turn_range": ["029", "035"],
+      "summary": "Details the isolation primitive ladder (chroot through bubblewrap), formalizes zones-as-filesystem, and resolves MCP server placement strategy. Lands on per-zone MCP server instances as the default model. Ends at the cliff before V1 scope reduction.",
+      "decision_ids": ["DR-0004"],
+      "source_proposals": ["A.phase-4"],
+      "notes": "Kept the 035->036 seam intact: this phase is the last 'expand the design' phase before the V1 contraction."
+    },
+    {
+      "phase_id": "05",
+      "slug": "v1-scope-reduction",
+      "name": "V1 scope reduction and frontend search",
+      "merged_turn_range": ["036", "056"],
+      "summary": "User asks for the simplest credible V1; the assistant catalogues cuts (3D/VR, macOS, SSH, MCP, bubblewrap, live policy, event sourcing, NATO symbology, VegaFusion, magic CLI). Discussion then circulates through frontend framework candidates (React, plain JS, htmx, Svelte, p5.js, Flutter) before the user rejects React and reframes the problem as feature differentiation rather than framework choice.",
+      "decision_ids": ["DR-0005", "DR-0006"],
+      "source_proposals": ["B.phase-1", "B.phase-2"],
+      "notes": "Merged Agent B's 'v1-scope-reduction' (036-041) with 'frontend-framework-selection' (042-056) because the framework search is the immediate consequence of the scope cut and resolves into the same conclusion (frontend is not the load-bearing question)."
+    },
+    {
+      "phase_id": "06",
+      "slug": "vscode-notebook-substrate",
+      "name": "VS Code notebook as chat substrate",
+      "merged_turn_range": ["057", "076"],
+      "summary": "Identifies the chat window as the real differentiator, evaluates custom Chromium vs simpler hosts, lands on VS Code as unified host, then discovers VS Code's NotebookController API plus a fork of vscode-jupyter as the right substrate. Locks bidirectional MCP as the primary communication protocol with agent text output suppressed in favor of forced tool use.",
+      "decision_ids": ["DR-0007", "DR-0008", "DR-0009", "DR-0010"],
+      "source_proposals": ["B.phase-3", "B.phase-4", "B.phase-5", "C.phase-1"],
+      "notes": "Dissolved the 070->071 agent boundary. Agent B's 'chat-window-as-differentiator' (057-062), 'vscode-as-unified-host' (063-066), 'notebook-as-chat-substrate' (067-070), and Agent C's 'mcp-chat-architecture' (071-076) are one continuous arc: they progressively narrow from 'where does chat live' to 'cell-based chat-over-MCP in VS Code'. Each sub-step is too small to be a phase on its own."
+    },
+    {
+      "phase_id": "07",
+      "slug": "subtractive-fork-and-storage",
+      "name": "Subtractive fork, LLMKernel scope, and storage design",
+      "merged_turn_range": ["077", "093"],
+      "summary": "User commits to a subtractive fork of vscode-jupyter (cut Python integration, IPyWidgets, remote servers, debugging, viewers; hardcode LLMKernel as sole kernel). Designs three-tier storage (layout tree, agent state graph, chat flow JSON), then collapses it into a single embedded .llmnb file. Establishes testing strategy for Jupyter messaging protocol and lifecycle bugs.",
+      "decision_ids": ["DR-0011", "DR-0012", "DR-0013", "DR-0014"],
+      "source_proposals": ["C.phase-2", "C.phase-3", "C.phase-4"],
+      "notes": "Merged Agent C's 'notebook-substrate-fork' (077-082), 'fork-approach-and-scope' (083-087), and 'storage-and-testing' (088-093) into one phase. They share a single thread: 'what to keep from vscode-jupyter and how to structure the data the survivor produces.' Splitting them creates artificial boundaries inside one continuous design exercise."
+    },
+    {
+      "phase_id": "08",
+      "slug": "blockers-mediator-standards",
+      "name": "Remaining blockers, kernel mediator role, and standards discipline",
+      "merged_turn_range": ["094", "105"],
+      "summary": "Catalogues resolved vs outstanding blockers, frames LLMKernel as MCP/PTY mediator with bidirectional 'paper-telephone' MCP between kernel and extension, and establishes Bell System-inspired standards discipline (RFC-driven tool specs, provisioning documentation, fault-injection plans). Design substantially locked at end.",
+      "decision_ids": ["DR-0015", "DR-0016"],
+      "source_proposals": ["C.phase-5"],
+      "notes": "Direct adoption of Agent C's phase 5."
+    }
+  ]
+}

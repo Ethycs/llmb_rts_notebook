@@ -1,0 +1,22 @@
+# pixi environments
+.pixi/*
+!.pixi/config.toml
+
+# node / extension build artifacts
+node_modules/
+extension/dist/
+extension/out/
+extension/*.vsix
+*.tsbuildinfo
+.vscode-test/
+
+# python build artifacts
+__pycache__/
+*.pyc
+.pytest_cache/
+.hypothesis/
+
+# stage 3 prototype traces (committed selectively, not auto-ignored — but local debug ones are)
+_ingest/prototypes/*.local.*
+_ingest/prototypes/r2-prototype/.run/
+_ingest/prototypes/r2-prototype/run.log

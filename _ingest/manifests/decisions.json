@@ -1,0 +1,148 @@
+{
+  "decisions": [
+    {
+      "decision_id": "DR-0001",
+      "slug": "rts-as-agent-orchestrator",
+      "title": "Project pivots from Vega-game-engine to RTS-for-agent-orchestration",
+      "merged_turn_refs": ["006", "007"],
+      "phase_id": "02",
+      "tag": "PIVOT",
+      "one_line": "Abandon Vega-specific game design; reconceive as RTS-style operator interface for controlling autonomous coding agents."
+    },
+    {
+      "decision_id": "DR-0002",
+      "slug": "agents-as-hypergraph-authors",
+      "title": "Agents modeled as hypergraph edge authors, not spatial entities",
+      "merged_turn_refs": ["009", "010"],
+      "phase_id": "02",
+      "tag": "PIVOT",
+      "one_line": "Shift from 'where are agents on a map' to 'what edges agents create in a temporal multiplex graph'."
+    },
+    {
+      "decision_id": "DR-0003",
+      "slug": "six-tier-architecture-locked",
+      "title": "Six-tier architecture diagram committed",
+      "merged_turn_refs": ["028"],
+      "phase_id": "03",
+      "tag": "LOCK-IN",
+      "one_line": "RTS core + integrations + isolation + agent model crystallized into a single architecture stack."
+    },
+    {
+      "decision_id": "DR-0004",
+      "slug": "per-zone-mcp-servers",
+      "title": "Per-zone MCP server instances chosen over host-shared servers",
+      "merged_turn_refs": ["034"],
+      "phase_id": "04",
+      "tag": "LOCK-IN",
+      "one_line": "MCP servers run inside each zone by default to preserve isolation; commons servers reserved for cheap shared tools."
+    },
+    {
+      "decision_id": "DR-0005",
+      "slug": "v1-scope-cut",
+      "title": "V1 scope reduction: cut 3D/VR, macOS, SSH, MCP, bubblewrap, live policy, event sourcing, NATO, VegaFusion, magic CLI",
+      "merged_turn_refs": ["036"],
+      "phase_id": "05",
+      "tag": "SCOPE-CUT",
+      "one_line": "Strip the architecture down to the minimum that tests the hypothesis that RTS metaphor improves agent oversight."
+    },
+    {
+      "decision_id": "DR-0006",
+      "slug": "reject-react-frontend-not-the-question",
+      "title": "Reject React; reframe frontend as not the load-bearing question",
+      "merged_turn_refs": ["041"],
+      "phase_id": "05",
+      "tag": "PIVOT",
+      "one_line": "Frontend framework choice is downstream; the real differentiator is the chat/operator interaction model."
+    },
+    {
+      "decision_id": "DR-0007",
+      "slug": "vscode-as-host",
+      "title": "VS Code adopted as unified host platform",
+      "merged_turn_refs": ["063", "064"],
+      "phase_id": "06",
+      "tag": "PIVOT",
+      "one_line": "Drop browser-based chat; deliver as a VS Code extension to eliminate context-switching and inherit rich APIs."
+    },
+    {
+      "decision_id": "DR-0008",
+      "slug": "bidirectional-mcp-as-comm-channel",
+      "title": "MCP used bidirectionally as primary agent communication channel",
+      "merged_turn_refs": ["060"],
+      "phase_id": "06",
+      "tag": "LOCK-IN",
+      "one_line": "Operator becomes an MCP server; agent communicates via MCP tool calls (clarify, request_approval, notify) instead of free text."
+    },
+    {
+      "decision_id": "DR-0009",
+      "slug": "notebook-controller-no-jupyter-kernel",
+      "title": "VS Code NotebookController API used; no Jupyter kernel, no Python runtime",
+      "merged_turn_refs": ["067", "070"],
+      "phase_id": "06",
+      "tag": "LOCK-IN",
+      "one_line": "Keep cell paradigm and notebook UI; drop the kernel entirely so there is no protocol bridge or Python expectation collision."
+    },
+    {
+      "decision_id": "DR-0010",
+      "slug": "force-tool-use-suppress-text",
+      "title": "Agent text output suppressed; tool calls become sole communication",
+      "merged_turn_refs": ["075", "076"],
+      "phase_id": "06",
+      "tag": "LOCK-IN",
+      "one_line": "Forced tool use migrates context entirely into structured MCP calls; no free-form agent prose in the operator surface."
+    },
+    {
+      "decision_id": "DR-0011",
+      "slug": "subtractive-fork-vscode-jupyter",
+      "title": "Subtractive fork of vscode-jupyter",
+      "merged_turn_refs": ["079", "080"],
+      "phase_id": "07",
+      "tag": "LOCK-IN",
+      "one_line": "Remove Python integration, IPyWidgets, remote servers, debugging, and viewers; keep notebook editor and cell semantics."
+    },
+    {
+      "decision_id": "DR-0012",
+      "slug": "llmkernel-sole-kernel",
+      "title": "LLMKernel hardcoded as sole kernel; no kernel discovery",
+      "merged_turn_refs": ["083"],
+      "phase_id": "07",
+      "tag": "SCOPE-CUT",
+      "one_line": "Cut kernel selection ceremony; one kernel is wired in by default."
+    },
+    {
+      "decision_id": "DR-0013",
+      "slug": "v1-feasible-with-claude-code",
+      "title": "V1 scope confirmed feasible with Claude Code as collaborator",
+      "merged_turn_refs": ["085"],
+      "phase_id": "07",
+      "tag": "LOCK-IN",
+      "one_line": "Honest feasibility assessment: fork/merge LLMKernel, advanced chat UI, and RTS view are deliverable as a serious V1."
+    },
+    {
+      "decision_id": "DR-0014",
+      "slug": "three-storage-structures-embedded",
+      "title": "Three storage structures (layout tree, agent graph, chat flow) embedded in single .llmnb file",
+      "merged_turn_refs": ["081", "082", "083"],
+      "phase_id": "07",
+      "tag": "LOCK-IN",
+      "one_line": "Each structure uses the data shape that fits its data; all three serialize as JSON inside one ipynb-derived file."
+    },
+    {
+      "decision_id": "DR-0015",
+      "slug": "kernel-extension-bidirectional-mcp",
+      "title": "Bidirectional 'paper-telephone' MCP between kernel and extension",
+      "merged_turn_refs": ["099"],
+      "phase_id": "08",
+      "tag": "LOCK-IN",
+      "one_line": "LLMKernel and the VS Code extension both expose MCP tool surfaces to each other; the kernel mediates MCP and PTY traffic."
+    },
+    {
+      "decision_id": "DR-0016",
+      "slug": "rfc-standards-discipline",
+      "title": "Bell System-inspired standards discipline: RFC-driven tool specs and provisioning",
+      "merged_turn_refs": ["103", "104", "105"],
+      "phase_id": "08",
+      "tag": "LOCK-IN",
+      "one_line": "Tool specifications, provisioning procedures, and reliability practices are written as numbered RFCs before implementation, mirroring Bell System engineering culture."
+    }
+  ]
+}

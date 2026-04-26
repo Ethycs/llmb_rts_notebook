@@ -1,0 +1,124 @@
+{
+  "name": "llmb-rts-notebook",
+  "displayName": "llmb RTS Notebook",
+  "description": "Operator interface for supervising fleets of autonomous coding agents. Subtractive fork of vscode-jupyter; renders .llmnb notebooks backed by LLMKernel as MCP/PTY mediator.",
+  "version": "0.1.0",
+  "publisher": "ethycs",
+  "license": "GPL-3.0-only",
+  "engines": {
+    "vscode": "^1.92.0",
+    "node": ">=20.0.0"
+  },
+  "categories": [
+    "Notebooks",
+    "AI",
+    "Other"
+  ],
+  "keywords": [
+    "llm",
+    "agents",
+    "mcp",
+    "notebook",
+    "rts"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onNotebook:llmnb"
+  ],
+  "contributes": {
+    "notebooks": [
+      {
+        "type": "llmnb",
+        "displayName": "llmb RTS Notebook",
+        "selector": [
+          {
+            "filenamePattern": "*.llmnb"
+          }
+        ]
+      }
+    ],
+    "languages": [
+      {
+        "id": "llmnb-cell",
+        "aliases": [
+          "llmb cell"
+        ],
+        "extensions": [
+          ".llmnb-cell"
+        ]
+      }
+    ],
+    "notebookRenderer": [
+      {
+        "id": "llmnb-run-renderer",
+        "displayName": "LLMNB Run Renderer",
+        "entrypoint": "./dist/run-renderer.js",
+        "mimeTypes": [
+          "application/vnd.rts.run+json"
+        ]
+      }
+    ],
+    "commands": [
+      {
+        "command": "llmnb.spawn",
+        "title": "LLMNB: Spawn agent (TODO C2: wire in R2)",
+        "category": "LLMNB"
+      },
+      {
+        "command": "llmnb.attach",
+        "title": "LLMNB: Attach to agent (TODO C2: wire in R2)",
+        "category": "LLMNB"
+      }
+    ],
+    "configuration": {
+      "title": "LLMNB",
+      "properties": {
+        "llmnb.kernel.serverUrl": {
+          "type": "string",
+          "default": "http://127.0.0.1:8888",
+          "description": "Base URL of the Jupyter Server hosting LLMKernel."
+        },
+        "llmnb.kernel.token": {
+          "type": "string",
+          "default": "",
+          "description": "Auth token for the Jupyter Server. Empty if no auth."
+        },
+        "llmnb.kernel.kernelName": {
+          "type": "string",
+          "default": "llm_kernel",
+          "description": "Jupyter kernelspec name for LLMKernel."
+        },
+        "llmnb.kernel.useStub": {
+          "type": "boolean",
+          "default": false,
+          "description": "Use the in-process stub kernel client (debug only)."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "build": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --minify",
+    "lint": "eslint src --ext ts",
+    "test": "vscode-test",
+    "pretest": "npm run build && npm run lint"
+  },
+  "dependencies": {
+    "@jupyterlab/services": "^7.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.x",
+    "@types/vscode": "^1.92.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "@vscode/test-cli": "^0.0.10",
+    "@vscode/test-electron": "^2.4.0",
+    "esbuild": "^0.23.0",
+    "eslint": "^9.0.0",
+    "typescript": "^5.5.0",
+    "vscode-notebook-renderer": "^1.72.0",
+    "wdio-vscode-service": "^6.1.0"
+  }
+}

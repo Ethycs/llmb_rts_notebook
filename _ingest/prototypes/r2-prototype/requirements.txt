@@ -1,0 +1,18 @@
+# R2-prototype harness extra dependencies.
+#
+# All runtime deps for the harness are intended to come from the kernel
+# pixi feature in pyproject.toml (litellm, mcp, pydantic, etc.).
+#
+# The harness additionally needs FastAPI/uvicorn (for the stub LiteLLM
+# proxy) and httpx (for forwarding to Anthropic). If `pixi install -e
+# kernel` does not already provide these (LiteLLM transitively pulls
+# fastapi+uvicorn+httpx, which it does on current versions), install
+# them via:
+#
+#     pixi run -e kernel pip install -r _ingest/prototypes/r2-prototype/requirements.txt
+#
+# Listed loosely — the harness is best-effort, not a release artifact.
+fastapi>=0.110
+uvicorn>=0.27
+httpx>=0.27
+anthropic>=0.40

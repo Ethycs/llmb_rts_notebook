@@ -1,0 +1,6 @@
+[submodule "vendor/LLMKernel"]
+	path = vendor/LLMKernel
+	url = https://github.com/Ethycs/LLMKernel.git
+[submodule "vendor/vscode-jupyter"]
+	path = vendor/vscode-jupyter
+	url = https://github.com/microsoft/vscode-jupyter.git
