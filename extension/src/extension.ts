@@ -13,12 +13,19 @@
 // StubKernelClient to emit bare OTLP spans plus optional `agent_emit` test
 // spans and `notebook.metadata` envelopes for renderer/applier exercising.
 //
+// I-T-X: replaced JupyterKernelClient with PtyKernelClient per RFC-008.
+// LLMKernel is now spawned as a subprocess via node-pty; the data plane is a
+// UDS / named-pipe / TCP socket carrying newline-delimited JSON. Dropped the
+// `@jupyterlab/services` dependency and the Jupyter Server config keys.
+// Added `LLMNB: Show kernel terminal` (RFC-008 §3 debug surface) and
+// LogRecordObserver wiring for OTLP/JSON LogRecord frames.
+//
 // Pattern adapted from
 // vendor/vscode-jupyter/src/notebooks/controllers/controllerRegistration.ts
 // where activation builds and disposes the controller graph.
 
 import * as vscode from 'vscode';
-import { MessageRouter } from './messaging/router.js';
+import { MessageRouter, OtlpLogRecord } from './messaging/router.js';
 import {
   LlmnbNotebookController,
   KernelClient,
@@ -27,9 +34,10 @@ import {
 } from './notebook/controller.js';
 import { LlmnbNotebookSerializer } from './llmnb/serializer.js';
 import {
-  JupyterKernelClient,
-  JupyterKernelConfig
-} from './notebook/jupyter-kernel-client.js';
+  PtyKernelClient,
+  PtyKernelConfig
+} from './notebook/pty-kernel-client.js';
+import { KernelTerminal } from './notebook/kernel-terminal.js';
 import {
   RtsV2Envelope,
   LayoutEditPayload,
@@ -44,6 +52,12 @@ import {
   NotebookMetadataApplier,
   WindowActiveNotebookProvider
 } from './notebook/metadata-applier.js';
+import {
+  MetadataLoader
+} from './notebook/metadata-loader.js';
+import { HeartbeatConsumer } from './messaging/heartbeat-consumer.js';
+import { BlobResolver } from './llmnb/blob-resolver.js';
+import type { BlobEntry } from './llmnb/blob-resolver.js';
 
 const NOTEBOOK_TYPE = 'llmnb';
 
@@ -52,6 +66,10 @@ let activeRouter: MessageRouter | undefined;
 let activeLogger: vscode.LogOutputChannel | undefined;
 let activeKernel: KernelClient | undefined;
 let activeApplier: NotebookMetadataApplier | undefined;
+let activeLoader: MetadataLoader | undefined;
+let activeHeartbeat: HeartbeatConsumer | undefined;
+let activeBlobResolver: BlobResolver | undefined;
+let activeSessionId: string | undefined;
 
 export function activate(context: vscode.ExtensionContext): ExtensionApi {
   const logger = vscode.window.createOutputChannel('LLMNB Extension', { log: true });
@@ -62,16 +80,32 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
   const router = new MessageRouter(logger);
   activeRouter = router;
 
-  // Track C R2 / I-X: the real JupyterKernelClient connects to LLMKernel over
-  // Jupyter messaging at Comm target `llmnb.rts.v2`. The stub remains
-  // available behind a config flag (`llmnb.kernel.useStub`) for offline
-  // development and unit tests.
+  // RFC-008 §"Default consumer": fan log records into the extension output
+  // channel. High-severity surfacing (toasts) is V1.5+.
+  context.subscriptions.push(
+    router.registerLogRecordHandler((rec: OtlpLogRecord) => {
+      const text =
+        (rec.body && typeof rec.body.stringValue === 'string'
+          ? rec.body.stringValue
+          : JSON.stringify(rec)) ?? '';
+      const sev = rec.severityText ?? `S${rec.severityNumber}`;
+      logger.info(`[kernel-log][${sev}] ${text}`);
+    })
+  );
+
+  const sessionId = randomUuid();
+  activeSessionId = sessionId;
+
+  // I-X: the StubKernelClient remains available behind a config flag for
+  // offline development and unit tests. The production path now spawns
+  // LLMKernel as a subprocess via node-pty per RFC-008; @jupyterlab/services
+  // is no longer used.
   const useStub = vscode.workspace
     .getConfiguration('llmnb')
     .get<boolean>('kernel.useStub', false);
   const kernel: KernelClient = useStub
     ? new StubKernelClient(logger)
-    : new JupyterKernelClient(loadKernelConfig(), logger);
+    : new PtyKernelClient(loadKernelConfig(sessionId), router, logger);
   activeKernel = kernel;
   if (kernel instanceof StubKernelClient) {
     kernel.attachRouter(router);
@@ -101,8 +135,97 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
   context.subscriptions.push({ dispose: () => applier.dispose() });
   context.subscriptions.push(router.registerMetadataObserver(applier));
 
+  // RFC-006 §8 v2.0.2 — Family F is bidirectional: when the operator opens an
+  // `.llmnb` with persisted state, the loader extracts `metadata.rts` and
+  // ships a `mode:"hydrate"` envelope outbound. The kernel respawns agents
+  // and sends a `mode:"snapshot"` `trigger:"hydrate_complete"` confirmation
+  // back through the applier path within 10s.
+  const loader = new MetadataLoader(
+    router,
+    {
+      logger: { info: (s) => logger.info(s), warn: (s) => logger.warn(s), error: (s) => logger.error(s) },
+      showWarning: (msg) => {
+        void vscode.window.showWarningMessage(msg);
+      }
+    },
+    NOTEBOOK_TYPE
+  );
+  activeLoader = loader;
+  context.subscriptions.push({ dispose: () => loader.dispose() });
+  // Hook into VS Code's notebook-open lifecycle. RFC-006 §8 hydrate envelopes
+  // ship per-open; PtyKernelClient was started above so the data plane is
+  // (or will become) ready by the time the kernel's read loop processes the
+  // envelope. Already-open notebooks at activation time also get a hydrate
+  // ship so reload-after-crash works.
+  context.subscriptions.push(
+    vscode.workspace.onDidOpenNotebookDocument((nb) => {
+      void loader.onDidOpenNotebook(nb);
+    })
+  );
+  for (const nb of vscode.workspace.notebookDocuments) {
+    if (nb.notebookType === NOTEBOOK_TYPE) {
+      void loader.onDidOpenNotebook(nb);
+    }
+  }
+
+  // RFC-006 §7 v2.0.2 — `heartbeat.kernel` consumer + liveness watchdog.
+  // The kernel emits a heartbeat every 5s; the watchdog flags an operator
+  // warning when >30s elapse without a heartbeat and the PTY transport is
+  // healthy (PTY-EOF / SIGCHLD already cover "process died").
+  const heartbeat = new HeartbeatConsumer({
+    onState: (payload) => {
+      logger.trace(`[heartbeat] state=${payload.kernel_state} uptime=${payload.uptime_seconds}s`);
+    },
+    sink: {
+      onLivenessLost: ({ sinceMs }) => {
+        const sec = Math.round(sinceMs / 1000);
+        void vscode.window.showWarningMessage(
+          `LLMNB: kernel may be hung — no heartbeat for ${sec}s while PTY remains healthy.`
+        );
+      }
+    },
+    pty: {
+      isHealthy: () => {
+        // PtyKernelClient owns transport health; the stub always reports OK
+        // because the stub doesn't emit heartbeats anyway (so the watchdog's
+        // "lastHeartbeatTimestamp === 0" guard never starts ticking).
+        if (kernel instanceof PtyKernelClient) {
+          const ph = (kernel as unknown as { isPtyHealthy?: () => boolean }).isPtyHealthy;
+          return typeof ph === 'function' ? ph.call(kernel) : true;
+        }
+        return true;
+      }
+    }
+  });
+  activeHeartbeat = heartbeat;
+  context.subscriptions.push(router.registerHeartbeatKernelObserver(heartbeat));
+  heartbeat.start();
+  context.subscriptions.push({ dispose: () => heartbeat.dispose() });
+
+  // RFC-005 §"metadata.rts.blobs" — instantiate a per-session BlobResolver so
+  // renderers can resolve `$blob:sha256:` sentinels in attribute values. The
+  // table refreshes whenever a notebook.metadata snapshot lands; the loader
+  // and applier are the snapshot consumers, but the resolver only needs the
+  // most recent table.
+  let activeBlobs: Record<string, BlobEntry> = {};
+  activeBlobResolver = new BlobResolver(activeBlobs);
+  context.subscriptions.push(
+    router.registerMetadataObserver({
+      onNotebookMetadata: (payload) => {
+        if (payload.mode !== 'snapshot' || !payload.snapshot) {
+          return;
+        }
+        const next = (payload.snapshot as { blobs?: Record<string, BlobEntry> }).blobs;
+        if (next && typeof next === 'object') {
+          activeBlobs = next;
+          activeBlobResolver = new BlobResolver(activeBlobs);
+        }
+      }
+    })
+  );
+
   // Wire the kernel client as the router's outbound subscriber so layout.edit
-  // / agent_graph.query / operator.action envelopes ride the active Comm.
+  // / agent_graph.query / operator.action envelopes ride the active socket.
   // Stub kernels accept (and silently swallow) outbound traffic; that's the
   // intended offline-development behaviour.
   context.subscriptions.push(
@@ -116,14 +239,43 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
     })
   );
 
-  // For the real Jupyter client, plumb inbound Comm envelopes back through
-  // the router. The stub kernel never opens a Comm; it emits its
+  // For the real PTY client, plumb inbound Comm envelopes back through the
+  // router. The stub kernel never opens a socket; it emits its
   // `notebook.metadata` directly via the router for testing (see below).
-  if (kernel instanceof JupyterKernelClient) {
+  if (kernel instanceof PtyKernelClient) {
     kernel.setCommSink({
       emit: (env) => router.route(env)
     });
+    // Eagerly start so the ready handshake races the first cell execution.
+    void kernel.start().catch((err) => {
+      logger.error(`[llmnb] PtyKernelClient start failed: ${String(err)}`);
+    });
   }
+
+  // RFC-008 §3 — operator command to surface the kernel debug terminal.
+  context.subscriptions.push(
+    vscode.commands.registerCommand('llmnb.showKernelTerminal', () => {
+      if (!(kernel instanceof PtyKernelClient)) {
+        void vscode.window.showInformationMessage(
+          'LLMNB: kernel terminal is only available with the production PtyKernelClient.'
+        );
+        return;
+      }
+      const term = new KernelTerminal(kernel, sessionId);
+      term.attach();
+      const terminal = vscode.window.createTerminal({
+        name: `LLMKernel: ${sessionId}`,
+        pty: term
+      });
+      terminal.show();
+      context.subscriptions.push({
+        dispose: () => {
+          terminal.dispose();
+          term.dispose();
+        }
+      });
+    })
+  );
 
   // Stage 5 S3: register the map-view command. RFC-006 Family B routes the
   // operator's drag-and-drop edits through the router's outbound queue.
@@ -157,7 +309,11 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
     getController: () => activeController,
     getRouter: () => activeRouter,
     getKernelClient: () => kernel,
-    getMetadataApplier: () => activeApplier
+    getMetadataApplier: () => activeApplier,
+    getMetadataLoader: () => activeLoader,
+    getHeartbeatConsumer: () => activeHeartbeat,
+    getBlobResolver: () => activeBlobResolver,
+    getSessionId: () => activeSessionId
   };
 }
 
@@ -165,26 +321,31 @@ export function deactivate(): void {
   activeLogger?.info('[llmnb] deactivate');
   activeController?.dispose();
   activeApplier?.dispose();
-  // If the active kernel is a real Jupyter client, tear down its
-  // KernelManager / connection. The stub has no resources to release.
-  if (activeKernel instanceof JupyterKernelClient) {
-    void activeKernel.disconnect();
+  activeLoader?.dispose();
+  activeHeartbeat?.dispose();
+  // If the active kernel is a real PTY client, send the shutdown handshake
+  // and clean up the PTY + socket. The stub has no resources to release.
+  if (activeKernel instanceof PtyKernelClient) {
+    void activeKernel.shutdown();
   }
   activeController = undefined;
   activeRouter = undefined;
   activeLogger = undefined;
   activeKernel = undefined;
   activeApplier = undefined;
+  activeLoader = undefined;
+  activeHeartbeat = undefined;
+  activeBlobResolver = undefined;
+  activeSessionId = undefined;
 }
 
-/** Load JupyterKernelClient connection settings from VS Code configuration.
+/** Load PtyKernelClient connection settings from VS Code configuration.
  *  See package.json `contributes.configuration.properties` for defaults. */
-function loadKernelConfig(): JupyterKernelConfig {
+function loadKernelConfig(sessionId: string): PtyKernelConfig {
   const cfg = vscode.workspace.getConfiguration('llmnb.kernel');
   return {
-    serverUrl: cfg.get<string>('serverUrl', 'http://127.0.0.1:8888'),
-    token: cfg.get<string>('token', ''),
-    kernelName: cfg.get<string>('kernelName', 'llm_kernel')
+    sessionId,
+    pythonPath: cfg.get<string>('pythonPath', 'python')
   };
 }
 
@@ -196,6 +357,10 @@ export interface ExtensionApi {
   getRouter(): MessageRouter | undefined;
   getKernelClient(): KernelClient;
   getMetadataApplier(): NotebookMetadataApplier | undefined;
+  getMetadataLoader(): MetadataLoader | undefined;
+  getHeartbeatConsumer(): HeartbeatConsumer | undefined;
+  getBlobResolver(): BlobResolver | undefined;
+  getSessionId(): string | undefined;
 }
 
 /**
@@ -232,7 +397,7 @@ export class StubKernelClient implements KernelClient {
     this.router = router;
   }
 
-  /** Outbound surface compatible with `JupyterKernelClient.sendEnvelope`. The
+  /** Outbound surface compatible with `PtyKernelClient.sendEnvelope`. The
    *  stub captures, then drops; the activation glue sees the same interface
    *  shape so the router's outbound subscriber works without a branch. */
   public async sendEnvelope(envelope: RtsV2Envelope<unknown>): Promise<void> {

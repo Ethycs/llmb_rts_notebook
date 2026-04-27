@@ -18,7 +18,8 @@ import {
   MessageRouter,
   RunLifecycleObserver,
   MapViewObserver,
-  NotebookMetadataObserver
+  NotebookMetadataObserver,
+  LogRecordObserver
 } from '../../src/messaging/router.js';
 import type {
   RtsV2Envelope,
@@ -28,7 +29,8 @@ import type {
   NotebookMetadataPayload,
   RunStartPayload,
   RunEventPayload,
-  RunCompletePayload
+  RunCompletePayload,
+  OtlpLogRecord
 } from '../../src/messaging/types.js';
 import {
   RFC006_SAMPLES,
@@ -260,5 +262,52 @@ suite('contract: MessageRouter (RFC-006)', () => {
     } finally {
       sub.dispose();
     }
+  });
+
+  // RFC-008 §6 — LogRecordObserver registration and dispatch.
+  test('routeLogRecord fans OTLP/JSON LogRecord frames to LogRecordObserver subscribers', () => {
+    const router = new MessageRouter(silentLogger());
+    const seen: OtlpLogRecord[] = [];
+    const obs: LogRecordObserver = { onLogRecord: (r) => seen.push(r) };
+    const sub = router.registerLogRecordObserver(obs);
+    try {
+      const rec: OtlpLogRecord = {
+        timeUnixNano: '1745588938412000000',
+        severityNumber: 9,
+        severityText: 'INFO',
+        body: { stringValue: 'hello' },
+        attributes: [
+          { key: 'event.name', value: { stringValue: 'kernel.ready' } }
+        ]
+      };
+      router.routeLogRecord(rec);
+      assert.equal(seen.length, 1);
+      assert.equal(seen[0].body?.stringValue, 'hello');
+    } finally {
+      sub.dispose();
+    }
+  });
+
+  test('registerLogRecordHandler convenience returns a Disposable that unhooks the handler', () => {
+    const router = new MessageRouter(silentLogger());
+    const seen: OtlpLogRecord[] = [];
+    const sub = router.registerLogRecordHandler((r) => seen.push(r));
+    const rec: OtlpLogRecord = {
+      timeUnixNano: '1',
+      severityNumber: 13,
+      body: { stringValue: 'warn1' }
+    };
+    router.routeLogRecord(rec);
+    assert.equal(seen.length, 1);
+    sub.dispose();
+    router.routeLogRecord({ ...rec, body: { stringValue: 'warn2' } });
+    // No additional dispatch after unsubscription.
+    assert.equal(seen.length, 1);
+  });
+
+  test('routeLogRecord on a non-object input does not throw', () => {
+    const router = new MessageRouter(silentLogger());
+    assert.doesNotThrow(() => router.routeLogRecord(undefined as unknown as OtlpLogRecord));
+    assert.doesNotThrow(() => router.routeLogRecord(null as unknown as OtlpLogRecord));
   });
 });

@@ -2,9 +2,15 @@
 
 ## Status
 
-Draft. Date: 2026-04-26. Version: 1.0.0.
+Draft. Date: 2026-04-27. Version: 1.0.1.
 
 This RFC is the layer-1 (persistent storage) normative specification for the on-disk shape of an `.llmnb` notebook. It MUST be accepted before any code writes to the `metadata.rts` namespace. Conforming implementations attach to this exact version string; deviations require an RFC update, not a code workaround.
+
+**Changelog**:
+- v1.0.1 (additive):
+  - `config.recoverable.agents[]` schema gains two required fields surfaced during V1 mega-round implementation: `task` (string, the agent's job description; required for `AgentSupervisor.respawn_from_config(...)` to know what to spawn) and `work_dir` (string, optional; defaults to workspace root). Without these, the kernel cannot deterministically respawn agents on file open.
+  - §F13 queue-overflow disk fallback file format locked: marker at `<workspace_root>/.llmnb-overflow-marker.json` with `{"kernel_session_id", "overflow_at" (ISO 8601), "snapshot_version", "queue_size_at_overflow"}`; snapshot at `<workspace_root>/.llmnb-overflow-snapshot.json` containing the full `metadata.rts` body. Atomic write via `<file>.tmp` + `os.replace`. Operator/extension may merge or discard on next file open.
+- v1.0.0: initial draft.
 
 ## Source ADRs and prior RFCs
 

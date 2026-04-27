@@ -73,25 +73,20 @@
         "command": "llmnb.openMapView",
         "title": "LLMNB: Open map view",
         "category": "LLMNB"
+      },
+      {
+        "command": "llmnb.showKernelTerminal",
+        "title": "LLMNB: Show kernel terminal",
+        "category": "LLMNB"
       }
     ],
     "configuration": {
       "title": "LLMNB",
       "properties": {
-        "llmnb.kernel.serverUrl": {
+        "llmnb.kernel.pythonPath": {
           "type": "string",
-          "default": "http://127.0.0.1:8888",
-          "description": "Base URL of the Jupyter Server hosting LLMKernel."
-        },
-        "llmnb.kernel.token": {
-          "type": "string",
-          "default": "",
-          "description": "Auth token for the Jupyter Server. Empty if no auth."
-        },
-        "llmnb.kernel.kernelName": {
-          "type": "string",
-          "default": "llm_kernel",
-          "description": "Jupyter kernelspec name for LLMKernel."
+          "default": "python",
+          "description": "Path to the Python interpreter used to spawn LLMKernel via `python -m llm_kernel pty-mode` (RFC-008 §3)."
         },
         "llmnb.kernel.useStub": {
           "type": "boolean",
@@ -105,7 +100,7 @@
     "vscode:prepublish": "npm run package",
     "build": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "package": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --minify",
+    "package": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --external:node-pty --format=cjs --platform=node --minify",
     "package:renderer": "esbuild src/renderers/run-renderer.ts --bundle --outfile=dist/run-renderer.js --format=esm --platform=browser --minify",
     "lint": "eslint src --ext ts",
     "build:tests": "tsc -p ./tsconfig.test.json",
@@ -117,7 +112,7 @@
     "pretest": "npm run build && npm run lint"
   },
   "dependencies": {
-    "@jupyterlab/services": "^7.2.0"
+    "node-pty": "^1.1.0"
   },
   "devDependencies": {
     "@types/node": "^20.x",

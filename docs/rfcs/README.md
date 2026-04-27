@@ -15,6 +15,7 @@ The discipline is Bell-System-inspired: every RFC is normative, dated, version-n
 | RFC-005 | `.llmnb` file format | Draft | [DR-0009](../decisions/0009-notebook-controller-no-jupyter-kernel.md), [DR-0014](../decisions/0014-three-storage-structures-embedded.md), [DR-0016](../decisions/0016-rfc-standards-discipline.md) |
 | RFC-006 | Kernel↔extension wire format (v2; supersedes RFC-003) | Draft | [DR-0009](../decisions/0009-notebook-controller-no-jupyter-kernel.md), [DR-0015](../decisions/0015-kernel-extension-bidirectional-mcp.md), [DR-0016](../decisions/0016-rfc-standards-discipline.md) |
 | RFC-007 | `.tape` files (OTLP/JSON Logs for raw kernel observability) | Queued | [DR-0016](../decisions/0016-rfc-standards-discipline.md) |
+| RFC-008 | Kernel host integration (PTY + socket two-channel transport) | Draft | [DR-0009](../decisions/0009-notebook-controller-no-jupyter-kernel.md), [DR-0011](../decisions/0011-subtractive-fork-vscode-jupyter.md), [DR-0012](../decisions/0012-llmkernel-sole-kernel.md), [DR-0015](../decisions/0015-kernel-extension-bidirectional-mcp.md) |
 
 ## RFC document structure
 

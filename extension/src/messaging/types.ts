@@ -61,9 +61,45 @@ export type RunCompletePayload = OtlpSpan;
 /** Discriminator for the bare run-MIME payload: full span vs. partial event. */
 export type RunMimePayload = OtlpSpan | RunEventPayload;
 
+// ===== OTLP/JSON LogRecord (RFC-008 §6 — data-plane Frame B) ===============
+//
+// LogRecord frames flow over the data-plane socket alongside Spans (Family A)
+// and RFC-006 Comm envelopes. They carry the kernel's `logging` output and
+// agent stderr captures, OTLP-shaped, per RFC-008 §7. Receivers identify a
+// LogRecord by the presence of `timeUnixNano` AND `severityNumber` at the
+// top level of the parsed JSON object (RFC-008 §6).
+//
+// Severity follows the OTel SeverityNumber convention:
+//   1..4   TRACE
+//   5..8   DEBUG
+//   9..12  INFO
+//   13..16 WARN
+//   17..20 ERROR
+//   21..24 FATAL
+
+export interface OtlpLogRecord {
+  /** Unix-nanos as a JSON string. */
+  timeUnixNano: string;
+  /** OTel SeverityNumber (1..24). */
+  severityNumber: number;
+  /** Optional human-readable severity (`INFO`, `WARN`, ...). */
+  severityText?: string;
+  /** Body is an OTLP AnyValue; in practice the kernel sends `{stringValue}`. */
+  body?: { stringValue?: string; [k: string]: unknown };
+  /** OTLP/JSON `attributes` list; RFC-008 §7 fills logger.name / code.* keys. */
+  attributes?: Array<{ key: string; value: { [k: string]: unknown } }>;
+  /** OTel `observedTimeUnixNano` is present in the kernel's emission. */
+  observedTimeUnixNano?: string;
+  /** Permissive escape-hatch: future producers may add keys. */
+  [extra: string]: unknown;
+}
+
 // ===== Comm envelope (RFC-006 §3) ==========================================
 
-/** RFC-006 §4–§9 — every Comm message type. */
+/** RFC-006 §4–§9 + RFC-008 §4 — every Comm message type the V1 wire carries.
+ *  `kernel.shutdown_request` is added by RFC-008 §4 for the clean-shutdown
+ *  handshake (extension→kernel; the kernel responds with a final snapshot
+ *  + `kernel.shutting_down` LogRecord on the data plane). */
 export type RtsV2MessageType =
   | 'layout.update'
   | 'layout.edit'
@@ -72,7 +108,8 @@ export type RtsV2MessageType =
   | 'operator.action'
   | 'heartbeat.kernel'
   | 'heartbeat.extension'
-  | 'notebook.metadata';
+  | 'notebook.metadata'
+  | 'kernel.shutdown_request';
 
 /** RFC-006 §3 — thin Comm envelope. */
 export interface RtsV2Envelope<P = unknown> {
@@ -199,14 +236,30 @@ export interface RtsMetadataSnapshot {
   [extra: string]: unknown;
 }
 
-/** RFC-006 §8 — `notebook.metadata` payload. V1 implementations MUST emit
- *  `mode: "snapshot"` only (V1.5+ may add `"patch"` per RFC 6902). */
+/** RFC-006 §8 (v2.0.2 amended) — `notebook.metadata` payload. V1 senders
+ *  MUST NOT emit `"patch"` (V1.5+). The extension SENDS `"hydrate"` on
+ *  file-open and EXPECTS a `"snapshot"` confirmation with
+ *  `trigger: "hydrate_complete"` within 10s.
+ *
+ *  Triggers:
+ *   - `save | shutdown | timer | end_of_run` — kernel-emitted runtime cadence.
+ *   - `open` — extension-emitted when shipping `mode: "hydrate"` on file open.
+ *   - `hydrate_complete` — kernel-emitted as confirmation after processing
+ *     a hydrate envelope.
+ */
 export interface NotebookMetadataPayload {
-  mode: 'snapshot' | 'patch';
+  mode: 'snapshot' | 'patch' | 'hydrate';
   snapshot_version: number;
   snapshot?: RtsMetadataSnapshot;
   patch?: Array<Record<string, unknown>>; // RFC 6902 ops (V1.5+)
-  trigger?: 'save' | 'shutdown' | 'timer' | 'end_of_run' | string;
+  trigger?:
+    | 'save'
+    | 'shutdown'
+    | 'timer'
+    | 'end_of_run'
+    | 'open'
+    | 'hydrate_complete'
+    | string;
 }
 
 // ===== Cross-cutting =======================================================

@@ -27,9 +27,9 @@ import {
  *  payload per emission via the supplied sink; the controller materializes
  *  cell outputs and execution lifecycle from the stream. */
 export interface KernelClient {
-  /** Optional eager-connect hook. Real Jupyter clients (Track C R2) use
-   *  this to spin up the @jupyterlab/services KernelManager + comm-target
-   *  registration before the first cell executes. The StubKernelClient
+  /** Optional eager-connect hook. The PtyKernelClient (RFC-008) uses this
+   *  to spawn LLMKernel via node-pty and complete the data-plane socket
+   *  ready handshake before the first cell executes. The StubKernelClient
    *  omits it. The controller awaits it before each executeCell call;
    *  implementations MUST be idempotent. */
   connect?(): Promise<void>;
@@ -44,6 +44,31 @@ export interface KernelExecuteRequest {
   cellUri: string;
   text: string;
   language?: string;
+  /** Pre-parsed cell directive (V1: `/spawn <agent_id> task:"..."`). When
+   *  set, the kernel client SHOULD dispatch the structured directive instead
+   *  of re-parsing `text`. When null, no recognized directive was found
+   *  (kernel client may treat as no-op or echo). */
+  directive?: CellDirective | null;
+}
+
+/** V1 cell-directive grammar. Currently only `/spawn` is supported; future
+ *  V1.5 may add `@agent ref` for cross-cell agent referencing. */
+export type CellDirective =
+  | { kind: 'spawn'; agent_id: string; task: string }
+  ;
+
+/** Parse a cell's text content for V1 directives. Returns null when the
+ *  cell does not begin with a recognized directive. */
+export function parseCellDirective(text: string): CellDirective | null {
+  // Match: /spawn <agent_id> task:"<task>"
+  // <agent_id> is a non-whitespace token; task value is double-quoted.
+  // Multi-line tasks are not supported in V1; embedded escaped quotes either.
+  const trimmed = text.trim();
+  const m = trimmed.match(/^\/spawn\s+(\S+)\s+task:"([^"]*)"\s*$/);
+  if (m) {
+    return { kind: 'spawn', agent_id: m[1], task: m[2] };
+  }
+  return null;
 }
 
 /** Sink the kernel client uses to push run-MIME payloads at the controller.
@@ -114,13 +139,13 @@ export class LlmnbNotebookController implements vscode.Disposable, RunLifecycleO
     };
 
     try {
-      // TODO(C2): a cell-input parser handles `/spawn` and `@agent` directives
-      // before dispatching; for V1 the raw text is forwarded as-is.
       if (this.kernel.connect) {
         await this.kernel.connect();
       }
+      const text = cell.document.getText();
+      const directive = parseCellDirective(text);
       await this.kernel.executeCell(
-        { cellUri: cellKey, text: cell.document.getText(), language: cell.document.languageId },
+        { cellUri: cellKey, text, language: cell.document.languageId, directive },
         sink
       );
       // The terminal span (handled in onRunComplete) is the canonical

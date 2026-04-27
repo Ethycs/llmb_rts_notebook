@@ -2,7 +2,13 @@
 
 ## Status
 
-Draft. Date: 2026-04-26. Version: 2.0.0. Supersedes [RFC-003](RFC-003-custom-message-format.md) v1.0.0.
+Draft. Date: 2026-04-27. Version: 2.0.3. Supersedes [RFC-003](RFC-003-custom-message-format.md) v1.0.0.
+
+**Changelog**:
+- v2.0.3 (additive): §6 `operator.action` `action_type` enum gains `agent_spawn` — extension's parsed `/spawn <agent_id> task:"..."` cell directive arrives as this action_type with parameters `{agent_id, task, cell_id}`. Kernel handler delegates to `AgentSupervisor.spawn(...)`. Required by V1 hero-loop "type /spawn in a cell → agent runs → notify renders."
+- v2.0.2 (additive): §7 Family E heartbeat is now asymmetric for V1 — `heartbeat.kernel` MUST be emitted by the kernel every 5s (drives the operator-facing kernel-state indicator and detects "kernel alive but stuck" cases that PTY-EOF cannot catch); `heartbeat.extension` is `SHOULD` in V1 (`MUST` in V1.5+). §8 Family F `notebook.metadata` becomes bidirectional with new `mode: "hydrate"` (extension→kernel) for `.llmnb` load path.
+- v2.0.1 (additive): added `kernel.shutdown_request` (§7.1) for RFC-008 graceful-shutdown signal compatibility.
+- v2.0.0: initial supersession of RFC-003 v1.0.0.
 
 This RFC is the layer-6 (session) normative specification for every message that crosses the kernel↔extension boundary in V1, beyond the standard MCP-shaped tool calls. It supersedes RFC-003 v1.0.0 in full. RFC-003 remains in the docket marked Superseded for historical reference; conforming V1 implementations attach to **this** document.
 
@@ -221,7 +227,7 @@ One message, payload identical to RFC-003 v1 §Family D.
 {
   "type": "operator.action",
   "payload": {
-    "action_type": "cell_edit | branch_switch | zone_select | approval_response | dismiss_notification | drift_acknowledged",
+    "action_type": "cell_edit | branch_switch | zone_select | approval_response | dismiss_notification | drift_acknowledged | agent_spawn",
     "parameters": { ... },
     "originating_cell_id": "..."
   }
@@ -234,10 +240,21 @@ One message, payload identical to RFC-003 v1 §Family D.
 
 Two messages, payloads identical to RFC-003 v1 §Family E.
 
+#### V1 status: asymmetric (amended in v2.0.2)
+
+PTY-EOF + SIGCHLD per RFC-008 detect "kernel process died" — necessary but not sufficient. They do NOT detect "kernel alive but stuck" (deadlock, infinite loop, hung native code, blocked I/O). For that, Family E's application-level heartbeat is the primitive.
+
+V1's amended posture:
+
+- **`heartbeat.kernel` (kernel→extension): `MUST` in V1.** The kernel emits a 5-second heartbeat on the data plane. The extension consumes it to keep the operator-facing kernel-state indicator continuously fresh ("ok / degraded / starting / shutting_down") — without it, the badge never updates after the initial ready handshake. Heartbeat absence (>30s with PTY healthy) signals "kernel is alive but stuck"; the extension surfaces a "kernel may be hung" warning per the failure-modes table. Together with PTY-EOF (= "process died"), the two signals fully cover the kernel liveness state space.
+- **`heartbeat.extension` (extension→kernel): `SHOULD` in V1, `MUST` in V1.5+.** Deferred for V1 because the kernel doesn't have a meaningful "is the extension hung" branch in V1 — if the extension is gone, the data-plane socket EOFs and the kernel shuts down via §7.1. Extension-side hung-but-alive (the kernel sees no inbound traffic but the socket is open) is rare and benign in V1.
+
+V1 receivers MUST tolerate the absence of `heartbeat.extension` envelopes (no false alarm). V1 senders (kernels) MUST emit `heartbeat.kernel` every 5 seconds.
+
 #### `heartbeat.kernel`
 
 - *Direction:* kernel→extension.
-- *Cadence:* every 5 seconds.
+- *Cadence:* every 5 seconds (`MUST` in V1).
 
 ```json
 {
@@ -253,7 +270,7 @@ Two messages, payloads identical to RFC-003 v1 §Family E.
 #### `heartbeat.extension`
 
 - *Direction:* extension→kernel.
-- *Cadence:* every 5 seconds.
+- *Cadence:* every 5 seconds (when emitted; SHOULD in V1, MUST in V1.5+).
 
 ```json
 {
@@ -266,37 +283,77 @@ Two messages, payloads identical to RFC-003 v1 §Family E.
 }
 ```
 
-Receivers MUST surface a liveness warning when no heartbeat has been received from the peer for >30 seconds.
+Receivers MUST surface a liveness warning when no heartbeat has been received from the peer for >30 seconds **AND** the underlying RFC-008 PTY transport is also reporting unhealthy (PTY EOF or no PTY data for >30s). When the PTY is healthy and Family E is silent, the silence is normal — the producer is V1-conformant under this amendment.
 
-### §8 — Family F: Notebook metadata (NEW)
+### §7.1 — `kernel.shutdown_request` (additive in v2.0.1)
 
-Family F is the persistence channel that [RFC-005 §"Persistence strategy"](RFC-005-llmnb-file-format.md#persistence-strategy-who-writes-the-file) requires. The kernel is the single logical writer of `metadata.rts`; this family is how the kernel ships its writes to the extension, which then applies them via `vscode.NotebookEdit.updateNotebookMetadata` and lets VS Code's normal save flow persist.
+Required by RFC-008 §4 step 6: the extension's graceful-shutdown signal. Drafted into RFC-006 as an additive type within v2.x; consumers conforming to v2.0.0 SHOULD also accept this type since it is required by RFC-008 conformance.
+
+#### `kernel.shutdown_request`
+
+- *Direction:* extension→kernel.
+- *Semantics:* the extension requests a graceful kernel shutdown. The kernel MUST emit a final `notebook.metadata` snapshot (Family F), close the data plane socket cleanly, and exit. The kernel MUST honor the request without operator confirmation; the operator's intent is implicit in the extension closing the notebook or the VS Code window.
+
+```json
+{
+  "type": "kernel.shutdown_request",
+  "payload": {
+    "reason": "operator_close | extension_deactivate | restart"
+  }
+}
+```
+
+`reason` is informational only — kernel behavior does not depend on it. The kernel MAY log it to the data plane via a `LogRecord` for tape capture.
+
+If the kernel does not receive `kernel.shutdown_request` before the data plane socket EOFs (e.g., the extension crashed), the kernel MUST treat EOF as an implicit shutdown signal and follow the same final-snapshot + clean-exit path. Socket EOF is the V1.0.0 fallback shutdown trigger.
+
+### §8 — Family F: Notebook metadata (bidirectional in v2.0.2)
+
+Family F is the persistence channel that [RFC-005 §"Persistence strategy"](RFC-005-llmnb-file-format.md#persistence-strategy-who-writes-the-file) requires. The kernel is the single *logical* writer of `metadata.rts`; the extension is the single *physical* reader/writer of `.llmnb` files. **Family F flows in both directions**:
+
+- **Kernel → extension** (`mode: "snapshot"` or `"patch"`): kernel ships its in-memory `metadata.rts` to the extension; extension applies via `vscode.NotebookEdit.updateNotebookMetadata` so VS Code's save flow persists. This is the runtime emission path (autosave, end-of-run, clean shutdown, periodic timer).
+- **Extension → kernel** (`mode: "hydrate"`, NEW in v2.0.2): on file-open, the extension parses the `.llmnb` (its existing serializer), extracts `metadata.rts`, and ships it to the kernel for state hydration. The kernel's read loop receives, calls `MetadataWriter.hydrate(snapshot)`, runs `DriftDetector.compare(persisted_volatile, current_volatile)` to populate `metadata.rts.drift_log`, and respawns agents from `config.recoverable.agents[]` via `AgentSupervisor.respawn_from_config(...)`. After the hydrate handler returns, the kernel emits a confirmation `notebook.metadata` `mode:"snapshot"` envelope back to the extension carrying the post-hydrate state (so the extension knows hydration completed and can update its UI).
+
+The bidirectionality is necessary because the architecture commits to "extension is the single physical reader/writer of `.llmnb`" (RFC-005 §"Persistence strategy"). The kernel cannot read the file directly; the extension is its sole source of persisted state on file-open.
 
 #### `notebook.metadata`
 
-- *Direction:* kernel→extension.
-- *Semantics:* deliver a snapshot or patch of the `metadata.rts` namespace. The extension applies it to the open notebook document; the next save flushes it to disk.
+- *Direction:* bidirectional (kernel↔extension).
+- *Semantics by `mode`:*
+  - `"snapshot"` — full `metadata.rts` shipped from kernel to extension OR from extension to kernel as the hydrate confirmation. Emitted by kernel on RFC-005 §"Snapshot triggers" cadence (save/shutdown/timer/end_of_run); also emitted by kernel as confirmation after a `hydrate` envelope is processed.
+  - `"patch"` — JSON Patch operations applied against the receiver's current `metadata.rts`. **V1.5+ only**; V1 implementations MUST NOT emit `"patch"` and MUST reject inbound `"patch"` envelopes with a `wire-failure` LogRecord.
+  - `"hydrate"` — full `metadata.rts` shipped from extension to kernel on file-open. **V2.0.2 NEW**. Receivers (kernel) MUST: (a) call `MetadataWriter.hydrate(snapshot)` idempotently, (b) drive `DriftDetector.compare(...)` and append drift events to the in-memory `drift_log`, (c) respawn agents from `config.recoverable.agents[]`, (d) emit a confirmation `mode: "snapshot"` envelope with `trigger: "hydrate_complete"` carrying the post-hydrate state.
 
 ```json
 {
   "type": "notebook.metadata",
   "payload": {
-    "mode": "snapshot | patch",
+    "mode": "snapshot | patch | hydrate",
     "snapshot_version": 42,
-    "snapshot": { /* full metadata.rts contents per RFC-005 */ },
+    "snapshot": { /* full metadata.rts contents per RFC-005 — present when mode != "patch" */ },
     "patch": [ /* JSON Patch operations (RFC 6902) — V1.5+ only */ ],
-    "trigger": "save | shutdown | timer | end_of_run"
+    "trigger": "save | shutdown | timer | end_of_run | open | hydrate_complete"
   }
 }
 ```
 
 Field semantics:
 
-- `mode` (required) — `"snapshot"` carries `snapshot` and omits `patch`; `"patch"` carries `patch` and omits `snapshot`. V1 implementations MUST emit `"snapshot"` only. V1.5 introduces `"patch"`.
-- `snapshot_version` (required) — monotonically increasing integer that survives across kernel restarts (persisted in `metadata.rts` and incremented on every emission). The extension uses it to detect missed updates and to refuse out-of-order applies.
-- `snapshot` (object, required when `mode == "snapshot"`) — the full `metadata.rts` contents per RFC-005 v1.0.0. The schema is governed by RFC-005, not this RFC; this RFC only specifies that the field carries that schema verbatim.
-- `patch` (array, required when `mode == "patch"`, V1.5+) — RFC 6902 operation list applied against the receiver's current `metadata.rts`.
-- `trigger` (required) — what caused this emission, per RFC-005 §"Snapshot triggers." Receivers MUST tolerate unknown trigger values.
+- `mode` (required) — `"snapshot"` (kernel→extension or hydrate confirmation), `"patch"` (V1.5+, either direction), `"hydrate"` (extension→kernel on open). V1 senders MUST NOT emit `"patch"`.
+- `snapshot_version` (required) — monotonically increasing integer that survives across kernel restarts (persisted in `metadata.rts.snapshot_version` and incremented on every kernel emission). For `mode: "hydrate"`, this is the version that was last persisted before close; the kernel resumes its counter from this value + 1.
+- `snapshot` (object, required when `mode == "snapshot"` or `mode == "hydrate"`) — the full `metadata.rts` contents per RFC-005. Schema governed by RFC-005, not this RFC.
+- `patch` (array, required when `mode == "patch"`, V1.5+) — RFC 6902 operation list.
+- `trigger` (required) — what caused this emission. Kernel-emitted triggers: `save | shutdown | timer | end_of_run | hydrate_complete`. Extension-emitted trigger: `open` (when the extension opens an `.llmnb`).
+
+#### Hydrate request/response semantics
+
+The extension's `hydrate` envelope is request-shaped: the extension expects a `mode:"snapshot"` `trigger:"hydrate_complete"` confirmation from the kernel within 10 seconds. If no confirmation arrives, the extension MUST surface a "kernel failed to hydrate" warning and treat agents from `config.recoverable.agents[]` as not-respawned (the operator can retry or proceed without resume).
+
+The kernel MUST process at most one `hydrate` envelope per session. A second `hydrate` envelope received after the first MUST be rejected with a `wire-failure` LogRecord; the operator's intent for "load a different notebook" is to close and reopen, not to re-hydrate in place.
+
+#### Partial hydration (V1.5+)
+
+V1's `hydrate` mode carries the full `snapshot`. V1.5 may add a `selectors` field allowing the extension to request only specific subsections (e.g., `["event_log", "blobs"]` for a "show me the runs but don't respawn agents" mode). V1 receivers MUST reject any envelope carrying `selectors` with a `wire-failure` LogRecord.
 
 #### Cadence and triggers
 
@@ -317,8 +374,9 @@ This RFC governs the *transport* of `metadata.rts` (the envelope and Family F se
 
 ### §9 — Cross-family invariants
 
-- **Run-record integrity.** Every span emitted via Family A IOPub MUST also appear in the `metadata.rts.event_log` snapshot delivered via Family F when that span first closes. Cell-output spans and event-log spans MUST be byte-identical to within JSON serialization noise.
-- **Heartbeat-driven liveness gates Family F.** If the extension hasn't been seen for >30 seconds, the kernel pauses Family F emissions and switches to the queue. On extension reconnect, the kernel emits a single replay snapshot before resuming normal cadence.
+- **Run-record integrity.** Every span emitted via Family A IOPub MUST also appear in the `metadata.rts.event_log` snapshot delivered via Family F when that span first closes. Cell-output spans and event-log spans MUST be byte-identical to within JSON serialization noise (sort keys before compare).
+- **Liveness signal hierarchy.** The extension's view of kernel health combines (a) PTY-EOF / SIGCHLD = "kernel process died" and (b) `heartbeat.kernel` absence >30s = "kernel alive but stuck." Both are necessary; neither alone is sufficient. PTY-EOF causes immediate Family F suspension and marks the kernel dead. Heartbeat absence with PTY healthy surfaces a "kernel may be hung" operator warning but does not auto-restart (operator decides). Family F emissions are gated only by PTY health; heartbeat absence is informational. On reconnect (rare in V1 — kernel is subprocess of extension, reconnect implies respawn), the kernel emits a single full `mode: "snapshot"` envelope before resuming normal cadence.
+- **Hydrate exclusivity.** The kernel processes at most one `notebook.metadata` `mode: "hydrate"` envelope per session. Subsequent hydrate envelopes are rejected with a `wire-failure` LogRecord. To switch notebooks, the operator closes and reopens (which respawns the kernel).
 - **Comm target version is the major-version handshake.** A v3 kernel SHALL register `llmnb.rts.v3`; a v2 extension SHALL NOT open a v3 Comm. Receivers MUST refuse to open Comms with mismatched major target names.
 
 ## Backward-compatibility analysis

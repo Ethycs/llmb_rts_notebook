@@ -2,9 +2,13 @@
 
 ## Status
 
-Draft. Date: 2026-04-26. Version: 1.0.0.
+Draft. Date: 2026-04-27. Version: 1.0.1.
 
 This RFC is the layer-6 normative specification for the kernel-extension MCP surface, per [chapter 08](../dev-guide/08-blockers-mediator-standards.md). It MUST be accepted before any kernel MCP server registration code is merged. Conforming implementations attach to this exact version string; deviations require an RFC update, not a code workaround.
+
+**Changelog**:
+- v1.0.1 (additive): added two optional input fields to two tools — `report_completion.task_id` (string, optional) for once-per-task idempotency tracking, and `present.artifact_id` (string, optional) for artifact-update idempotency. Both fields are required by RFC-001 §"Native tools" behavioral semantics ("idempotent at most once per task", "idempotent under (artifact.uri, body-hash)"); v1.0.0 did not document them in input schemas. V1 implementations track these fields per K-MCP's mega-round implementation.
+- v1.0.0: initial draft.
 
 ## Context
 

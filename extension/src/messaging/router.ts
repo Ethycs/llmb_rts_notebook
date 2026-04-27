@@ -28,7 +28,8 @@ import {
   OperatorActionPayload,
   HeartbeatKernelPayload,
   HeartbeatExtensionPayload,
-  NotebookMetadataPayload
+  NotebookMetadataPayload,
+  OtlpLogRecord
 } from './types.js';
 
 export {
@@ -44,7 +45,8 @@ export {
   OperatorActionPayload,
   HeartbeatKernelPayload,
   HeartbeatExtensionPayload,
-  NotebookMetadataPayload
+  NotebookMetadataPayload,
+  OtlpLogRecord
 };
 
 /** Run-lifecycle observer surface. RFC-006 §1 carries OTLP spans (or a
@@ -76,6 +78,25 @@ export interface NotebookMetadataObserver {
   onNotebookMetadata(payload: NotebookMetadataPayload): void;
 }
 
+/** RFC-008 §6 — data-plane LogRecord consumer surface. The kernel ships
+ *  `logging` output and agent stderr captures as OTLP/JSON LogRecord frames
+ *  on the same socket as Spans and Comm envelopes; `PtyKernelClient` calls
+ *  `routeLogRecord()` for each one and the router fan-outs to subscribers.
+ *
+ *  Default consumer: the extension's output channel (so dev tools surface
+ *  them as a fallback). Future consumer: high-severity records → toasts. */
+export interface LogRecordObserver {
+  onLogRecord(record: OtlpLogRecord): void;
+}
+
+/** RFC-006 §7 v2.0.2 — `heartbeat.kernel` consumer surface. The kernel emits
+ *  every 5s; the consumer updates the operator-facing kernel-state badge
+ *  and resets the liveness watchdog. The watchdog itself lives in the
+ *  consumer (HeartbeatLivenessWatchdog) — the router is a pure dispatcher. */
+export interface HeartbeatKernelObserver {
+  onHeartbeatKernel(payload: HeartbeatKernelPayload): void;
+}
+
 /** Outbound subscriber: ships every enqueued envelope onto the active
  *  `llmnb.rts.v2` Comm. The JupyterKernelClient registers a real sender;
  *  StubKernelClient registers a no-op. */
@@ -86,6 +107,8 @@ export class MessageRouter {
   private readonly runObservers: RunLifecycleObserver[] = [];
   private readonly mapObservers: MapViewObserver[] = [];
   private readonly metadataObservers: NotebookMetadataObserver[] = [];
+  private readonly logRecordObservers: LogRecordObserver[] = [];
+  private readonly heartbeatKernelObservers: HeartbeatKernelObserver[] = [];
   private readonly outboundSubscribers: OutboundSubscriber[] = [];
 
   public constructor(private readonly logger: vscode.LogOutputChannel) {}
@@ -118,6 +141,43 @@ export class MessageRouter {
       const idx = this.metadataObservers.indexOf(observer);
       if (idx >= 0) {
         this.metadataObservers.splice(idx, 1);
+      }
+    });
+  }
+
+  /** RFC-008 §6 — register a consumer for OTLP/JSON LogRecord frames lifted
+   *  off the data-plane socket. Multiple subscribers may register
+   *  independently; the router fan-outs in registration order. */
+  public registerLogRecordObserver(observer: LogRecordObserver): vscode.Disposable {
+    this.logRecordObservers.push(observer);
+    return new vscode.Disposable(() => {
+      const idx = this.logRecordObservers.indexOf(observer);
+      if (idx >= 0) {
+        this.logRecordObservers.splice(idx, 1);
+      }
+    });
+  }
+
+  /** Convenience handler-based variant; mirrors the I-X observer registration
+   *  style requested in RFC-008 §"§4 New observer". The returned Disposable
+   *  unhooks the handler. */
+  public registerLogRecordHandler(
+    handler: (record: OtlpLogRecord) => void
+  ): vscode.Disposable {
+    return this.registerLogRecordObserver({ onLogRecord: handler });
+  }
+
+  /** RFC-006 §7 v2.0.2 — register a `heartbeat.kernel` consumer. Multiple
+   *  subscribers may register independently (status-bar + watchdog +
+   *  diagnostics); the router fan-outs in registration order. */
+  public registerHeartbeatKernelObserver(
+    observer: HeartbeatKernelObserver
+  ): vscode.Disposable {
+    this.heartbeatKernelObservers.push(observer);
+    return new vscode.Disposable(() => {
+      const idx = this.heartbeatKernelObservers.indexOf(observer);
+      if (idx >= 0) {
+        this.heartbeatKernelObservers.splice(idx, 1);
       }
     });
   }
@@ -164,12 +224,24 @@ export class MessageRouter {
       case 'agent_graph.query':
       case 'operator.action':
       case 'heartbeat.extension':
+      case 'kernel.shutdown_request':
         // These are extension→kernel; reaching this branch normally means a
         // producer used `route()` instead of `enqueueOutbound()`. Forward.
         this.enqueueOutbound(envelope);
         return;
       case 'heartbeat.kernel':
-        // RFC-006 §7 + §9: TODO(V1.5) reset kernel-liveness timer.
+        // RFC-006 §7 v2.0.2 — kernel→extension liveness. Dispatch to every
+        // registered HeartbeatKernelObserver (status badge updater +
+        // liveness watchdog).
+        for (const obs of this.heartbeatKernelObservers) {
+          try {
+            obs.onHeartbeatKernel(
+              (envelope as RtsV2Envelope<HeartbeatKernelPayload>).payload
+            );
+          } catch (err) {
+            this.logger.error(`[router] heartbeat.kernel observer threw: ${String(err)}`);
+          }
+        }
         this.logger.trace(`[router] heartbeat.kernel received (cid=${envelope.correlation_id ?? '-'})`);
         return;
       default: {
@@ -218,6 +290,26 @@ export class MessageRouter {
     } else {
       for (const obs of this.runObservers) {
         obs.onRunStart(span);
+      }
+    }
+  }
+
+  /** RFC-008 §6 — entry point for LogRecord frames lifted off the data-plane
+   *  socket. The PtyKernelClient calls this once per parsed frame. The router
+   *  fan-outs to every registered LogRecordObserver. Producers that emit a
+   *  malformed record (missing `timeUnixNano` or `severityNumber`) are
+   *  filtered out at the kernel-client framer; this method is permissive and
+   *  forwards whatever it receives. */
+  public routeLogRecord(record: OtlpLogRecord): void {
+    if (!record || typeof record !== 'object') {
+      this.logger.error('[router] routeLogRecord: record is not an object');
+      return;
+    }
+    for (const obs of this.logRecordObservers) {
+      try {
+        obs.onLogRecord(record);
+      } catch (err) {
+        this.logger.error(`[router] log-record observer threw: ${String(err)}`);
       }
     }
   }

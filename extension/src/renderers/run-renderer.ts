@@ -30,6 +30,8 @@ import type {
 } from '../messaging/types.js';
 import { decodeAttrs, getStringAttr } from '../otel/attrs.js';
 import type { OtlpAttribute, OtlpSpan } from '../otel/attrs.js';
+import { BlobResolver } from '../llmnb/blob-resolver.js';
+import type { BlobEntry } from '../llmnb/blob-resolver.js';
 import {
   renderNotify, renderRequestApproval, renderPropose,
   renderReportProgress, renderReportCompletion, renderReportProblem,
@@ -153,15 +155,36 @@ function renderOpenSpan(
   return `<div class="rts-run-start"><strong>[${escapeHtml(runType || 'unknown')}] ${escapeHtml(name)}</strong></div>`;
 }
 
-/** Pull the OpenInference `input.value` attribute and JSON-parse it. */
+/** Resolve an attribute string through the active BlobResolver (if any).
+ *  RFC-005 §"metadata.rts.blobs" — string attribute values may carry a
+ *  `$blob:sha256:<hex>` sentinel; the resolver looks the content up in the
+ *  in-memory blob table. The blob table is published to the renderer
+ *  context via a webview-scoped global (`__llmnbBlobs__`); when absent,
+ *  the resolver passes strings through unchanged. */
+function getActiveBlobResolver(): BlobResolver {
+  const g = globalThis as { __llmnbBlobs__?: Record<string, BlobEntry> };
+  return new BlobResolver(g.__llmnbBlobs__ ?? {});
+}
+
+/** Pull the OpenInference `input.value` attribute and JSON-parse it. The
+ *  resolver replaces any nested `$blob:` sentinels with their content
+ *  before the renderer materializes argument values. */
 function parseInputValue(attrs: OtlpAttribute[] | undefined): Record<string, unknown> {
   const raw = getStringAttr(attrs, 'input.value', '');
   if (!raw) {
     return {};
   }
+  // Resolve the outermost string first (covers the case where the entire
+  // value is a single $blob: ref).
+  const resolver = getActiveBlobResolver();
+  const resolvedRaw = resolver.resolveString(raw);
   try {
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : {};
+    const parsed = JSON.parse(resolvedRaw);
+    if (parsed && typeof parsed === 'object') {
+      // Recurse into the parsed object so nested $blob: refs resolve.
+      return resolver.resolve(parsed) as Record<string, unknown>;
+    }
+    return {};
   } catch {
     return {};
   }
