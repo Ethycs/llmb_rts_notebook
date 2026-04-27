@@ -8,7 +8,7 @@
 // Spec references:
 //   chapter 06 — VS Code substrate (DR-0009: keep cells, drop kernel process)
 //   chapter 07 — subtractive fork & storage (RTS_RUN_MIME canonicalised)
-//   RFC-001    — notebook tool ABI (run_type / tool dispatch)
+//   RFC-001    — notebook tool ABI (llmnb.run_type / tool dispatch)
 
 import * as assert from 'node:assert/strict';
 import * as vscode from 'vscode';
@@ -104,19 +104,23 @@ suite('contract: NotebookController API surface', () => {
 
   // https://code.visualstudio.com/api/references/vscode-api#NotebookCellExecution.appendOutput
   // https://code.visualstudio.com/api/references/vscode-api#NotebookCellOutputItem.json
-  test('NotebookCellOutputItem.json carries the RTS run MIME the renderer expects', () => {
+  test('NotebookCellOutputItem.json carries the bare OTLP span at the RTS run MIME', () => {
+    // I-X: per RFC-006 §1, cell outputs carry the bare OTLP span (no envelope).
     const sample = {
-      message_type: 'run.complete',
-      direction: 'kernel→extension',
-      correlation_id: 'cid',
-      timestamp: '2026-04-26T00:00:00.000Z',
-      rfc_version: '1.0.0',
-      payload: { run_id: 'cid', end_time: '2026-04-26T00:00:00.000Z', outputs: {}, status: 'success' }
+      traceId: 'a'.repeat(32),
+      spanId: 'b'.repeat(16),
+      name: 'echo',
+      kind: 'SPAN_KIND_INTERNAL',
+      startTimeUnixNano: '1745588938412000000',
+      endTimeUnixNano: '1745588938612000000',
+      attributes: [{ key: 'llmnb.run_type', value: { stringValue: 'chain' } }],
+      status: { code: 'STATUS_CODE_OK', message: '' }
     };
     const item = vscode.NotebookCellOutputItem.json(sample, RTS_RUN_MIME);
     assert.equal(item.mime, RTS_RUN_MIME);
     const decoded = JSON.parse(new TextDecoder('utf-8').decode(item.data)) as Record<string, unknown>;
-    assert.equal(decoded['message_type'], 'run.complete');
+    assert.equal(decoded['spanId'], 'b'.repeat(16));
+    assert.equal((decoded['status'] as { code: string }).code, 'STATUS_CODE_OK');
   });
 
   // https://code.visualstudio.com/api/references/vscode-api#NotebookCellExecution

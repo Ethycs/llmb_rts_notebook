@@ -1,12 +1,18 @@
 // Notebook serializer for the .llmnb file type.
 //
-// .llmnb files are .ipynb-conformant JSON per
-// docs/dev-guide/07-subtractive-fork-and-storage.md ("One file: .llmnb").
+// .llmnb files are .ipynb-conformant JSON per RFC-005 §"Top-level structure"
+// and docs/dev-guide/07-subtractive-fork-and-storage.md ("One file: .llmnb").
 // metadata.rts is preserved verbatim — this serializer is intentionally
-// shallow because the kernel is the single logical writer of metadata.rts.
+// shallow because the kernel is the single logical writer of metadata.rts
+// (RFC-005 §"Persistence strategy"). The extension's metadata-applier.ts
+// (RFC-006 §8) is the only path that mutates metadata.rts from the extension
+// side; the serializer's job is to round-trip the payload byte-for-byte
+// through deserialize/serialize so neither this module nor any downstream
+// step competes with the kernel for ownership.
 //
 // Cell outputs are serialized through VS Code's NotebookCellOutput shape;
-// the run-record outputs use MIME type application/vnd.rts.run+json.
+// run-record outputs use MIME type application/vnd.rts.run+json (the bare
+// OTLP/JSON span per RFC-006 §1, no envelope).
 
 import * as vscode from 'vscode';
 import { RTS_RUN_MIME } from '../notebook/controller.js';

@@ -1,77 +1,93 @@
-// RFC-003 Custom Jupyter message format — TypeScript types
+// RFC-006 kernel↔extension wire format (v2) — TypeScript types.
 //
-// One TypeScript interface per payload schema in
-// docs/rfcs/RFC-003-custom-message-format.md. The envelope is generic over
-// the payload type so receivers can dispatch on `message_type` and obtain a
-// statically-typed payload via the per-family unions below.
+// Per RFC-006 §"Architecture: two carriers", the wire splits into:
+//
+//   1. Family A (run lifecycle): OTLP/JSON spans over Jupyter
+//      `display_data` / `update_display_data`. NO envelope at this layer;
+//      the OTLP span is self-describing. The extension consumes the bare
+//      `application/vnd.rts.run+json` MIME payload directly.
+//
+//   2. Families B–F (layout, agent_graph, operator action, heartbeat,
+//      notebook.metadata): a thin Comm envelope `{type, payload,
+//      correlation_id?}` over Jupyter Comm at target `llmnb.rts.v2`.
+//      Direction / timestamp / rfc_version are dropped (sender identity
+//      gives direction, payloads carry their own time fields, the major
+//      version is encoded in the Comm target name).
+//
+// RFC-006 supersedes RFC-003 v1; this module dropped the v1 envelope shape
+// in I-X. Producers that emit v1 envelopes are non-conformant; the router
+// logs and discards them at the boundary.
+//
+// The OTLP-shaped run payloads (Family A) live in `extension/src/otel/attrs.ts`.
 
-/** RFC-003 envelope direction enum. */
-export type Rfc003Direction = 'kernel→extension' | 'extension→kernel';
+import type { OtlpSpan, OtlpSpanEvent } from '../otel/attrs.js';
 
-/** RFC-003 §Specification — every message_type the envelope enum permits. */
-export type Rfc003MessageType =
-  | 'run.start'
-  | 'run.event'
-  | 'run.complete'
+// ===== Family A — Run lifecycle (OTLP/JSON over IOPub) ======================
+//
+// Per RFC-006 §1, run-lifecycle traffic carries one OTLP span (or a partial
+// per-event payload during streaming) directly as the `application/vnd.rts.run+json`
+// MIME value. There is no envelope; the IOPub message itself plus the OTLP
+// span content is the contract.
+
+/** Family A — `run.start` semantics: an in-progress OTLP span
+ *  (`endTimeUnixNano: null`, `status.code: STATUS_CODE_UNSET`).
+ *
+ *  Note: this is now just an alias for OtlpSpan; "run.start" is no longer a
+ *  message_type, but the term is preserved here for code clarity. */
+export type RunStartPayload = OtlpSpan;
+
+/** Family A — partial event payload emitted during streaming.
+ *
+ *  RFC-006 §1 leaves the choice of "re-emit the full span vs. ship only the
+ *  new event" to the producer; the kernel's RunTracker (vendor/LLMKernel
+ *  llm_kernel/run_tracker.py) emits the partial form `{spanId, event}`,
+ *  optionally with `traceId`. The receiver tolerates both: this payload, or
+ *  a full OtlpSpan with new events appended. */
+export interface RunEventPayload {
+  /** 32 hex chars; matches the parent span's traceId. Optional because
+   *  current kernels (e.g. LLMKernel's RunTracker) elide it; the spanId is
+   *  the canonical routing key (== Jupyter `display_id`). */
+  traceId?: string;
+  /** 16 hex chars; matches the parent span's spanId. */
+  spanId: string;
+  /** OTLP-shaped event. */
+  event: OtlpSpanEvent;
+}
+
+/** Family A — `run.complete` semantics: a closed OTLP span (terminal
+ *  `endTimeUnixNano` and a non-UNSET `status.code`). */
+export type RunCompletePayload = OtlpSpan;
+
+/** Discriminator for the bare run-MIME payload: full span vs. partial event. */
+export type RunMimePayload = OtlpSpan | RunEventPayload;
+
+// ===== Comm envelope (RFC-006 §3) ==========================================
+
+/** RFC-006 §4–§9 — every Comm message type. */
+export type RtsV2MessageType =
   | 'layout.update'
   | 'layout.edit'
   | 'agent_graph.query'
   | 'agent_graph.response'
   | 'operator.action'
   | 'heartbeat.kernel'
-  | 'heartbeat.extension';
+  | 'heartbeat.extension'
+  | 'notebook.metadata';
 
-/** RFC-003 §Envelope schema — universal envelope wrapping every payload. */
-export interface Rfc003Envelope<P = unknown> {
-  message_type: Rfc003MessageType;
-  direction: Rfc003Direction;
-  correlation_id: string;
-  timestamp: string;
-  rfc_version: string;
+/** RFC-006 §3 — thin Comm envelope. */
+export interface RtsV2Envelope<P = unknown> {
+  type: RtsV2MessageType;
   payload: P;
+  correlation_id?: string;
 }
 
-// --- Family A: run lifecycle ----------------------------------------------
+// ----- Family B: layout ----------------------------------------------------
 
-/** RFC-003 §Family A — run.start payload. */
-export interface RunStartPayload {
-  id: string;
-  trace_id: string;
-  parent_run_id: string | null;
-  name: string;
-  run_type: 'llm' | 'tool' | 'chain' | 'retriever' | 'agent' | 'embedding';
-  start_time: string;
-  inputs: Record<string, unknown>;
-  tags?: string[];
-  metadata?: Record<string, unknown>;
-}
-
-/** RFC-003 §Family A — run.event payload. */
-export interface RunEventPayload {
-  run_id: string;
-  event_type: 'token' | 'tool_call' | 'tool_result' | 'log' | 'error';
-  data: Record<string, unknown>;
-  timestamp: string;
-}
-
-/** RFC-003 §Family A — run.complete payload. */
-export interface RunCompletePayload {
-  run_id: string;
-  end_time: string;
-  outputs: Record<string, unknown>;
-  error?: { kind?: string; message?: string; traceback?: string } | null;
-  status: 'success' | 'error' | 'timeout';
-}
-
-// --- Family B: layout ------------------------------------------------------
-
-/** RFC-003 §Family B — layout.update payload. */
 export interface LayoutUpdatePayload {
   snapshot_version: number;
   tree: LayoutNode;
 }
 
-/** RFC-003 §Family B — layout tree node (recursive). */
 export interface LayoutNode {
   id: string;
   type: 'workspace' | 'zone' | 'file' | 'agent' | 'viewpoint' | 'annotation';
@@ -79,7 +95,6 @@ export interface LayoutNode {
   children: LayoutNode[];
 }
 
-/** RFC-003 §Family B — layout.edit payload. */
 export interface LayoutEditPayload {
   operation: 'add_zone' | 'remove_node' | 'move_node' | 'rename_node' | 'update_render_hints';
   parameters: {
@@ -91,9 +106,8 @@ export interface LayoutEditPayload {
   };
 }
 
-// --- Family C: agent graph -------------------------------------------------
+// ----- Family C: agent graph -----------------------------------------------
 
-/** RFC-003 §Family C — agent_graph.query payload. */
 export interface AgentGraphQueryPayload {
   query_type: 'neighbors' | 'paths' | 'subgraph' | 'full_snapshot';
   node_id?: string;
@@ -112,7 +126,6 @@ export type AgentGraphEdgeKind =
   | 'has_capability'
   | 'configured_with';
 
-/** RFC-003 §Family C — agent_graph.response payload. */
 export interface AgentGraphResponsePayload {
   nodes: Array<{
     id: string;
@@ -128,43 +141,97 @@ export interface AgentGraphResponsePayload {
   truncated?: boolean;
 }
 
-// --- Family D: operator action --------------------------------------------
+// ----- Family D: operator action -------------------------------------------
 
-/** RFC-003 §Family D — operator.action payload. */
+/** RFC-006 §6 — `operator.action`. `drift_acknowledged` is added in v2 (the
+ *  operator confirmed a drift event from RFC-005's drift log). */
+export type OperatorActionType =
+  | 'cell_edit'
+  | 'branch_switch'
+  | 'zone_select'
+  | 'approval_response'
+  | 'dismiss_notification'
+  | 'drift_acknowledged';
+
 export interface OperatorActionPayload {
-  action_type: 'cell_edit' | 'branch_switch' | 'zone_select' | 'approval_response' | 'dismiss_notification';
+  action_type: OperatorActionType;
   parameters: Record<string, unknown>;
   originating_cell_id?: string;
 }
 
-// --- Family E: heartbeat / liveness ---------------------------------------
+// ----- Family E: heartbeat / liveness --------------------------------------
 
-/** RFC-003 §Family E — heartbeat.kernel payload. */
 export interface HeartbeatKernelPayload {
   kernel_state: 'ok' | 'degraded' | 'starting' | 'shutting_down';
   uptime_seconds: number;
   last_run_timestamp?: string | null;
 }
 
-/** RFC-003 §Family E — heartbeat.extension payload. */
 export interface HeartbeatExtensionPayload {
   extension_state: 'ok' | 'degraded' | 'starting' | 'shutting_down';
   active_notebook_id?: string | null;
   focused_cell_id?: string | null;
 }
 
-/** Discriminated union over all RFC-003 envelopes (sender-shape). */
-export type AnyRfc003Envelope =
-  | Rfc003Envelope<RunStartPayload>
-  | Rfc003Envelope<RunEventPayload>
-  | Rfc003Envelope<RunCompletePayload>
-  | Rfc003Envelope<LayoutUpdatePayload>
-  | Rfc003Envelope<LayoutEditPayload>
-  | Rfc003Envelope<AgentGraphQueryPayload>
-  | Rfc003Envelope<AgentGraphResponsePayload>
-  | Rfc003Envelope<OperatorActionPayload>
-  | Rfc003Envelope<HeartbeatKernelPayload>
-  | Rfc003Envelope<HeartbeatExtensionPayload>;
+// ----- Family F: notebook.metadata (NEW in RFC-006) ------------------------
+//
+// Per RFC-006 §8 + RFC-005 §"Persistence strategy": the kernel ships
+// `metadata.rts` snapshots over this family; the extension applies them to
+// the open notebook document via `vscode.NotebookEdit.updateNotebookMetadata`
+// and lets VS Code's normal save flow persist.
 
-/** RFC-003 currently-supported major.minor.patch. */
-export const RFC003_VERSION = '1.0.0';
+/** RFC-005 §"Top-level structure" — the `metadata.rts` namespace. The shape
+ *  is intentionally permissive (`Record<string, unknown>` for substructures)
+ *  because RFC-005 governs the schema; this RFC's typing only enforces the
+ *  outer envelope. The applier validates `schema_version` at the boundary. */
+export interface RtsMetadataSnapshot {
+  schema_version: string;
+  schema_uri?: string;
+  session_id?: string;
+  created_at?: string;
+  layout?: Record<string, unknown>;
+  agents?: Record<string, unknown>;
+  config?: Record<string, unknown>;
+  event_log?: Record<string, unknown>;
+  blobs?: Record<string, unknown>;
+  drift_log?: unknown[];
+  /** Permissive escape-hatch: future RFC-005 minor versions may add keys. */
+  [extra: string]: unknown;
+}
+
+/** RFC-006 §8 — `notebook.metadata` payload. V1 implementations MUST emit
+ *  `mode: "snapshot"` only (V1.5+ may add `"patch"` per RFC 6902). */
+export interface NotebookMetadataPayload {
+  mode: 'snapshot' | 'patch';
+  snapshot_version: number;
+  snapshot?: RtsMetadataSnapshot;
+  patch?: Array<Record<string, unknown>>; // RFC 6902 ops (V1.5+)
+  trigger?: 'save' | 'shutdown' | 'timer' | 'end_of_run' | string;
+}
+
+// ===== Cross-cutting =======================================================
+
+/** Discriminated union of every kernel→extension Comm envelope. */
+export type AnyInboundCommEnvelope =
+  | RtsV2Envelope<LayoutUpdatePayload>
+  | RtsV2Envelope<AgentGraphResponsePayload>
+  | RtsV2Envelope<HeartbeatKernelPayload>
+  | RtsV2Envelope<NotebookMetadataPayload>;
+
+/** Discriminated union of every extension→kernel Comm envelope. */
+export type AnyOutboundCommEnvelope =
+  | RtsV2Envelope<LayoutEditPayload>
+  | RtsV2Envelope<AgentGraphQueryPayload>
+  | RtsV2Envelope<OperatorActionPayload>
+  | RtsV2Envelope<HeartbeatExtensionPayload>;
+
+/** Comm target name. RFC-006 §2: the major version is part of the name so a
+ *  v3 kernel and a v2 extension fail to open a Comm together — and the
+ *  failure IS the upgrade prompt. */
+export const RTS_COMM_TARGET_V2 = 'llmnb.rts.v2';
+
+/** Currently-supported wire major.minor.patch (RFC-006). */
+export const RFC006_VERSION = '2.0.0';
+
+/** RFC-005 schema major we accept on `notebook.metadata` snapshots. */
+export const RFC005_SCHEMA_MAJOR = '1';

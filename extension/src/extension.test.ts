@@ -1,26 +1,27 @@
 // V1 smoke test. Activates the extension, opens an in-memory .llmnb
 // document with one cell, executes it, and verifies that the
-// StubKernelClient emitted run.start + run.complete and that the cell
-// output carries an application/vnd.rts.run+json item.
+// StubKernelClient emitted an open + closed OTLP span pair and that the
+// cell output carries an application/vnd.rts.run+json item.
 //
 // Pattern adapted from
 // vendor/vscode-jupyter/src/test/ — vscode-jupyter's smoke tests open a
 // notebook via vscode.workspace.openNotebookDocument and execute through
 // vscode.commands.executeCommand('notebook.cell.execute').
 //
-// TODO(T1): once Track B3 lands the real JupyterKernelClient, expand this
-// to the full integration scenario (real RFC-003 envelopes over Jupyter
-// messaging, run.event streaming, error paths, F1/F4/F5 from RFC-003).
+// I-X: payloads are now bare OTLP/JSON spans per RFC-006 §1; the run
+// lifecycle is no longer enveloped. Identification is by `endTimeUnixNano`
+// (`null` ⇒ open; set ⇒ closed).
 
 import * as assert from 'assert';
 import * as vscode from 'vscode';
 import { ExtensionApi, StubKernelClient } from './extension.js';
 import { RTS_RUN_MIME } from './notebook/controller.js';
+import type { OtlpSpan } from './otel/attrs.js';
 
 const EXT_ID = 'ethycs.llmb-rts-notebook';
 
 suite('llmnb V1 smoke', () => {
-  test('cell execution emits run.start + run.complete with rts.run+json output', async () => {
+  test('cell execution emits open + closed OTLP spans with rts.run+json output', async () => {
     // Force the stub kernel client for this smoke test. Track C R2 added a
     // JupyterKernelClient that requires a live Jupyter server (full
     // integration coverage is TODO(T1) in the WebdriverIO harness).
@@ -50,13 +51,17 @@ suite('llmnb V1 smoke', () => {
       doc.uri
     );
 
-    // Allow time for the controller to flush outputs from run.complete.
+    // Allow time for the controller to flush outputs from the closed span.
     await waitFor(() => doc.cellAt(0).outputs.length > 0, 2000);
 
     const kernel = api.getKernelClient() as StubKernelClient;
-    const types = kernel.lastEnvelopes.map((e) => e.message_type);
-    assert.ok(types.includes('run.start'), `expected run.start in ${JSON.stringify(types)}`);
-    assert.ok(types.includes('run.complete'), `expected run.complete in ${JSON.stringify(types)}`);
+    const spans = kernel.lastPayloads.filter(
+      (p): p is OtlpSpan => 'name' in (p as object) && 'kind' in (p as object)
+    );
+    const open = spans.find((s) => s.endTimeUnixNano === null);
+    const closed = spans.find((s) => s.endTimeUnixNano !== null);
+    assert.ok(open, `expected an open span (endTimeUnixNano:null) in ${spans.length} payloads`);
+    assert.ok(closed, `expected a closed span (terminal endTimeUnixNano) in ${spans.length} payloads`);
 
     const outputs = doc.cellAt(0).outputs;
     const items = outputs.flatMap((o) => o.items);

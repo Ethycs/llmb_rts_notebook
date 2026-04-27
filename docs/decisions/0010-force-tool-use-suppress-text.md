@@ -47,6 +47,21 @@ The agent's text channel either does not exist (suppressed by configuration), co
 - **Configure tool-only at the framework level (Claude Code flags) rather than the prompt level.** Considered. Rejected as the primary mechanism — framework configuration is brittle across versions and across agent runtimes (Claude Code, OpenCode, etc.). The prompt-level discipline is portable; framework configuration is supplementary belt-and-braces.
 - **Keep a "free message to operator" tool but make it the default.** Considered. Rejected — defaults shape behavior. If a free-text-message tool is the default, every other tool is a special case the agent has to be steered toward. Keep `respond(content, kind="explanation")` as the explicit catch-all but discourage it.
 
+## Refinement (RFC-005 / RFC-006 era, 2026-04-26)
+
+The original wording "the operator does not see it" has been refined under RFC-005 §"`agent_emit` runs" and RFC-006 §"`agent_emit` over Family A": **structured tool calls remain the *primary* operator-facing channel, but raw agent output is captured and surfaced as `agent_emit` spans rather than silently discarded.**
+
+The original concern was UX coherence — preventing the operator surface from becoming a half-and-half mix of typed events and free-form prose. That concern is preserved: `agent_emit` spans are visually de-emphasized (collapsed by default in the renderer), so the operator still operates on tool calls. But silent drops were a debuggability hazard:
+
+- Free-form prose that escaped the suppression prompt (DR-0010 violations) was logged but invisible. When the agent went off-script the operator could not tell.
+- Pre-tool-call reasoning ("Let me check the file first.") was discarded. Later debugging had no record of what the agent was thinking.
+- Subprocess stderr was kernel-log-only. Diagnostic information stayed buried.
+- Malformed tool-use blocks the parser couldn't classify were lost. The operator saw a "completed" run with no record of why a tool call didn't materialize.
+
+The refinement keeps the supervisor framing (tool calls are still primary; renderers de-emphasize prose) but closes the silent-drop hole. Every byte of agent output reaches an `agent_emit` span; renderers decide visibility; nothing gets lost. This is "show but de-emphasize," not "show alongside as equals" — the half-and-half failure mode the original decision rejected.
+
+The refinement does not require a new ADR; it is a clarification of how DR-0010's spirit ("tool calls are the sole *intended* communication") is implemented under the observability constraints of RFC-005 / RFC-006. Implementations conforming to RFC-005 ≥ v1.0.0 MUST emit `agent_emit` spans per the refinement.
+
 ## Source
 
 - **Source merged turn(s):** 075, 076 (in phase 06)

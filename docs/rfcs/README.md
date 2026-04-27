@@ -10,8 +10,11 @@ The discipline is Bell-System-inspired: every RFC is normative, dated, version-n
 |---|---|---|---|
 | RFC-001 | V1 MCP tool taxonomy | Draft | [DR-0008](../decisions/0008-bidirectional-mcp-as-comm-channel.md), [DR-0010](../decisions/0010-force-tool-use-suppress-text.md), [DR-0015](../decisions/0015-kernel-extension-bidirectional-mcp.md) |
 | RFC-002 | Claude Code provisioning procedure | Draft | [DR-0010](../decisions/0010-force-tool-use-suppress-text.md), [DR-0012](../decisions/0012-llmkernel-sole-kernel.md), [DR-0015](../decisions/0015-kernel-extension-bidirectional-mcp.md) |
-| RFC-003 | Custom Jupyter message format | Draft | [DR-0009](../decisions/0009-notebook-controller-no-jupyter-kernel.md), [DR-0014](../decisions/0014-three-storage-structures-embedded.md), [DR-0015](../decisions/0015-kernel-extension-bidirectional-mcp.md) |
+| RFC-003 | Custom Jupyter message format | Superseded by RFC-006 | [DR-0009](../decisions/0009-notebook-controller-no-jupyter-kernel.md), [DR-0014](../decisions/0014-three-storage-structures-embedded.md), [DR-0015](../decisions/0015-kernel-extension-bidirectional-mcp.md) |
 | RFC-004 | Failure-mode analysis and fault-injection harness | Draft | [DR-0013](../decisions/0013-v1-feasible-with-claude-code.md), [DR-0015](../decisions/0015-kernel-extension-bidirectional-mcp.md) |
+| RFC-005 | `.llmnb` file format | Draft | [DR-0009](../decisions/0009-notebook-controller-no-jupyter-kernel.md), [DR-0014](../decisions/0014-three-storage-structures-embedded.md), [DR-0016](../decisions/0016-rfc-standards-discipline.md) |
+| RFC-006 | Kernel↔extension wire format (v2; supersedes RFC-003) | Draft | [DR-0009](../decisions/0009-notebook-controller-no-jupyter-kernel.md), [DR-0015](../decisions/0015-kernel-extension-bidirectional-mcp.md), [DR-0016](../decisions/0016-rfc-standards-discipline.md) |
+| RFC-007 | `.tape` files (OTLP/JSON Logs for raw kernel observability) | Queued | [DR-0016](../decisions/0016-rfc-standards-discipline.md) |
 
 ## RFC document structure
 

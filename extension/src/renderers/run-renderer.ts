@@ -1,18 +1,21 @@
 /// <reference lib="dom" />
 // Notebook renderer for application/vnd.rts.run+json.
 //
+// RFC-006 §1 dropped the run-lifecycle envelope: cell outputs now carry one
+// OTLP/JSON span (or a `{spanId, event}` partial event payload) directly as
+// the MIME value. The renderer dispatches on `attributes["llmnb.run_type"]`:
+//
+//   - `tool`        → per-tool component (RFC-001 catalog)
+//   - `agent_emit`  → agent-emit component (RFC-005 §"agent_emit runs")
+//   - other         → generic header
+//
 // Pattern adapted from
 // vendor/vscode-jupyter/src/webviews/extension-side/ — vscode-jupyter's
-// renderer entrypoints export an `activate(context)` function returning
-// `{ renderOutputItem }` from a renderer-context module. This file is the
-// renderer-target bundle that the VS Code notebook UI loads.
+// renderer entrypoints export an `activate(context)` returning
+// `{ renderOutputItem }` from a renderer-context module.
 //
-// V1 dispatches on RFC-001's 13 tool names plus RFC-003's run_type via a
-// per-tool registry of HTML-string-producing functions. Interactive tools
-// (request_approval, propose, ask, clarify, present, escalate) emit
-// `data-rts-action` attributes that this module's delegated click
-// listener inspects, posting RFC-003 §operator.action envelopes back to
-// the extension host via ctx.postMessage.
+// I-X scope: removed RFC-003 envelope dispatch (`message_type` switch),
+// added agent_emit dispatch, kept the click-handler surface intact.
 
 import type {
   RendererContext,
@@ -20,22 +23,23 @@ import type {
   ActivationFunction
 } from 'vscode-notebook-renderer';
 import type {
-  Rfc003Envelope,
   RunStartPayload,
+  RunCompletePayload,
   RunEventPayload,
-  RunCompletePayload
+  RunMimePayload
 } from '../messaging/types.js';
+import { decodeAttrs, getStringAttr } from '../otel/attrs.js';
+import type { OtlpAttribute, OtlpSpan } from '../otel/attrs.js';
 import {
   renderNotify, renderRequestApproval, renderPropose,
   renderReportProgress, renderReportCompletion, renderReportProblem,
   renderAsk, renderClarify, renderPresent, renderEscalate,
   renderReadFile, renderWriteFile, renderRunCommand,
+  renderAgentEmit,
   escapeHtml
 } from './components/index.js';
 
-type AnyRunPayload = RunStartPayload | RunEventPayload | RunCompletePayload;
-
-/** Per-tool renderer signature. `runId` is the RFC-003 run.start.id. */
+/** Per-tool renderer signature. `runId` is the OTLP spanId of the run. */
 type ToolRenderer = (
   args: Record<string, unknown>,
   ctx: RendererContext<unknown>,
@@ -66,8 +70,8 @@ export const activate: ActivationFunction = (ctx: RendererContext<unknown>) => {
   return {
     renderOutputItem(item: OutputItem, element: HTMLElement): void {
       try {
-        const env = item.json() as Rfc003Envelope<AnyRunPayload>;
-        element.innerHTML = renderEnvelope(env, ctx);
+        const payload = item.json() as RunMimePayload;
+        element.innerHTML = renderRunMime(payload, ctx);
         installDelegatedHandlers(element, ctx);
       } catch (err) {
         element.textContent = `[run-renderer] failed to render: ${String(err)}`;
@@ -87,40 +91,84 @@ function ensureStylesInjected(): void {
   document.head.appendChild(link);
 }
 
-function renderEnvelope(
-  env: Rfc003Envelope<AnyRunPayload>,
+/** Top-level dispatch on the run-MIME payload. RFC-006 §1: payload is either
+ *  a full OtlpSpan (open or closed) or a `{spanId, event}` partial event. */
+function renderRunMime(payload: RunMimePayload, ctx: RendererContext<unknown>): string {
+  if (!payload || typeof payload !== 'object') {
+    return `<pre>${escapeHtml(JSON.stringify(payload, null, 2))}</pre>`;
+  }
+  // Partial event shape — `{spanId, event}` (no full span).
+  if ('event' in payload && (payload as RunEventPayload).event) {
+    const ev = (payload as RunEventPayload).event;
+    const evAttrs = decodeAttrs(ev.attributes);
+    return `<div class="rts-run-event"><em>${escapeHtml(ev.name)}</em> ${escapeHtml(JSON.stringify(evAttrs))}</div>`;
+  }
+  // Full span. Distinguish open vs. closed by `endTimeUnixNano`.
+  const span = payload as OtlpSpan;
+  if (typeof span.spanId !== 'string') {
+    return `<pre>${escapeHtml(JSON.stringify(payload, null, 2))}</pre>`;
+  }
+  if (span.endTimeUnixNano && span.endTimeUnixNano.length > 0) {
+    return renderClosedSpan(span as RunCompletePayload);
+  }
+  return renderOpenSpan(span as RunStartPayload, ctx);
+}
+
+/** Render a closed/terminal span. The status code maps to the V1 UI label. */
+function renderClosedSpan(span: RunCompletePayload): string {
+  const code = span.status?.code ?? 'STATUS_CODE_UNSET';
+  const label = code === 'STATUS_CODE_OK'
+    ? 'success'
+    : code === 'STATUS_CODE_ERROR'
+    ? 'error'
+    : 'unset';
+  return `<div class="rts-run-complete">[done: ${escapeHtml(label)}]</div>`;
+}
+
+/** Render an open/in-progress span. RFC-006 §1: re-emissions are last-writer-
+ *  wins; the renderer just re-runs against whatever payload it sees. */
+function renderOpenSpan(
+  span: RunStartPayload,
   ctx: RendererContext<unknown>
 ): string {
-  switch (env.message_type) {
-    case 'run.start':
-      return renderRunStart(env as Rfc003Envelope<RunStartPayload>, ctx);
-    case 'run.event': {
-      const { event_type, data } = (env as Rfc003Envelope<RunEventPayload>).payload;
-      return `<div class="rts-run-event"><em>${escapeHtml(event_type)}</em> ${escapeHtml(JSON.stringify(data))}</div>`;
-    }
-    case 'run.complete': {
-      const { status } = (env as Rfc003Envelope<RunCompletePayload>).payload;
-      return `<div class="rts-run-complete">[done: ${escapeHtml(status)}]</div>`;
-    }
-    default:
-      return `<pre>${escapeHtml(JSON.stringify(env, null, 2))}</pre>`;
+  const runType = getStringAttr(span.attributes, 'llmnb.run_type');
+  const name = span.name;
+  const id = span.spanId;
+  // RFC-005 §"agent_emit runs": route on llmnb.run_type === "agent_emit".
+  if (runType === 'agent_emit') {
+    return renderAgentEmit(span.attributes, ctx, id);
+  }
+  // OpenInference convention: tools put their name in `tool.name`. The
+  // domain-aliased `llmnb.tool_name` is also accepted.
+  const toolName =
+    getStringAttr(span.attributes, 'tool.name') ||
+    getStringAttr(span.attributes, 'llmnb.tool_name') ||
+    name;
+  if (runType === 'tool') {
+    const args = parseInputValue(span.attributes);
+    const fn = TOOL_RENDERERS[toolName];
+    if (fn) return fn(args, ctx, id);
+    return `<div class="rts-tool-generic">[${escapeHtml(toolName)}] ${escapeHtml(JSON.stringify(args))}</div>`;
+  }
+  return `<div class="rts-run-start"><strong>[${escapeHtml(runType || 'unknown')}] ${escapeHtml(name)}</strong></div>`;
+}
+
+/** Pull the OpenInference `input.value` attribute and JSON-parse it. */
+function parseInputValue(attrs: OtlpAttribute[] | undefined): Record<string, unknown> {
+  const raw = getStringAttr(attrs, 'input.value', '');
+  if (!raw) {
+    return {};
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : {};
+  } catch {
+    return {};
   }
 }
 
-function renderRunStart(
-  env: Rfc003Envelope<RunStartPayload>,
-  ctx: RendererContext<unknown>
-): string {
-  const { run_type, name, inputs, id } = env.payload;
-  if (run_type === 'tool') {
-    const fn = TOOL_RENDERERS[name];
-    if (fn) return fn(inputs, ctx, id);
-    return `<div class="rts-tool-generic">[${escapeHtml(name)}] ${escapeHtml(JSON.stringify(inputs))}</div>`;
-  }
-  return `<div class="rts-run-start"><strong>[${escapeHtml(run_type)}] ${escapeHtml(name)}</strong></div>`;
-}
-
-/** Wire delegated click handlers for interactive widgets (RFC-003 §operator.action). */
+/** Wire delegated click handlers for interactive widgets (RFC-006 Family D —
+ *  `operator.action`). */
 function installDelegatedHandlers(
   element: HTMLElement,
   ctx: RendererContext<unknown>
@@ -129,18 +177,31 @@ function installDelegatedHandlers(
   element.addEventListener('click', (ev: MouseEvent) => {
     const t = ev.target;
     if (!(t instanceof HTMLElement)) return;
-    const toggleId = t.getAttribute('data-rts-toggle');
-    if (toggleId) {
-      const node = element.querySelector(`#${cssEscape(toggleId)}`);
-      if (node instanceof HTMLElement) node.hidden = !node.hidden;
-      return;
+    // The agent_emit toggle uses both data-rts-action and data-rts-toggle so
+    // either click path fires the body show/hide. Resolve the toggle first.
+    const owningToggle = t.closest('[data-rts-toggle]') as HTMLElement | null;
+    if (owningToggle) {
+      const toggleId = owningToggle.getAttribute('data-rts-toggle');
+      if (toggleId) {
+        const node = element.querySelector(`#${cssEscape(toggleId)}`);
+        if (node instanceof HTMLElement) node.hidden = !node.hidden;
+        // Fall through to action dispatch below so a click that has BOTH
+        // toggle and action attributes still emits an operator.action when
+        // the consumer cares (e.g. agent_emit_toggle telemetry).
+      }
     }
-    const action = t.getAttribute('data-rts-action');
+    const owningAction = t.closest('[data-rts-action]') as HTMLElement | null;
+    if (!owningAction) return;
+    const action = owningAction.getAttribute('data-rts-action');
     if (!action) return;
-    const params = collectParams(element, t);
+    // agent_emit_toggle is a UI-local action: do not pester the kernel with
+    // it. Only emit operator.action for kernel-bound actions.
+    if (action === 'agent_emit_toggle') return;
+    const params = collectParams(element, owningAction);
     if (typeof ctx.postMessage === 'function') {
+      // RFC-006 §3 thin envelope — no direction/timestamp/rfc_version.
       ctx.postMessage({
-        message_type: 'operator.action',
+        type: 'operator.action',
         payload: { action_type: action, parameters: params }
       });
     }

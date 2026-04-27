@@ -59,15 +59,18 @@ suite('integration: stub-kernel smoke', () => {
     const runItems = items.filter((i) => i.mime === RTS_RUN_MIME);
     assert.ok(runItems.length > 0, `expected at least one ${RTS_RUN_MIME} output item`);
 
-    // The last run output must be run.complete with status=success (stub kernel
-    // emits run.start + run.complete, so the closing envelope is the success).
+    // I-X: per RFC-006 §1, cell outputs carry bare OTLP spans (no envelope).
+    // Identification is by `endTimeUnixNano` (set ⇒ closed) + status.code.
     const decoded = runItems.map((i) => JSON.parse(new TextDecoder('utf-8').decode(i.data))) as Array<{
-      message_type: string;
-      payload: { status?: string };
+      spanId?: string;
+      endTimeUnixNano?: string | null;
+      status?: { code?: string };
     }>;
-    const completeEnv = decoded.find((d) => d.message_type === 'run.complete');
-    assert.ok(completeEnv, 'expected a run.complete envelope in cell outputs');
-    assert.equal(completeEnv!.payload.status, 'success');
+    const closed = decoded.find(
+      (d) => typeof d.endTimeUnixNano === 'string' && d.endTimeUnixNano.length > 0
+    );
+    assert.ok(closed, 'expected a closed span (terminal endTimeUnixNano) in cell outputs');
+    assert.equal(closed!.status?.code, 'STATUS_CODE_OK');
   });
 });
 

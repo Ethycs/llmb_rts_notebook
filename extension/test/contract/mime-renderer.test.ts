@@ -1,27 +1,29 @@
 // Contract tests for the application/vnd.rts.run+json MIME renderer.
 //
-// Doc-driven rule: each assertion walks a documented surface from
-//   chapter 07 — subtractive fork & storage (renderer registration)
-//   RFC-001    — notebook tool ABI (notify, report_completion, …)
-//   RFC-003    — run.start / run.event / run.complete shapes
+// I-X: per RFC-006 §1, the run-MIME value is now the bare OTLP/JSON span (or
+// `{spanId, event}` partial event) — no envelope. The renderer dispatches on
+// `attributes["llmnb.run_type"]` plus `attributes["tool.name"]` for tool runs.
 //
-// The bundle is `extension/dist/run-renderer.js` produced by `npm run package`.
-// If the bundle is missing the suite skips (renderer is build-output, not source).
+// Spec references:
+//   RFC-006 §1            — Family A bare OTLP/JSON
+//   RFC-001               — notebook tool ABI (notify, report_completion, …)
+//   RFC-005 §"agent_emit" — agent_emit run dispatch (covered separately by
+//                            agent-emit-renderer.test.ts)
+//
+// The bundle is `extension/dist/run-renderer.js` produced by `npm run
+// package:renderer`. If the bundle is missing the suite skips.
 
 import * as assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as url from 'node:url';
 import type {
-  Rfc003Envelope,
   RunStartPayload,
   RunEventPayload,
   RunCompletePayload
 } from '../../src/messaging/types.js';
+import { encodeAttrs } from '../../src/otel/attrs.js';
 
-// CJS test build — __filename and __dirname are Node globals; no redeclaration needed.
-
-/** extension/dist/run-renderer.js, regardless of compiled-out depth. */
 const RENDERER_BUNDLE: string = path.resolve(
   __dirname,
   '..',
@@ -43,19 +45,17 @@ interface OutputItemLike {
   data: Uint8Array;
 }
 
-function makeStubItem(envelope: unknown): OutputItemLike {
-  const text = JSON.stringify(envelope);
+function makeStubItem(payload: unknown): OutputItemLike {
+  const text = JSON.stringify(payload);
   return {
     mime: 'application/vnd.rts.run+json',
-    json: (): unknown => envelope,
+    json: (): unknown => payload,
     text: (): string => text,
     data: new TextEncoder().encode(text)
   };
 }
 
 function makeStubElement(): HTMLElement {
-  // Minimal HTMLElement stub: only innerHTML / textContent are exercised.
-  // Casting through unknown because the renderer uses element.innerHTML setter.
   const stub = {
     innerHTML: '',
     textContent: ''
@@ -63,13 +63,14 @@ function makeStubElement(): HTMLElement {
   return stub as unknown as HTMLElement;
 }
 
+const SAMPLE_TRACE_ID = 'a'.repeat(32);
+const SAMPLE_SPAN_ID = 'b'.repeat(16);
+
 suite('contract: MIME renderer (application/vnd.rts.run+json)', () => {
   let renderer: ReturnType<RendererModule['activate']> | undefined;
 
   suiteSetup(async function (): Promise<void> {
     if (!fs.existsSync(RENDERER_BUNDLE)) {
-      // The renderer is build-output. Without it loaded the contract assertion
-      // is meaningless, so skip rather than fail.
       // eslint-disable-next-line no-console
       console.warn(
         `[mime-renderer.test] ${RENDERER_BUNDLE} missing — run \`npm run package\` first; skipping`
@@ -77,92 +78,80 @@ suite('contract: MIME renderer (application/vnd.rts.run+json)', () => {
       this.skip();
       return;
     }
-    // The renderer bundle is ESM (esbuild --format=esm). Use dynamic import.
     const mod = (await import(url.pathToFileURL(RENDERER_BUNDLE).href)) as RendererModule;
     renderer = mod.activate({});
   });
 
-  // chapter 07 §"renderers": activate() returns { renderOutputItem }.
   test('activate(ctx) returns an object with renderOutputItem', () => {
     assert.ok(renderer, 'renderer must be loaded');
     assert.equal(typeof renderer!.renderOutputItem, 'function');
   });
 
-  // RFC-001 — tool dispatch on `notify`
-  test('run.start (run_type=tool, name=notify) produces [NOTIFY] in HTML', () => {
-    const env: Rfc003Envelope<RunStartPayload> = {
-      message_type: 'run.start',
-      direction: 'kernel→extension',
-      correlation_id: 'r1',
-      timestamp: '2026-04-26T00:00:00.000Z',
-      rfc_version: '1.0.0',
-      payload: {
-        id: 'r1',
-        trace_id: 'r1',
-        parent_run_id: null,
-        name: 'notify',
-        run_type: 'tool',
-        start_time: '2026-04-26T00:00:00.000Z',
-        inputs: { observation: 'hello world', importance: 'medium' }
-      }
+  // RFC-001 — tool dispatch on `notify` (attributes-driven).
+  test('open span (llmnb.run_type=tool, tool.name=notify) produces [NOTIFY] in HTML', () => {
+    const span: RunStartPayload = {
+      traceId: SAMPLE_TRACE_ID,
+      spanId: SAMPLE_SPAN_ID,
+      name: 'notify',
+      kind: 'SPAN_KIND_INTERNAL',
+      startTimeUnixNano: '1745588938412000000',
+      endTimeUnixNano: null,
+      attributes: encodeAttrs({
+        'llmnb.run_type': 'tool',
+        'tool.name': 'notify',
+        'input.value': JSON.stringify({ observation: 'hello world', importance: 'info' }),
+        'input.mime_type': 'application/json'
+      }),
+      status: { code: 'STATUS_CODE_UNSET', message: '' }
     };
     const el = makeStubElement();
-    renderer!.renderOutputItem(makeStubItem(env), el);
+    renderer!.renderOutputItem(makeStubItem(span), el);
     assert.ok(el.innerHTML.length > 0, 'innerHTML should be non-empty');
     assert.ok(el.innerHTML.includes('[NOTIFY]'), `expected [NOTIFY] in ${el.innerHTML}`);
   });
 
-  // RFC-003 §Family A — run.event{event_type=token}
-  test('run.event token produces an event div with the token data', () => {
-    const env: Rfc003Envelope<RunEventPayload> = {
-      message_type: 'run.event',
-      direction: 'kernel→extension',
-      correlation_id: 'r1',
-      timestamp: '2026-04-26T00:00:00.000Z',
-      rfc_version: '1.0.0',
-      payload: {
-        run_id: 'r1',
-        event_type: 'token',
-        data: { delta: 'hi' },
-        timestamp: '2026-04-26T00:00:00.000Z'
+  // RFC-006 §1 — partial event payload `{spanId, event}` over update_display_data.
+  test('partial event payload produces an event div with the event name', () => {
+    const payload: RunEventPayload = {
+      traceId: SAMPLE_TRACE_ID,
+      spanId: SAMPLE_SPAN_ID,
+      event: {
+        timeUnixNano: '1745588938512000000',
+        name: 'gen_ai.choice',
+        attributes: encodeAttrs({ 'gen_ai.choice.delta': 'hi' })
       }
     };
     const el = makeStubElement();
-    renderer!.renderOutputItem(makeStubItem(env), el);
+    renderer!.renderOutputItem(makeStubItem(payload), el);
     assert.ok(el.innerHTML.length > 0);
     assert.ok(
-      el.innerHTML.includes('token') || el.innerHTML.includes('rts-run-event'),
-      `expected token marker in ${el.innerHTML}`
+      el.innerHTML.includes('gen_ai.choice') || el.innerHTML.includes('rts-run-event'),
+      `expected event marker in ${el.innerHTML}`
     );
   });
 
-  // RFC-003 §Family A — run.complete{status=success}
-  test('run.complete success produces [done: success] in HTML', () => {
-    const env: Rfc003Envelope<RunCompletePayload> = {
-      message_type: 'run.complete',
-      direction: 'kernel→extension',
-      correlation_id: 'r1',
-      timestamp: '2026-04-26T00:00:00.000Z',
-      rfc_version: '1.0.0',
-      payload: {
-        run_id: 'r1',
-        end_time: '2026-04-26T00:00:00.000Z',
-        outputs: {},
-        status: 'success'
-      }
+  // RFC-006 §1 — closed span with STATUS_CODE_OK.
+  test('closed span STATUS_CODE_OK produces [done: success] in HTML', () => {
+    const span: RunCompletePayload = {
+      traceId: SAMPLE_TRACE_ID,
+      spanId: SAMPLE_SPAN_ID,
+      name: 'echo',
+      kind: 'SPAN_KIND_INTERNAL',
+      startTimeUnixNano: '1745588938412000000',
+      endTimeUnixNano: '1745588938612000000',
+      attributes: encodeAttrs({ 'llmnb.run_type': 'chain' }),
+      status: { code: 'STATUS_CODE_OK', message: '' }
     };
     const el = makeStubElement();
-    renderer!.renderOutputItem(makeStubItem(env), el);
+    renderer!.renderOutputItem(makeStubItem(span), el);
     assert.ok(el.innerHTML.includes('[done: success]'), `expected [done: success] in ${el.innerHTML}`);
   });
 
-  // RFC-003 F1 — fail-closed on malformed input must NOT throw.
-  test('renderer does not throw on a non-envelope object', () => {
+  // RFC-006 §"Failure modes" W2 — fail-closed on malformed input must NOT throw.
+  test('renderer does not throw on a non-payload object', () => {
     const el = makeStubElement();
-    const malformed = { not_an_envelope: true };
+    const malformed = { not_a_span: true };
     assert.doesNotThrow(() => renderer!.renderOutputItem(makeStubItem(malformed), el));
-    // Either rendered as a JSON pre-block or as an error message — both
-    // satisfy the contract that no exception escapes.
     assert.ok(
       el.innerHTML.length > 0 || el.textContent.length > 0,
       'renderer should still write *something* to the element'

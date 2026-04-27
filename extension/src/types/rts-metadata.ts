@@ -9,8 +9,13 @@
 //
 // Cell-specific hints (trace id, target agent, branch markers) live in
 // cells[*].metadata.rts and are typed by `RtsCellMetadata` below.
+//
+// Refactor R1-X: the persistent run-record form is the merged OTLP/JSON
+// span. RtsRunRecord aliases OtlpSpan; cell-level OTLP traceId hints in
+// cells[*].metadata.rts use the same hex-string encoding.
 
 import type { LayoutNode, AgentGraphResponsePayload } from '../messaging/types.js';
+import type { OtlpSpan } from '../otel/attrs.js';
 
 /** chapter 07 §"One file: .llmnb" — top-level metadata.rts namespace. */
 export interface RtsNotebookMetadata {
@@ -43,27 +48,15 @@ export interface RtsConfigMetadata {
   [k: string]: unknown;
 }
 
-/** chapter 07 §"Chat flow JSON" — LangSmith-shaped run record stored in the
- *  event_log array. The cell-level flow lives separately in cell outputs. */
-export interface RtsRunRecord {
-  id: string;
-  trace_id: string;
-  parent_run_id: string | null;
-  name: string;
-  run_type: 'llm' | 'tool' | 'chain' | 'retriever' | 'agent' | 'embedding';
-  start_time: string;
-  end_time?: string;
-  inputs: Record<string, unknown>;
-  outputs?: Record<string, unknown>;
-  events?: Array<{ event_type: string; data: Record<string, unknown>; timestamp: string }>;
-  tags?: string[];
-  metadata?: Record<string, unknown>;
-  error?: { kind?: string; message?: string; traceback?: string } | null;
-}
+/** chapter 07 §"Chat flow JSON" — strict OTLP/JSON span persisted in the
+ *  event_log array. One merged span per run. The cell-level flow lives
+ *  separately in cell outputs (also as RFC-003 envelopes carrying spans). */
+export type RtsRunRecord = OtlpSpan;
 
 /** chapter 07 §"One file: .llmnb" — cells[*].metadata.rts shape. */
 export interface RtsCellMetadata {
-  trace_id?: string;
+  /** OTLP traceId hint (32 lowercase hex chars) for cells that pin to a run. */
+  traceId?: string;
   target_agent?: string;
   branch_marker?: string;
   /** Free-form extension. */

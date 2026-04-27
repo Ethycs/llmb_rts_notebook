@@ -22,4 +22,5 @@ export {
   renderWriteFile,
   renderRunCommand
 } from './proxied.js';
+export { renderAgentEmit } from './agent-emit.js';
 export { escapeHtml, escapeAttr } from './escape.js';
