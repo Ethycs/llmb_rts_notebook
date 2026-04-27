@@ -1,0 +1,35 @@
+{
+  "mcpServers": {
+    "llmkernel-operator-bridge": {
+      "transport": "stdio",
+      "command": "C:\\Users\\Qeyto\\Documents\\GitHub\\llmb_rts_notebook\\.pixi\\envs\\kernel\\python.exe",
+      "args": [
+        "-m",
+        "llm_kernel.mcp_server",
+        "--agent-id",
+        "alpha",
+        "--zone-id",
+        "smoke"
+      ],
+      "env": {
+        "LLMKERNEL_RUN_TRACE_ID": "9d90f00a-2542-46f7-aeb2-f83a854670d5",
+        "PYTHONPATH": "C:\\Users\\Qeyto\\Documents\\GitHub\\llmb_rts_notebook\\vendor\\LLMKernel"
+      },
+      "allowedTools": [
+        "ask",
+        "clarify",
+        "propose",
+        "request_approval",
+        "report_progress",
+        "report_completion",
+        "report_problem",
+        "present",
+        "notify",
+        "escalate",
+        "read_file",
+        "write_file",
+        "run_command"
+      ]
+    }
+  }
+}

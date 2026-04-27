@@ -12,6 +12,14 @@ import json, os, pathlib, shutil, subprocess, sys, time, uuid  # noqa: E401
 from datetime import datetime, timezone
 from typing import Any
 
+# Load secrets from a project-root .env if python-dotenv is available.
+# Walks up from CWD; first .env found wins. Safe no-op if missing.
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 _HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(_HERE))  # so `python run_smoke.py` finds the sibling.
 

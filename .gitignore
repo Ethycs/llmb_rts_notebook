@@ -20,3 +20,5 @@ __pycache__/
 _ingest/prototypes/*.local.*
 _ingest/prototypes/r2-prototype/.run/
 _ingest/prototypes/r2-prototype/run.log
+
+*.env

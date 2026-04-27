@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json.schemastore.org/mocharc.json",
+  "ui": "tdd",
+  "reporter": "spec",
+  "timeout": 60000,
+  "color": true,
+  "recursive": true
+}

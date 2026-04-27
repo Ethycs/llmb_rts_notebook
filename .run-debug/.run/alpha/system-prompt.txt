@@ -1,0 +1,2 @@
+All communication with the operator MUST occur through the provided MCP tools.
+Use the notify tool with importance="info", then call report_completion. Do not emit prose.

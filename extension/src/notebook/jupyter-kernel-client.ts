@@ -52,6 +52,9 @@ export class JupyterKernelClient implements KernelClient {
   /** V1 has at most one inflight cell, so a single sink reference is enough.
    *  Multi-cell parallelism is TODO(C2). */
   private activeCommSink: KernelEventSink | undefined;
+  /** RTS comm channel used by sendEnvelope() to ship outbound envelopes
+   *  (Stage 5 S3). Opened on first use. */
+  private rtsComm: Kernel.IComm | undefined;
 
   public constructor(
     private readonly config: JupyterKernelConfig,
@@ -122,6 +125,30 @@ export class JupyterKernelClient implements KernelClient {
     }
   }
 
+  /** Stage 5 S3: ship an RFC-003 envelope toward the kernel via the
+   *  `llmnb.rts.v1` Comm. Used by the router's outbound subscription to
+   *  carry layout.edit / agent_graph.query / operator.action envelopes.
+   *  Lazily opens the comm on first call; subsequent calls reuse it. */
+  public async sendEnvelope(envelope: Rfc003Envelope<unknown>): Promise<void> {
+    if (!this.kernel) {
+      await this.connect();
+    }
+    const kernel = this.kernel;
+    if (!kernel) {
+      this.logger.warn('[jupyter-kernel] sendEnvelope: no kernel connection');
+      return;
+    }
+    if (!this.rtsComm) {
+      this.rtsComm = kernel.createComm(RTS_COMM_TARGET);
+      this.rtsComm.open();
+    }
+    // Rfc003Envelope is structurally JSON-shaped, but the JSONValue type
+    // from @lumino/coreutils does not accept `unknown`-keyed records
+    // without a widening cast.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    this.rtsComm.send(envelope as any);
+  }
+
   // --- internals -----------------------------------------------------------
 
   private async doConnect(): Promise<void> {
@@ -156,7 +183,7 @@ export class JupyterKernelClient implements KernelClient {
       comm.onMsg = (msg: KernelMessage.ICommMsgMsg): void => {
         const data = msg.content.data as unknown;
         if (this.activeCommSink && isObject(data)) {
-          this.activeCommSink.emit(data as Rfc003Envelope<unknown>);
+          this.activeCommSink.emit(data as unknown as Rfc003Envelope<unknown>);
         } else {
           this.logger.debug('[jupyter-kernel] comm_msg dropped (no sink)');
         }
@@ -178,7 +205,7 @@ export class JupyterKernelClient implements KernelClient {
       const bundle = content.data as Record<string, unknown>;
       const verbatim = bundle[RTS_ENVELOPE_MIME];
       if (isObject(verbatim)) {
-        sink.emit(verbatim as Rfc003Envelope<unknown>);
+        sink.emit(verbatim as unknown as Rfc003Envelope<unknown>);
         return;
       }
       const runPayload = bundle[RTS_RUN_MIME];

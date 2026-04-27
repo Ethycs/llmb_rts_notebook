@@ -1,0 +1,29 @@
+{
+  // Test-build TypeScript config.
+  //
+  // Extends the production tsconfig but re-roots the build to include the
+  // sibling `test/` tree and emits everything under `out/test/`. The renderer
+  // contract test exercises DOM stubs, so `lib` adds DOM. Mocha + Node ambient
+  // types are required so suite()/test()/before()/after() resolve without imports.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "out/test",
+    "lib": ["ES2022", "DOM"],
+    "types": ["mocha", "node"],
+    "sourceMap": true,
+    "declaration": false
+  },
+  "include": [
+    "src/**/*.ts",
+    "test/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "out",
+    "dist",
+    ".vscode-test",
+    "test/wdio/**/*",
+    "wdio.conf.ts"
+  ]
+}

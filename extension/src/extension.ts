@@ -28,8 +28,10 @@ import {
   Rfc003Envelope,
   RunStartPayload,
   RunCompletePayload,
+  LayoutEditPayload,
   RFC003_VERSION
 } from './messaging/types.js';
+import { MapViewPanel } from './webviews/map-view-panel.js';
 
 const NOTEBOOK_TYPE = 'llmnb';
 
@@ -67,6 +69,52 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
     vscode.workspace.registerNotebookSerializer(NOTEBOOK_TYPE, serializer, {
       transientOutputs: false,
       transientCellMetadata: { executionOrder: false }
+    })
+  );
+
+  // Wire the kernel client as the router's outbound subscriber so layout.edit
+  // / agent_graph.query / operator.action envelopes ride the active Comm.
+  // Stub kernels accept (and silently swallow) outbound traffic; that's the
+  // intended offline-development behaviour.
+  context.subscriptions.push(
+    router.subscribeOutbound((env) => {
+      const sender = kernel as unknown as {
+        sendEnvelope?: (e: Rfc003Envelope<unknown>) => Promise<void>;
+      };
+      if (typeof sender.sendEnvelope === 'function') {
+        void sender.sendEnvelope(env);
+      }
+    })
+  );
+
+  // Stage 5 S3: register the map-view command. RFC-003 §Family B routes the
+  // operator's drag-and-drop edits through the router's outbound queue.
+  context.subscriptions.push(
+    vscode.commands.registerCommand('llmnb.openMapView', () => {
+      const panel = MapViewPanel.show(context.extensionUri, logger);
+      // Forward layout.update / agent_graph.response from kernel to panel.
+      const mapDisp = router.registerMapObserver({
+        onLayoutUpdate: (env) => panel.applyLayoutUpdate(env.payload),
+        onAgentGraphResponse: (env) => panel.applyAgentGraphResponse(env.payload)
+      });
+      // Wrap webview-emitted layout.edit payloads in RFC-003 envelopes.
+      const editDisp = panel.onLayoutEdit((payload: LayoutEditPayload) => {
+        router.enqueueOutbound({
+          message_type: 'layout.edit',
+          direction: 'extension→kernel',
+          correlation_id: randomUuid(),
+          timestamp: new Date().toISOString(),
+          rfc_version: RFC003_VERSION,
+          payload
+        });
+      });
+      // Tear the wiring down with the panel (the panel disposes itself when
+      // the operator closes the tab).
+      const linkDisposable = new vscode.Disposable(() => {
+        mapDisp.dispose();
+        editDisp.dispose();
+      });
+      context.subscriptions.push(linkDisposable);
     })
   );
 

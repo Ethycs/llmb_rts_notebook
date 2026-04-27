@@ -1,0 +1,224 @@
+/*
+ * LLMNB run-renderer styles.
+ *
+ * VS Code webview styling guide:
+ *   https://code.visualstudio.com/api/extension-guides/webview#theming-webview-content
+ * Notebook renderers run in the cell-output webview iframe; we lean on the
+ * documented `--vscode-*` CSS variables so the renderer auto-themes with
+ * the operator's color theme rather than hardcoding light/dark palettes.
+ *
+ * Severity-level brand colors are the only hardcoded values, used as
+ * fallbacks when VS Code does not surface a matching variable. They follow
+ * the RFC-001 §report_problem and §escalate severity enums.
+ */
+
+.rts-card {
+  border: 1px solid var(--vscode-panel-border, #444);
+  background: var(--vscode-editor-background, #1e1e1e);
+  color: var(--vscode-foreground, #cccccc);
+  padding: 8px 12px;
+  margin: 4px 0;
+  border-radius: 4px;
+  font-family: var(--vscode-font-family, sans-serif);
+  font-size: var(--vscode-font-size, 13px);
+}
+
+.rts-card-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.rts-card-body {
+  white-space: pre-wrap;
+  margin: 4px 0;
+}
+
+/* --- approval / propose ---------------------------------------------------- */
+
+.rts-approval-card {
+  border-left-width: 4px;
+  border-left-style: solid;
+}
+.rts-approval-card[data-risk="low"]      { border-left-color: #6abf69; }
+.rts-approval-card[data-risk="medium"]   { border-left-color: #d4a017; }
+.rts-approval-card[data-risk="high"]     { border-left-color: #d97706; }
+.rts-approval-card[data-risk="critical"] { border-left-color: #b91c1c; }
+
+.rts-risk-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 0.85em;
+  margin-left: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: var(--vscode-badge-background, #4d4d4d);
+  color: var(--vscode-badge-foreground, #fff);
+}
+
+.rts-button-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.rts-button-approve,
+.rts-button-reject,
+.rts-button-secondary {
+  border: 1px solid var(--vscode-button-border, transparent);
+  padding: 4px 10px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
+}
+.rts-button-approve {
+  background: var(--vscode-button-background, #0e639c);
+  color: var(--vscode-button-foreground, #fff);
+}
+.rts-button-approve:hover {
+  background: var(--vscode-button-hoverBackground, #1177bb);
+}
+.rts-button-reject {
+  background: var(--vscode-errorForeground, #b91c1c);
+  color: var(--vscode-button-foreground, #fff);
+}
+.rts-button-secondary {
+  background: var(--vscode-button-secondaryBackground, #3a3d41);
+  color: var(--vscode-button-secondaryForeground, #fff);
+}
+
+/* --- progress -------------------------------------------------------------- */
+
+.rts-progress-bar {
+  width: 100%;
+  height: 6px;
+  background: var(--vscode-progressBar-background, #3a3a3a);
+  border-radius: 3px;
+  overflow: hidden;
+  margin: 6px 0;
+}
+.rts-progress-bar > .rts-progress-fill {
+  height: 100%;
+  background: var(--vscode-progressBar-background, #0e70c0);
+  transition: width 200ms ease-out;
+}
+
+/* --- completion ------------------------------------------------------------ */
+
+.rts-check-icon {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #16a34a;
+  position: relative;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+.rts-check-icon::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 4px;
+  height: 8px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.rts-artifact-list {
+  list-style: none;
+  padding: 0;
+  margin: 6px 0 0 0;
+}
+.rts-artifact-list > li {
+  padding: 2px 0;
+}
+.rts-artifact-list > li::before {
+  content: "·";
+  display: inline-block;
+  width: 12px;
+  color: var(--vscode-descriptionForeground, #888);
+}
+
+/* --- severity & importance badges ----------------------------------------- */
+
+.rts-severity-badge,
+.rts-importance-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 0.85em;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-right: 6px;
+  background: var(--vscode-badge-background, #4d4d4d);
+  color: var(--vscode-badge-foreground, #fff);
+}
+.rts-severity-badge[data-severity="info"]    { background: #2563eb; }
+.rts-severity-badge[data-severity="warning"] { background: #d4a017; }
+.rts-severity-badge[data-severity="error"]   { background: #b91c1c; }
+.rts-severity-badge[data-severity="fatal"]   { background: #581c87; }
+
+.rts-importance-badge[data-importance="trace"] { background: #6b7280; }
+.rts-importance-badge[data-importance="info"]  { background: #2563eb; }
+.rts-importance-badge[data-importance="warn"]  { background: #d4a017; }
+
+/* --- escalate -------------------------------------------------------------- */
+
+.rts-escalate-banner {
+  border-left: 4px solid #b91c1c;
+  background: var(--vscode-inputValidation-errorBackground, #5a1d1d);
+  color: var(--vscode-foreground, #fff);
+  padding: 8px 12px;
+  border-radius: 4px;
+}
+
+/* --- proxied / terminal --------------------------------------------------- */
+
+.rts-mono {
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 0.9em;
+  background: var(--vscode-textBlockQuote-background, #2a2a2a);
+  padding: 2px 4px;
+  border-radius: 2px;
+}
+.rts-terminal-block {
+  font-family: var(--vscode-editor-font-family, monospace);
+  background: var(--vscode-terminal-background, #181818);
+  color: var(--vscode-terminal-foreground, #cccccc);
+  padding: 6px 8px;
+  border-radius: 3px;
+  white-space: pre-wrap;
+  margin-top: 6px;
+}
+
+/* --- fallback / generic --------------------------------------------------- */
+
+.rts-tool-generic {
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 0.9em;
+  color: var(--vscode-descriptionForeground, #888);
+  border: 1px dashed var(--vscode-panel-border, #444);
+  padding: 6px 8px;
+  border-radius: 3px;
+}
+
+/* --- inputs --------------------------------------------------------------- */
+
+.rts-input,
+.rts-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--vscode-input-background, #2a2a2a);
+  color: var(--vscode-input-foreground, #cccccc);
+  border: 1px solid var(--vscode-input-border, #444);
+  padding: 4px 6px;
+  border-radius: 3px;
+  font-family: inherit;
+  font-size: inherit;
+}
+.rts-radio-list { list-style: none; padding: 0; margin: 6px 0; }
+.rts-radio-list > li { padding: 2px 0; }

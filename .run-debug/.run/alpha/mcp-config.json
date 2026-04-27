@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "llmkernel-operator-bridge": {
+      "transport": "stdio",
+      "command": "python",
+      "args": ["-c", "import sys; sys.exit(0)"],
+      "env": {}
+    }
+  }
+}

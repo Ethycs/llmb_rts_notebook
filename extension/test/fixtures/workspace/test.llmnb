@@ -1,0 +1,23 @@
+{
+  "cells": [
+    {
+      "cell_type": "code",
+      "source": "echo hello",
+      "metadata": {},
+      "outputs": [],
+      "execution_count": null
+    }
+  ],
+  "metadata": {
+    "rts": {
+      "layout": {},
+      "agents": {},
+      "config": {
+        "rfc_version": "1.0.0"
+      },
+      "event_log": []
+    }
+  },
+  "nbformat": 4,
+  "nbformat_minor": 5
+}
