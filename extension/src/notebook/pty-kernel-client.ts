@@ -189,6 +189,9 @@ export class PtyKernelClient implements KernelClient {
   private lastTraceId: string | undefined;
   /** Set when shutdown() has been called; stops the readyTimer from firing. */
   private disposed = false;
+  /** FSP-003 Pillar A — flips true once the kernel.ready handshake lands.
+   *  `waitForKernelReady` polls this to surface K71 on timeout. */
+  private _isReady = false;
   /** Resolved socket address (UDS path / `tcp:host:port`). For TCP, the
    *  port may start as `0` (OS-pick) and gets rewritten by `listenSocket`
    *  to the actual port before the kernel subprocess is spawned, so the
@@ -232,6 +235,11 @@ export class PtyKernelClient implements KernelClient {
 
   public getDriftEvents(): readonly KernelDriftEvent[] {
     return this.driftEvents.slice();
+  }
+
+  /** FSP-003 Pillar A — true after the `kernel.ready` LogRecord lands. */
+  public get isReady(): boolean {
+    return this._isReady;
   }
 
   /** Activation glue forwards inbound Comm envelopes into the router via
@@ -610,6 +618,7 @@ export class PtyKernelClient implements KernelClient {
 
   private completeReady(): void {
     this.cancelReadyTimeout();
+    this._isReady = true;
     if (this.readyResolve) {
       const r = this.readyResolve;
       this.readyResolve = undefined;

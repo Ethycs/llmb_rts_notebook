@@ -25,6 +25,8 @@
 // where activation builds and disposes the controller graph.
 
 import * as vscode from 'vscode';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { MessageRouter, OtlpLogRecord } from './messaging/router.js';
 import {
   LlmnbNotebookController,
@@ -85,7 +87,58 @@ function pushRing(ring: unknown[], item: unknown): void {
   if (ring.length > RING_LIMIT) ring.shift();
 }
 
+// FSP-003 Pillar A — activation diagnostics. Populated in activate()
+// regardless of verbose flag because the typed-wait helpers
+// (waitForActivation / waitForKernelReady / waitForHydrate) depend on
+// these timestamps to print a useful K-coded failure record. Tests pull
+// them via ExtensionApi.getActivationDiagnostics().
+interface ActivationDiagnostics {
+  activated_at: number | undefined;
+  kernel_started_at: number | undefined;
+  kernel_ready_at: number | undefined;
+  hydrate_count: number;
+  last_marker: string | undefined;
+}
+const activationDiagnostics: ActivationDiagnostics = {
+  activated_at: undefined,
+  kernel_started_at: undefined,
+  kernel_ready_at: undefined,
+  hydrate_count: 0,
+  last_marker: undefined
+};
+
+/** FSP-003 Pillar A — append a JSONL diagnostic record to the marker file
+ *  if either `LLMNB_MARKER_FILE` (FSP-003) or `LLMNB_E2E_MARKER_FILE`
+ *  (legacy) is set. Production code never sets either env var; tests
+ *  always set them via the `typed-waits` / `preflight` helpers. Errors
+ *  are swallowed so the marker writer can never crash activation. */
+function writeMarkerEvent(component: string, event: string, fields: Record<string, unknown> = {}): void {
+  const target =
+    process.env.LLMNB_MARKER_FILE ??
+    process.env.LLMNB_E2E_MARKER_FILE;
+  if (!target) {
+    return;
+  }
+  const record = { ts: Date.now(), component, event, ...fields };
+  let line: string;
+  try {
+    line = JSON.stringify(record) + '\n';
+  } catch {
+    line = JSON.stringify({ ts: Date.now(), component, event, _encode_error: true }) + '\n';
+  }
+  try {
+    const dir = path.dirname(target);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.appendFileSync(target, line, { encoding: 'utf-8' });
+  } catch {
+    /* swallow — diagnostics MUST NOT crash the extension. */
+  }
+  activationDiagnostics.last_marker = `${component}:${event}`;
+}
+
 export function activate(context: vscode.ExtensionContext): ExtensionApi {
+  activationDiagnostics.activated_at = Date.now();
+  writeMarkerEvent('extension', 'activation_started');
   const baseLogger = vscode.window.createOutputChannel('LLMNB Extension', { log: true });
   context.subscriptions.push(baseLogger);
   // BSP-001 / Testing.md §6: under LLMNB_E2E_VERBOSE=1, tee every
@@ -200,11 +253,17 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
   // ship so reload-after-crash works.
   context.subscriptions.push(
     vscode.workspace.onDidOpenNotebookDocument((nb) => {
+      if (nb.notebookType === NOTEBOOK_TYPE) {
+        activationDiagnostics.hydrate_count += 1;
+        writeMarkerEvent('extension', 'hydrate_invoked', { uri: nb.uri.toString() });
+      }
       void loader.onDidOpenNotebook(nb);
     })
   );
   for (const nb of vscode.workspace.notebookDocuments) {
     if (nb.notebookType === NOTEBOOK_TYPE) {
+      activationDiagnostics.hydrate_count += 1;
+      writeMarkerEvent('extension', 'hydrate_invoked', { uri: nb.uri.toString() });
       void loader.onDidOpenNotebook(nb);
     }
   }
@@ -288,9 +347,25 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
       emit: (env) => router.route(env)
     });
     // Eagerly start so the ready handshake races the first cell execution.
-    void kernel.start().catch((err) => {
-      logger.error(`[llmnb] PtyKernelClient start failed: ${String(err)}`);
-    });
+    activationDiagnostics.kernel_started_at = Date.now();
+    writeMarkerEvent('extension', 'kernel_start_invoked');
+    void kernel.start().then(
+      () => {
+        activationDiagnostics.kernel_ready_at = Date.now();
+        writeMarkerEvent('extension', 'kernel_ready_observed');
+      },
+      (err) => {
+        logger.error(`[llmnb] PtyKernelClient start failed: ${String(err)}`);
+        writeMarkerEvent('extension', 'kernel_start_failed', { error: String(err) });
+      }
+    );
+  } else if (kernel instanceof StubKernelClient) {
+    // Stub flips ready synchronously inside attachRouter() (already invoked
+    // above). Capture the ready timestamp so getActivationDiagnostics()
+    // can report it for waitForKernelReady's K71 dump path.
+    activationDiagnostics.kernel_started_at = Date.now();
+    activationDiagnostics.kernel_ready_at = Date.now();
+    writeMarkerEvent('extension', 'stub_kernel_ready');
   }
 
   // RFC-008 §3 — operator command to surface the kernel debug terminal.
@@ -360,6 +435,8 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
     }
   }
 
+  writeMarkerEvent('extension', 'activation_complete');
+
   return {
     getController: () => activeController,
     getRouter: () => activeRouter,
@@ -371,7 +448,8 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
     getSessionId: () => activeSessionId,
     getRecentPtyBytes: () => ptyByteRing.join(''),
     getRecentLogRecords: () => [...logRecordRing],
-    getRecentFrames: () => [...frameRing]
+    getRecentFrames: () => [...frameRing],
+    getActivationDiagnostics: () => ({ ...activationDiagnostics })
   };
 }
 
@@ -421,6 +499,19 @@ function resolveConfigPath(value: string): string {
     .replace(/\$\{env:([^}]+)\}/g, (_m, name: string) => process.env[name] ?? '');
 }
 
+/** Snapshot of activation lifecycle timestamps and counts. FSP-003 Pillar A —
+ *  the typed-wait helpers (waitForActivation, waitForKernelReady, etc.) read
+ *  this on timeout to print a useful K-coded failure record. All fields are
+ *  Unix-ms timestamps except `hydrate_count` (integer) and `last_marker`
+ *  (most-recent `component:event` written via the marker file). */
+export interface ActivationDiagnosticsSnapshot {
+  activated_at: number | undefined;
+  kernel_started_at: number | undefined;
+  kernel_ready_at: number | undefined;
+  hydrate_count: number;
+  last_marker: string | undefined;
+}
+
 /** Public surface returned from activate(). The smoke test uses this to
  *  reach the controller and the kernel client without depending on
  *  internal modules. */
@@ -439,6 +530,8 @@ export interface ExtensionApi {
   getRecentPtyBytes?(): string;
   getRecentLogRecords?(): unknown[];
   getRecentFrames?(): unknown[];
+  /** FSP-003 Pillar A — activation lifecycle snapshot for typed-wait dumps. */
+  getActivationDiagnostics(): ActivationDiagnosticsSnapshot;
 }
 
 /**
@@ -466,13 +559,23 @@ export class StubKernelClient implements KernelClient {
   /** Reference to the active router. Set via setRouter(); the activate()
    *  flow injects it after construction. */
   private router: { route: (env: RtsV2Envelope<unknown>) => void } | undefined;
+  /** FSP-003 Pillar A — flips true once attachRouter() lands. The stub has
+   *  no remote handshake, so "ready" is essentially synchronous from the
+   *  activation glue's perspective. */
+  private _isReady = false;
 
   public constructor(private readonly logger: vscode.LogOutputChannel) {}
+
+  /** True once attachRouter() has been called (FSP-003 Pillar A). */
+  public get isReady(): boolean {
+    return this._isReady;
+  }
 
   /** Allow the activation glue to inject the router so the stub can pretend
    *  to be the kernel side of the Comm channel. */
   public attachRouter(router: { route: (env: RtsV2Envelope<unknown>) => void }): void {
     this.router = router;
+    this._isReady = true;
   }
 
   /** Outbound surface compatible with `PtyKernelClient.sendEnvelope`. The

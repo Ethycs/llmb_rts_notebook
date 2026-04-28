@@ -25,6 +25,13 @@ import * as os from 'node:os';
 import * as vscode from 'vscode';
 import type { ExtensionApi } from '../../src/extension.js';
 import { RTS_RUN_MIME } from '../../src/notebook/controller.js';
+import { ensureMarkerFile } from '../util/marker-tail.js';
+import { preflightLive } from '../util/preflight.js';
+import {
+  waitForActivation,
+  waitForCellComplete,
+  waitForKernelReady
+} from '../util/typed-waits.js';
 
 const EXT_ID = 'ethycs.llmb-rts-notebook';
 const NOTEBOOK_TYPE = 'llmnb';
@@ -70,16 +77,25 @@ suite('e2e: live kernel against real Pixi Python', () => {
   suiteSetup(async function (): Promise<void> {
     this.timeout(60000);
 
+    // FSP-003 Pillar B — live-tier preflight. Skips with a one-line cause
+    // when pixi env / claude CLI / credentials / orphan kernels block us.
+    if (!preflightLive(this)) {
+      return;
+    }
+
     // Sanity: pixi env exists. Skip the suite if not (CI without pixi).
     if (!fs.existsSync(pythonPath)) {
       this.skip();
       return;
     }
 
-    // Set the marker file BEFORE ext.activate() so the kernel subprocess
-    // (spawned during activation when the first cell executes) inherits
-    // the live env var via node-pty's `{...process.env}` spread.
+    // FSP-003 Pillar A — set the marker file BEFORE ext.activate() so the
+    // kernel subprocess (spawned during activation when the first cell
+    // executes) inherits the live env var via node-pty's `{...process.env}`
+    // spread. ensureMarkerFile() also sets the legacy env name.
+    process.env.LLMNB_MARKER_FILE = markerFile;
     process.env.LLMNB_E2E_MARKER_FILE = markerFile;
+    ensureMarkerFile('e2e-live');
     // Force API-key auth path so Claude Code uses ANTHROPIC_API_KEY from
     // .env (loaded by the kernel's __main__.py via find_dotenv) instead
     // of OAuth (which isn't reachable from Extension Host's spawn ctx).
@@ -94,14 +110,11 @@ suite('e2e: live kernel against real Pixi Python', () => {
     await cfg.update('kernel.useStub', false, vscode.ConfigurationTarget.Global);
     await cfg.update('kernel.pythonPath', pythonPath, vscode.ConfigurationTarget.Global);
 
-    const ext = vscode.extensions.getExtension<ExtensionApi>(EXT_ID);
-    assert.ok(ext, `extension ${EXT_ID} not found`);
-    api = await ext.activate();
+    api = (await waitForActivation(vscode, EXT_ID, 30000)) as ExtensionApi;
     assert.ok(api.getController(), 'controller should be created on activate');
-
-    // Ready handshake should land within 30s. We don't have a public hook
-    // to assert it directly, but executing a cell will fail loudly if the
-    // kernel never reached READY.
+    // FSP-003 Pillar A — K71 fires here with a useful marker tail if the
+    // kernel.ready handshake never lands.
+    await waitForKernelReady(api, 30000);
   });
 
   suiteTeardown(async function (): Promise<void> {

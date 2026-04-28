@@ -13,6 +13,13 @@ import * as assert from 'node:assert/strict';
 import * as vscode from 'vscode';
 import type { ExtensionApi } from '../../src/extension.js';
 import { RTS_RUN_MIME } from '../../src/notebook/controller.js';
+import { ensureMarkerFile } from '../util/marker-tail.js';
+import { preflightStub } from '../util/preflight.js';
+import {
+  waitForActivation,
+  waitForCellComplete,
+  waitForKernelReady
+} from '../util/typed-waits.js';
 
 const EXT_ID = 'ethycs.llmb-rts-notebook';
 const NOTEBOOK_TYPE = 'llmnb';
@@ -22,14 +29,20 @@ suite('integration: stub-kernel smoke', () => {
 
   suiteSetup(async function (): Promise<void> {
     this.timeout(30000);
+    // FSP-003 Pillar B — preflight-skip the suite if the stub-tier
+    // environment is not ready (no vscode-test cache, etc.).
+    if (!preflightStub(this)) {
+      return;
+    }
+    // FSP-003 Pillar A — promote the marker file to always-on for tests.
+    ensureMarkerFile('integration-stub');
     await vscode.workspace
       .getConfiguration('llmnb')
       .update('kernel.useStub', true, vscode.ConfigurationTarget.Global);
 
-    const ext = vscode.extensions.getExtension<ExtensionApi>(EXT_ID);
-    assert.ok(ext, `extension ${EXT_ID} not found`);
-    api = await ext.activate();
+    api = (await waitForActivation(vscode, EXT_ID, 15000)) as ExtensionApi;
     assert.ok(api.getController(), 'controller should be created on activate');
+    await waitForKernelReady(api, 5000);
   });
 
   test('execute one cell → cell.outputs contains rts.run+json with status=success', async function (): Promise<void> {
@@ -52,7 +65,9 @@ suite('integration: stub-kernel smoke', () => {
       doc.uri
     );
 
-    await waitFor(() => doc.cellAt(0).outputs.length > 0, 5000);
+    // FSP-003 Pillar A — typed wait for the terminal RTS_RUN_MIME span.
+    // Timeout fires K72 with marker-file tail on failure.
+    await waitForCellComplete(doc, 0, 5000);
 
     const outputs = doc.cellAt(0).outputs;
     const items = outputs.flatMap((o) => o.items);
@@ -74,13 +89,5 @@ suite('integration: stub-kernel smoke', () => {
   });
 });
 
-async function waitFor(predicate: () => boolean, timeoutMs: number): Promise<void> {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    if (predicate()) {
-      return;
-    }
-    await new Promise((r) => setTimeout(r, 25));
-  }
-  throw new Error(`waitFor: predicate did not become true within ${timeoutMs}ms`);
-}
+// Local waitFor removed in FSP-003 Pillar A — use waitForCellComplete /
+// waitForActivation / waitForKernelReady from ../util/typed-waits.js.
