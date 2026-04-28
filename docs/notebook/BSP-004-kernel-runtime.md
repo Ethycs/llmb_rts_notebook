@@ -100,6 +100,73 @@ K-RT — kernel runtime migration:
 
 No extension changes, no test changes, no wire changes. If the runtime swap works, every existing test should pass unchanged.
 
+## V1.x retrospective — what landed, what regressed, what V3 looks like
+
+### V1 attempt 1 (commit 2264834, 2026-04-27)
+
+Implemented the §8 slice. `pty-mode` invoked `uvicorn.run("llm_kernel.app:app", ...)`; the lifespan called `boot_kernel()` and then scheduled `_async_serve_socket(state)` as an asyncio task. The serve coroutine wrapped the existing synchronous `_run_read_loop` in `loop.run_in_executor(None, ...)` because Windows `ProactorEventLoop` doesn't support `add_reader` on socket fds.
+
+**This regressed Tier 4 e2e.** The marker file from a failing run showed:
+
+```
+agent_spawn_received → supervisor_spawn_popen_started (pid=53016) → agent_spawn_returned
+[+1.4s]
+async_serve_socket_exited
+```
+
+The kernel's read loop exited 1.4 seconds after the agent_spawn handler returned. The Claude subprocess was alive, but the kernel stopped reading from the data plane, so the operator's `notify` span never reached the cell — Tier 4 timed out at 180s where the prior session ran in 8.7s.
+
+**Hypothesis (not fully confirmed):** `subprocess.Popen` on Windows, called from a thread-pool executor worker, has different handle-inheritance / lifecycle behavior than from the main thread. The data-plane socket is inheritable by default on Windows; when Claude's child process is spawned from the executor worker that's mid-`select()` on the socket, something in the OS-level handle dance EOFs the parent's `recv`.
+
+### V1 attempt 2 (BSP-004 V2, commit 6316037)
+
+Replaced `loop.run_in_executor` with a dedicated `threading.Thread` for the read loop. Same runtime model, clearer lifecycle (named thread, no pool sharing). `_async_serve_socket` now polls `read_thread.is_alive()` until exit instead of awaiting an executor Future.
+
+**Honest assessment:** V2 leverages uvicorn for `/health` + lifespan ordering + signal handling only. The read path is still threaded — the asyncio loop doesn't actually drive it. Verification of whether V2 fixes the Tier 4 regression is deferred until a clean machine run (claude on PATH, no other VS Code instance holding the install mutex). The set_inheritable(False) fix on the data-plane socket (commit 51cc7a4) is a strict improvement either way.
+
+### V3 plan (when V2 falls short, or when we want real async leverage)
+
+**Use `loop.sock_recv()` for reads on the asyncio loop.** This is what the original §8 sketch wanted but couldn't do under ProactorEventLoop's `add_reader` limitation. `sock_recv` works on both Selector and Proactor loops on Python 3.8+ (ProactorEventLoop uses overlapped I/O internally for it).
+
+Sketch:
+
+```python
+async def _async_serve_socket(state):
+    sock = state["writer"]._sock
+    sock.setblocking(False)
+    loop = asyncio.get_event_loop()
+    buffer = bytearray()
+    while not state["shutdown_event"].is_set():
+        try:
+            chunk = await asyncio.wait_for(loop.sock_recv(sock, 4096), 0.5)
+        except asyncio.TimeoutError:
+            continue
+        if not chunk:
+            break
+        buffer.extend(chunk)
+        # Lines are dispatched via run_in_executor so the synchronous
+        # handler chain (comm_manager → handler → AgentSupervisor.spawn
+        # → subprocess.Popen) doesn't block the asyncio loop. This puts
+        # subprocess.Popen back on a worker thread — which is where V1
+        # attempt 1 had the regression. Mitigation: the data-plane
+        # socket's set_inheritable(False) (commit 51cc7a4) makes the
+        # subprocess inherit nothing of consequence regardless of which
+        # thread Popen runs on.
+        while True:
+            nl = buffer.find(b"\n")
+            if nl < 0:
+                break
+            line = bytes(buffer[:nl])
+            del buffer[:nl + 1]
+            if line.strip():
+                await loop.run_in_executor(None, _dispatch_inbound_line, line, state["kernel"])
+```
+
+V3 actually leverages asyncio: reads on the loop, blocking work offloaded explicitly via `run_in_executor`. Trade-off: dispatches now run on worker threads (same as V1 attempt 1's read loop did). The bet is that the inheritability fix neutralizes the original failure mode regardless of thread.
+
+V3 is queued behind V1 ship-readiness — not blocking V1.
+
 ## Changelog
 
 - **Issue 1, 2026-04-27**: initial. Targeted runtime swap; wire and substrate untouched.
+- **Issue 2, 2026-04-28**: retrospective added. V1 attempt 1 regressed Tier 4 e2e; root cause hypothesis (subprocess.Popen-from-executor-worker EOF'ing the parent socket on Windows). V2 (dedicated thread) verification pending; V3 (sock_recv-based) sketched as the path that actually leverages asyncio. Inheritability fix on the data-plane socket (commit 51cc7a4) lands regardless.
