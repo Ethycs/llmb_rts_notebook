@@ -190,17 +190,26 @@ export class LlmnbNotebookController implements vscode.Disposable, RunLifecycleO
       return;
     }
     const item = vscode.NotebookCellOutputItem.json(span, RTS_RUN_MIME);
-    void exec.appendOutput(new vscode.NotebookCellOutput([item]));
     const ok = span.status?.code === 'STATUS_CODE_OK';
-    exec.end(ok, Date.now());
-    // remove the inflight entry whose exec === exec
-    for (const [k, v] of this.inflight) {
-      if (v === exec) {
-        this.inflight.delete(k);
-        break;
+    // Await the append before calling end(): NotebookCellExecution.end()
+    // finalizes the cell, and pending Thenables from appendOutput can be
+    // discarded if they haven't committed yet, leaving the close payload
+    // missing from doc.cellAt(N).outputs even though it was emitted on
+    // the wire. The await keeps the close-shape JSON visible to readers.
+    void (async (): Promise<void> => {
+      try {
+        await exec.appendOutput(new vscode.NotebookCellOutput([item]));
+      } finally {
+        exec.end(ok, Date.now());
+        for (const [k, v] of this.inflight) {
+          if (v === exec) {
+            this.inflight.delete(k);
+            break;
+          }
+        }
+        this.cellByCorrelation.delete(span.spanId);
       }
-    }
-    this.cellByCorrelation.delete(span.spanId);
+    })();
   }
 
   /** Best-effort: route by spanId, falling back to "the only inflight cell"

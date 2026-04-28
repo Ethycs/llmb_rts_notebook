@@ -71,9 +71,49 @@ let activeHeartbeat: HeartbeatConsumer | undefined;
 let activeBlobResolver: BlobResolver | undefined;
 let activeSessionId: string | undefined;
 
+// Diagnostic ring buffers — populated only when LLMNB_E2E_VERBOSE === '1'.
+// Tests subscribe via the ExtensionApi accessors; production builds zero
+// out the buffers below to avoid memory growth.
+const E2E_VERBOSE = process.env.LLMNB_E2E_VERBOSE === '1';
+const RING_LIMIT = 200;
+const ptyByteRing: string[] = [];
+const logRecordRing: unknown[] = [];
+const frameRing: unknown[] = [];
+function pushRing(ring: unknown[], item: unknown): void {
+  if (!E2E_VERBOSE) return;
+  ring.push(item);
+  if (ring.length > RING_LIMIT) ring.shift();
+}
+
 export function activate(context: vscode.ExtensionContext): ExtensionApi {
-  const logger = vscode.window.createOutputChannel('LLMNB Extension', { log: true });
-  context.subscriptions.push(logger);
+  const baseLogger = vscode.window.createOutputChannel('LLMNB Extension', { log: true });
+  context.subscriptions.push(baseLogger);
+  // BSP-001 / Testing.md §6: under LLMNB_E2E_VERBOSE=1, tee every
+  // log line to stderr so Tier 4 / Tier 5 operators can see extension-
+  // side activity (controller, router, kernel client). The output
+  // channel is invisible from a CLI test runner. Without this tee,
+  // failures look like "agent ran but cell stayed blank" with no way
+  // to tell whether onRunStart/onRunComplete fired, whether
+  // appendOutput was called, or whether MessageRouter classified the
+  // payload at all. Wraps the LogOutputChannel surface; production
+  // builds (env var unset) bypass the wrapper and pay zero overhead.
+  const logger: vscode.LogOutputChannel = E2E_VERBOSE
+    ? new Proxy(baseLogger, {
+        get(target, prop, receiver) {
+          if (prop === 'trace' || prop === 'debug' || prop === 'info' ||
+              prop === 'warn' || prop === 'error') {
+            return (msg: string, ...args: unknown[]): void => {
+              // eslint-disable-next-line no-console
+              console.error(`[ext-log][${String(prop)}] ${msg}`,
+                ...(args.length > 0 ? [JSON.stringify(args)] : []));
+              const orig = Reflect.get(target, prop, receiver) as (m: string, ...a: unknown[]) => void;
+              orig.call(target, msg, ...args);
+            };
+          }
+          return Reflect.get(target, prop, receiver);
+        }
+      })
+    : baseLogger;
   activeLogger = logger;
   logger.info('[llmnb] activate');
 
@@ -90,6 +130,7 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
           : JSON.stringify(rec)) ?? '';
       const sev = rec.severityText ?? `S${rec.severityNumber}`;
       logger.info(`[kernel-log][${sev}] ${text}`);
+      pushRing(logRecordRing, { sev, text, raw: rec });
     })
   );
 
@@ -305,6 +346,20 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
     })
   );
 
+  // Diagnostic capture for Tier 4 e2e tests. PtyKernelClient already
+  // exposes onPtyData; we tee bytes into ptyByteRing. Frame capture
+  // requires an additional hook below.
+  if (E2E_VERBOSE && kernel instanceof PtyKernelClient) {
+    kernel.onPtyData((bytes) => {
+      pushRing(ptyByteRing, bytes);
+    });
+    if (typeof (kernel as unknown as { onFrame?: (cb: (frame: unknown) => void) => void }).onFrame === 'function') {
+      (kernel as unknown as { onFrame: (cb: (frame: unknown) => void) => void }).onFrame((frame: unknown) => {
+        pushRing(frameRing, frame);
+      });
+    }
+  }
+
   return {
     getController: () => activeController,
     getRouter: () => activeRouter,
@@ -313,7 +368,10 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
     getMetadataLoader: () => activeLoader,
     getHeartbeatConsumer: () => activeHeartbeat,
     getBlobResolver: () => activeBlobResolver,
-    getSessionId: () => activeSessionId
+    getSessionId: () => activeSessionId,
+    getRecentPtyBytes: () => ptyByteRing.join(''),
+    getRecentLogRecords: () => [...logRecordRing],
+    getRecentFrames: () => [...frameRing]
   };
 }
 
@@ -343,10 +401,24 @@ export function deactivate(): void {
  *  See package.json `contributes.configuration.properties` for defaults. */
 function loadKernelConfig(sessionId: string): PtyKernelConfig {
   const cfg = vscode.workspace.getConfiguration('llmnb.kernel');
+  const raw = cfg.get<string>('pythonPath', 'python');
   return {
     sessionId,
-    pythonPath: cfg.get<string>('pythonPath', 'python')
+    pythonPath: resolveConfigPath(raw)
   };
+}
+
+/** Substitute `${workspaceFolder}` (and `${env:NAME}`) in a config-string
+ *  path. VS Code does not auto-resolve variables in arbitrary settings —
+ *  only specific built-ins (e.g. `python.defaultInterpreterPath`). The
+ *  Python extension and many others do this manually; we follow suit so
+ *  the fixture workspace can use a portable `${workspaceFolder}/../...`
+ *  reference for both F5 (Tier 5) and `@vscode/test-cli` (Tier 4). */
+function resolveConfigPath(value: string): string {
+  const folder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
+  return value
+    .replace(/\$\{workspaceFolder\}/g, folder)
+    .replace(/\$\{env:([^}]+)\}/g, (_m, name: string) => process.env[name] ?? '');
 }
 
 /** Public surface returned from activate(). The smoke test uses this to
@@ -361,6 +433,12 @@ export interface ExtensionApi {
   getHeartbeatConsumer(): HeartbeatConsumer | undefined;
   getBlobResolver(): BlobResolver | undefined;
   getSessionId(): string | undefined;
+  // Diagnostic surfaces — populated only when LLMNB_E2E_VERBOSE === '1'.
+  // Tests subscribe to introspect what the extension actually saw when
+  // a Tier 4 e2e run fails. See Testing.md §6.
+  getRecentPtyBytes?(): string;
+  getRecentLogRecords?(): unknown[];
+  getRecentFrames?(): unknown[];
 }
 
 /**

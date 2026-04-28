@@ -12,7 +12,7 @@
         "smoke"
       ],
       "env": {
-        "LLMKERNEL_RUN_TRACE_ID": "9fde5043136041c4911f516cf002f1db",
+        "LLMKERNEL_RUN_TRACE_ID": "c1ee816b232f4e3d8190415f5ef74414",
         "PYTHONPATH": "C:\\Users\\Qeyto\\Documents\\GitHub\\llmb_rts_notebook\\vendor\\LLMKernel"
       },
       "allowedTools": [

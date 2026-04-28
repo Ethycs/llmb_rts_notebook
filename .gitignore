@@ -22,3 +22,11 @@ _ingest/prototypes/r2-prototype/.run/
 _ingest/prototypes/r2-prototype/run.log
 
 *.env
+
+# kernel runtime artifacts (RFC-008 diagnostics, RFC-005 overflow fallback)
+.llmnb-kernel-markers.jsonl
+.llmnb-agents/
+.llmnb-overflow-marker.json
+.llmnb-overflow-snapshot.json
+.llmnb-overflow-snapshot.json.tmp
+.run-smoke/

@@ -56,6 +56,16 @@ suite('e2e: live kernel against real Pixi Python', () => {
   let api: ExtensionApi | undefined;
   const repoRoot = findRepoRoot();
   const pythonPath = pixiPythonPath(repoRoot);
+  // Marker file path is suite-scoped so it can be set BEFORE ext.activate()
+  // spawns the kernel — otherwise the first 5 boot stages
+  // (pty_mode_main_entry, _env_read, _socket_connected, _ready_emitted,
+  // _dispatcher_started) are written to the kernel's CWD-default fallback
+  // path instead of this file, leaving the per-test tailer blind to the
+  // earliest-and-most-likely failure window.
+  const markerFile = path.join(
+    os.tmpdir(),
+    `llmnb-e2e-markers-${process.pid}-${Date.now()}.jsonl`
+  );
 
   suiteSetup(async function (): Promise<void> {
     this.timeout(60000);
@@ -66,10 +76,18 @@ suite('e2e: live kernel against real Pixi Python', () => {
       return;
     }
 
+    // Set the marker file BEFORE ext.activate() so the kernel subprocess
+    // (spawned during activation when the first cell executes) inherits
+    // the live env var via node-pty's `{...process.env}` spread.
+    process.env.LLMNB_E2E_MARKER_FILE = markerFile;
     // Force API-key auth path so Claude Code uses ANTHROPIC_API_KEY from
     // .env (loaded by the kernel's __main__.py via find_dotenv) instead
     // of OAuth (which isn't reachable from Extension Host's spawn ctx).
     process.env.LLMKERNEL_USE_BARE = '1';
+    // Enable diagnostic ring buffers in the extension's ExtensionApi.
+    // See Testing.md §6 — this populates getRecentPtyBytes / Frames /
+    // LogRecords so the live test can dump them on failure.
+    process.env.LLMNB_E2E_VERBOSE = '1';
 
     // Configure the extension to use the live kernel path.
     const cfg = vscode.workspace.getConfiguration('llmnb');
@@ -120,16 +138,11 @@ suite('e2e: live kernel against real Pixi Python', () => {
   //   - This e2e test for the substrate (activate, ready, heartbeat, hydrate)
   //   - Tier 3 smoke for the live agent spawn against real Anthropic
   test('execute /spawn directive → live Claude spawn → notify span in cell output', async function (): Promise<void> {
-    this.timeout(180000);  // Live agent + Anthropic API roundtrip can take 30-90s
+    this.timeout(180000);
 
-    // The kernel's __main__.py loads .env via find_dotenv(usecwd=True) so
-    // ANTHROPIC_API_KEY reaches the spawned Claude Code subprocess without
-    // the Extension Host needing to set it. If .env is missing or the key
-    // is absent/invalid, the agent_spawn handler emits a synthetic
-    // STATUS_CODE_ERROR span (RFC-006 §6 v2.0.3 fallback path), which
-    // satisfies this test's assertion (presence of a terminal span)
-    // without requiring real auth — proving the wire even on bad envs.
-
+    // markerFile and process.env.LLMNB_E2E_MARKER_FILE were set in
+    // suiteSetup, before ext.activate(), so the kernel subprocess
+    // (spawned during activation) inherits the live env var.
     const cellData = new vscode.NotebookCellData(
       vscode.NotebookCellKind.Code,
       '/spawn alpha task:"emit one notify and complete"',
@@ -140,33 +153,102 @@ suite('e2e: live kernel against real Pixi Python', () => {
     const doc = await vscode.workspace.openNotebookDocument(NOTEBOOK_TYPE, data);
     await vscode.window.showNotebookDocument(doc);
 
-    await vscode.commands.executeCommand(
-      'notebook.cell.execute',
-      { ranges: [{ start: 0, end: 1 }] },
-      doc.uri
-    );
+    // Real-time diagnostic taps so a hang isn't silent. Polls every 1s and
+    // tees new kernel stage markers + frames straight to stderr while the
+    // test waits. Without these, a hang past `agent_spawn_calling_spawn`
+    // produces zero output until the 150s waitFor fires the dump.
+    const ext = vscode.extensions.getExtension<ExtensionApi>(EXT_ID);
+    const api: ExtensionApi | undefined = ext?.exports;
+    const startedAt = Date.now();
+    let lastMarkerCount = 0;
+    let lastFrameCount = 0;
+    const tailInterval = setInterval(() => {
+      const allMarkers = readMarkers(markerFile);
+      for (let i = lastMarkerCount; i < allMarkers.length; i += 1) {
+        const m = allMarkers[i];
+        const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
+        console.error(`[${elapsed}s][marker] ${m.stage} ${JSON.stringify(m)}`);
+      }
+      lastMarkerCount = allMarkers.length;
+      const allFrames = api?.getRecentFrames?.() ?? [];
+      for (let i = lastFrameCount; i < allFrames.length; i += 1) {
+        const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
+        const s = JSON.stringify(allFrames[i]);
+        console.error(`[${elapsed}s][frame] ${s.slice(0, 300)}`);
+      }
+      lastFrameCount = allFrames.length;
+    }, 1000);
+    const heartbeatInterval = setInterval(() => {
+      const all = readMarkers(markerFile);
+      const last = all[all.length - 1]?.stage ?? '(none)';
+      const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
+      console.error(`[${elapsed}s][hb] still waiting; last marker = ${last}`);
+    }, 10000);
 
-    await waitFor(() => doc.cellAt(0).outputs.length > 0, 150000);
+    let testPassed = false;
+    try {
+      await vscode.commands.executeCommand(
+        'notebook.cell.execute',
+        { ranges: [{ start: 0, end: 1 }] },
+        doc.uri
+      );
+      // Wait for a CLOSED span specifically (endTimeUnixNano set), not
+      // just any output — the kernel emits an OPEN span first, and a
+      // race between waitFor resolving on length>0 and the close event
+      // being appended would otherwise fail the assertion below.
+      await waitFor(() => {
+        const items = doc.cellAt(0).outputs.flatMap((o) => o.items);
+        const runItems = items.filter((i) => i.mime === RTS_RUN_MIME);
+        return runItems.some((i) => {
+          try {
+            const d = JSON.parse(new TextDecoder('utf-8').decode(i.data)) as {
+              endTimeUnixNano?: string | null;
+            };
+            return typeof d.endTimeUnixNano === 'string' && d.endTimeUnixNano.length > 0;
+          } catch {
+            return false;
+          }
+        });
+      }, 150000);
 
-    const items = doc.cellAt(0).outputs.flatMap((o) => o.items);
-    const runItems = items.filter((i) => i.mime === RTS_RUN_MIME);
-    assert.ok(
-      runItems.length > 0,
-      `expected at least one ${RTS_RUN_MIME} output item against live kernel`
+      const items = doc.cellAt(0).outputs.flatMap((o) => o.items);
+      const runItems = items.filter((i) => i.mime === RTS_RUN_MIME);
+      assert.ok(runItems.length > 0, 'expected run-MIME output');
+      const decoded = runItems.map((i) =>
+        JSON.parse(new TextDecoder('utf-8').decode(i.data))
+      ) as Array<{ endTimeUnixNano?: string | null; status?: { code?: string } }>;
+      const closed = decoded.find(
+        (d) => typeof d.endTimeUnixNano === 'string' && d.endTimeUnixNano.length > 0
     );
-
-    const decoded = runItems.map((i) =>
-      JSON.parse(new TextDecoder('utf-8').decode(i.data))
-    ) as Array<{
-      spanId?: string;
-      endTimeUnixNano?: string | null;
-      status?: { code?: string };
-    }>;
-    const closed = decoded.find(
-      (d) => typeof d.endTimeUnixNano === 'string' && d.endTimeUnixNano.length > 0
-    );
-    assert.ok(closed, 'expected a closed span (terminal endTimeUnixNano) in cell outputs');
-    assert.match(closed!.status?.code ?? '', /STATUS_CODE_(OK|ERROR)/);
+      assert.ok(closed, 'expected a closed span');
+      assert.match(closed!.status?.code ?? '', /STATUS_CODE_(OK|ERROR)/);
+      testPassed = true;
+    } finally {
+      clearInterval(tailInterval);
+      clearInterval(heartbeatInterval);
+      // Diagnostic dump fires on any failure path (waitFor reject,
+      // assertion fail, executeCommand throw). Reads everything we
+      // instrumented: kernel-side stage markers from
+      // LLMNB_E2E_MARKER_FILE; extension-side ring buffers via
+      // ExtensionApi (LLMNB_E2E_VERBOSE=1).
+      if (!testPassed) {
+        const markers = readMarkers(markerFile);
+        const ptyBytes = api?.getRecentPtyBytes?.() ?? '(no api)';
+        const logRecords = api?.getRecentLogRecords?.() ?? [];
+        const frames = api?.getRecentFrames?.() ?? [];
+        console.error('=== KERNEL STAGE MARKERS ===');
+        for (const m of markers) console.error(JSON.stringify(m));
+        console.error('=== PTY BYTES (last 200 entries) ===');
+        console.error(ptyBytes.slice(-4000));
+        console.error(`=== LOG RECORDS (${logRecords.length}) ===`);
+        for (const r of logRecords) console.error(JSON.stringify(r));
+        console.error(`=== FRAMES (${frames.length}) ===`);
+        for (const f of frames.slice(-30)) console.error(JSON.stringify(f));
+        const lastStage =
+          markers[markers.length - 1]?.stage ?? '(no markers)';
+        console.error(`=== LAST KERNEL STAGE: ${lastStage} ===`);
+      }
+    }
   });
 
   test('heartbeat.kernel arrives within 11s (Family E v2.0.2: kernel emits, extension consumes)', async function (): Promise<void> {
@@ -230,4 +312,25 @@ async function waitFor(predicate: () => boolean, timeoutMs: number): Promise<voi
     await new Promise((r) => setTimeout(r, 50));
   }
   throw new Error(`waitFor: predicate did not become true within ${timeoutMs}ms`);
+}
+
+/** Read the kernel's stage markers, parsing one JSON record per line. */
+function readMarkers(markerFile: string): Array<{ stage: string; ts: number; [k: string]: unknown }> {
+  try {
+    if (!fs.existsSync(markerFile)) return [];
+    const raw = fs.readFileSync(markerFile, 'utf-8');
+    return raw
+      .trim()
+      .split('\n')
+      .filter((l) => l.length > 0)
+      .map((l) => {
+        try {
+          return JSON.parse(l) as { stage: string; ts: number };
+        } catch {
+          return { stage: '(unparseable)', ts: 0, raw: l };
+        }
+      });
+  } catch {
+    return [];
+  }
 }

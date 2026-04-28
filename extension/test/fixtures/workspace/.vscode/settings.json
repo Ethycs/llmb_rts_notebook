@@ -1,0 +1,22 @@
+{
+  "// Description": "Fixture workspace settings — applied to both F5 launches (Tier 5) and @vscode/test-cli automated runs (Tier 4). Pins the live kernel path and the diagnostic file location so artifacts always land in a known place. See Testing.md §5.",
+
+  "// Kernel transport": "Force live kernel (PtyKernelClient + real Python). For unit/contract tests use the global `llmnb.kernel.useStub: true` override.",
+  "llmnb.kernel.useStub": false,
+
+  "// Python interpreter": "Pixi-managed kernel env. Absolute path required because Extension Host's child_process.spawn does not inherit shell PATH activation.",
+  "llmnb.kernel.pythonPath": "${workspaceFolder}/../../../../.pixi/envs/kernel/python.exe",
+
+  "// Auth path": "API-key auth via .env at repo root. The kernel's __main__.py walks up via find_dotenv(usecwd=True) — verify the .env exists at <repo>/.env before F5.",
+
+  "// Notebook trust": "Trust the fixture workspace by default so F5 doesn't prompt.",
+  "security.workspace.trust.untrustedFiles": "open",
+
+  "// Files to exclude from explorer": "Hide diagnostic + work_dir artifacts that fill up between runs.",
+  "files.exclude": {
+    "**/.llmnb-kernel-markers.jsonl": true,
+    "**/.llmnb-agents": true,
+    "**/.llmnb-overflow-marker.json": true,
+    "**/.llmnb-overflow-snapshot.json": true
+  }
+}

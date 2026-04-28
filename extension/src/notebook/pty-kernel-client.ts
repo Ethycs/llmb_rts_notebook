@@ -177,6 +177,7 @@ export class PtyKernelClient implements KernelClient {
   private outboundBuffer: RtsV2Envelope<unknown>[] = [];
   /** PTY-data listeners; the kernel-terminal panel subscribes here. */
   private readonly ptyDataListeners: PtyDataListener[] = [];
+  private readonly frameListeners: ((frame: unknown) => void)[] = [];
   /** Drift events captured on the ready handshake. */
   private driftEvents: KernelDriftEvent[] = [];
   /** Inbound Comm forwarder; activation glue plumbs the router's `route()` here. */
@@ -188,8 +189,11 @@ export class PtyKernelClient implements KernelClient {
   private lastTraceId: string | undefined;
   /** Set when shutdown() has been called; stops the readyTimer from firing. */
   private disposed = false;
-  /** Resolved socket address (UDS path / pipe / tcp:host:port). */
-  private readonly socketAddress: string;
+  /** Resolved socket address (UDS path / `tcp:host:port`). For TCP, the
+   *  port may start as `0` (OS-pick) and gets rewritten by `listenSocket`
+   *  to the actual port before the kernel subprocess is spawned, so the
+   *  `LLMKERNEL_IPC_SOCKET` env var carries the live address. */
+  private socketAddress: string;
   private readonly readyTimeoutMs: number;
   private readonly shutdownGraceMs: number;
   private readonly emitter = new vscode.EventEmitter<KernelDriftEvent>();
@@ -208,11 +212,15 @@ export class PtyKernelClient implements KernelClient {
   }
 
   /** RFC-008 §2 — allocate the socket address per platform. UDS path on
-   *  POSIX, named pipe on Windows. The fallback to loopback TCP is reserved
-   *  for future use; V1 sticks with UDS / pipe. */
+   *  POSIX, loopback TCP on Windows. (Windows named pipes need
+   *  `pywin32` on the kernel side, which is not wired up in V1; the
+   *  kernel's `parse_address` raises `NotImplementedError` for `pipe:`
+   *  addresses and recommends `tcp:127.0.0.1:<port>` instead. The
+   *  ":0" sentinel asks the OS for an ephemeral port; `listenSocket`
+   *  rewrites this to the actual port after `server.listen` returns.) */
   public allocateSocketAddress(): string {
     if (process.platform === 'win32') {
-      return `\\\\.\\pipe\\llmnb-${this.config.sessionId}`;
+      return 'tcp:127.0.0.1:0';
     }
     const dir = process.env.XDG_RUNTIME_DIR ?? os.tmpdir();
     return path.join(dir, `llmnb-${this.config.sessionId}.sock`);
@@ -469,23 +477,15 @@ export class PtyKernelClient implements KernelClient {
 
   // --- internals -----------------------------------------------------------
 
-  /** RFC-008 §2 — listen on the allocated address. Cleans up stale UDS files
-   *  before binding. Sets mode `0600` after creation per §"Permissions and
-   *  security". */
+  /** RFC-008 §2 — listen on the allocated address. Two transports:
+   *  - `tcp:<host>:<port>` — Windows V1 + cross-platform dev (port 0 = OS-pick).
+   *  - UDS path — POSIX. Stale file unlinked, mode tightened to 0600.
+   *
+   *  After `listen()` resolves, `socketAddress` reflects the actual
+   *  bound port (relevant when port 0 was requested) so the kernel
+   *  subprocess sees the live address in `LLMKERNEL_IPC_SOCKET`. */
   private async listenSocket(): Promise<void> {
     return new Promise<void>((resolve, reject) => {
-      // Pre-emptively unlink stale UDS files (POSIX only; Windows pipes are
-      // ephemeral).
-      if (process.platform !== 'win32' && fs.existsSync(this.socketAddress)) {
-        try {
-          fs.unlinkSync(this.socketAddress);
-        } catch (err) {
-          this.logger.warn(
-            `[pty-kernel] unlink stale socket failed: ${String(err)}`
-          );
-        }
-      }
-
       const server = net.createServer((sock) => {
         if (this.socket) {
           // RFC-008 §"Failure modes" K10: reject second connections.
@@ -510,9 +510,30 @@ export class PtyKernelClient implements KernelClient {
         // K1: bind failure.
         reject(new Error(`socket bind failed: ${String(err)}`));
       });
-      server.listen(this.socketAddress, () => {
-        // K1 hardening: tighten UDS permissions to 0600.
-        if (process.platform !== 'win32') {
+
+      const tcpMatch = this.socketAddress.match(/^tcp:([^:]+):(\d+)$/);
+      if (tcpMatch) {
+        const host = tcpMatch[1];
+        const requestedPort = parseInt(tcpMatch[2], 10);
+        server.listen(requestedPort, host, () => {
+          const addr = server.address();
+          if (addr && typeof addr === 'object') {
+            this.socketAddress = `tcp:${host}:${addr.port}`;
+          }
+          resolve();
+        });
+      } else {
+        // UDS path: unlink stale, listen on path string, tighten 0600.
+        if (fs.existsSync(this.socketAddress)) {
+          try {
+            fs.unlinkSync(this.socketAddress);
+          } catch (err) {
+            this.logger.warn(
+              `[pty-kernel] unlink stale socket failed: ${String(err)}`
+            );
+          }
+        }
+        server.listen(this.socketAddress, () => {
           try {
             fs.chmodSync(this.socketAddress, 0o600);
           } catch (err) {
@@ -520,9 +541,9 @@ export class PtyKernelClient implements KernelClient {
               `[pty-kernel] chmod 0600 on UDS failed: ${String(err)}`
             );
           }
-        }
-        resolve();
-      });
+          resolve();
+        });
+      }
       this.server = server;
     });
   }
@@ -624,6 +645,18 @@ export class PtyKernelClient implements KernelClient {
     }
   }
 
+  /** Subscribe to every parsed inbound frame. Used by Tier 4 e2e tests
+   *  (Testing.md §6) to introspect what the kernel actually sent. The
+   *  callback fires after JSON parse, before dispatch — so it sees both
+   *  spans, log records, and envelopes in arrival order. */
+  public onFrame(listener: (frame: unknown) => void): vscode.Disposable {
+    this.frameListeners.push(listener);
+    return new vscode.Disposable(() => {
+      const i = this.frameListeners.indexOf(listener);
+      if (i >= 0) this.frameListeners.splice(i, 1);
+    });
+  }
+
   /** RFC-008 §6 dispatch table. Order matters: span check first (most
    *  distinctive shape), then log record, then envelope. */
   public dispatchLine(line: string): FrameKind {
@@ -641,9 +674,25 @@ export class PtyKernelClient implements KernelClient {
       this.logger.warn('[pty-kernel] K8 frame is not an object');
       return 'malformed';
     }
+    for (const listener of this.frameListeners) {
+      try {
+        listener(parsed);
+      } catch (err) {
+        // Listener errors must not affect dispatch.
+        this.logger.warn(`[pty-kernel] frame listener raised: ${String(err)}`);
+      }
+    }
     const f = parsed as Record<string, unknown>;
-    // OTel Span: traceId + spanId
-    if (typeof f.traceId === 'string' && typeof f.spanId === 'string') {
+    // RFC-006 §1 span family — three legal shapes, all keyed by spanId:
+    //  • full OTel Span open  : traceId + spanId + name + ... + endTimeUnixNano: null
+    //  • close payload (partial): spanId + endTimeUnixNano + status (NO traceId)
+    //  • streaming event (partial): spanId + event
+    // The router classifies start/complete/event by inspecting the
+    // payload — dispatchLine just needs to recognize "this is a span
+    // family frame" so the routing happens at all. Requiring traceId
+    // here was the bug: it dropped every close payload as "no
+    // recognized shape", so cells never observed terminal spans.
+    if (typeof f.spanId === 'string') {
       this.routeSpan(f as unknown as RunMimePayload);
       return 'span';
     }
