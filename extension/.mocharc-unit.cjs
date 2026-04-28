@@ -11,17 +11,26 @@
 
 'use strict';
 
+const fs = require('node:fs');
+const path = require('node:path');
+
+// FSP-003 Pillar C scaffolding: T0 unit tier exists in tsconfig but no
+// tests have been migrated into test/unit/ yet. Until then, the unit
+// tier is a no-op — pointing mocha at a missing dir errors on
+// "argument 'id' must be a non-empty string". Detect the missing dir
+// and feed mocha an empty file pattern that resolves cleanly.
+const unitDir = path.join(__dirname, 'out', 'test', 'test', 'unit');
+const hasUnitTests =
+  fs.existsSync(unitDir) &&
+  fs.readdirSync(unitDir).some((f) => f.endsWith('.test.js'));
+
 module.exports = {
-  // Compiled JS only — tsconfig.test.json emits to out/test.
-  spec: ['out/test/test/unit/**/*.test.js'],
+  spec: hasUnitTests
+    ? ['out/test/test/unit/**/*.test.js']
+    : [path.join(__dirname, '.mocharc-unit.empty-suite.js')],
   ui: 'tdd',
   reporter: 'spec',
   timeout: 5000,
   color: true,
-  // FSP-003 §4 — unit tier MUST NOT exceed 5s total. Mocha doesn't have
-  // a native suite-level deadline; the per-test 5s timeout above plus
-  // the absence of I/O work here keeps total runtime in budget.
-  recursive: true,
-  // Require nothing — unit tests have zero ambient dependencies.
-  require: []
+  recursive: true
 };

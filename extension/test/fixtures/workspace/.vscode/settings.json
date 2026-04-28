@@ -1,8 +1,7 @@
 {
   "// Description": "Fixture workspace settings — applied to both F5 launches (Tier 5) and @vscode/test-cli automated runs (Tier 4). Pins the live kernel path and the diagnostic file location so artifacts always land in a known place. See Testing.md §5.",
 
-  "// Kernel transport": "Force live kernel (PtyKernelClient + real Python). For unit/contract tests use the global `llmnb.kernel.useStub: true` override.",
-  "llmnb.kernel.useStub": false,
+  "// Kernel transport": "Default (live) kernel comes from package.json contributes default (useStub=false). The explicit workspace override was REMOVED here because workspace-scope settings WIN over ConfigurationTarget.Global, which broke stub-tier tests that set useStub=true via getConfiguration().update(...). Stub tests can now successfully set useStub=true at the global scope; live tests use the package.json default of false.",
 
   "// Python interpreter": "Pixi-managed kernel env. Absolute path required because Extension Host's child_process.spawn does not inherit shell PATH activation.",
   "llmnb.kernel.pythonPath": "${workspaceFolder}/../../../../.pixi/envs/kernel/python.exe",
