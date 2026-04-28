@@ -517,6 +517,27 @@ This anti-pattern is silent: tests pass in isolation, the deadlock surfaces only
 
 Generalization: **any callback path that logs MUST be re-entrant against the locks it transitively holds**. Applies to socket writers, file writers, queue producers — anywhere a producer's error path emits a log record, and the log handler is consumed by the same producer.
 
+### 11.8 VS Code configuration priority — workspace beats global
+
+`vscode.workspace.getConfiguration(section).update(key, value, ConfigurationTarget.Global)` only takes effect if no higher-priority scope already sets `key`. The priority order (highest first) is:
+
+1. `WorkspaceFolder`
+2. `Workspace`
+3. `Global` (a.k.a. user)
+4. Default (from `package.json` `contributes.configuration`)
+
+A test fixture's `.vscode/settings.json` is `Workspace` scope. If that file pins `"llmnb.kernel.useStub": false` and a test then does `update("kernel.useStub", true, Global)`, the read at activation time still returns `false` — the workspace value wins. The test thinks it set up a stub kernel; the extension activates with the live kernel; downstream typed waits time out (K71 ready handshake never observed; K72 terminal span never observed); a hydrate-emitting live kernel races `applyEdit` calls in unrelated metadata tests.
+
+The trap is silent because the config update API doesn't fail or warn — `update(...).then(...)` resolves successfully, but its value gets shadowed on read. The fix is one of:
+
+- **Don't pin the value in the workspace fixture** if tests need to override it. Rely on the `package.json` `contributes.configuration` default, which is the lowest priority and yields to any test's update.
+- **Have the test use `ConfigurationTarget.Workspace` (or `WorkspaceFolder`)** so it actually overrides the fixture — but this mutates the on-disk fixture file between runs, which is messy.
+- **Use a dedicated fixture per tier** (one workspace folder for stub-tier, another for live-tier, each with the pinned value).
+
+Generalization: **a settings.json under a test fixture's `.vscode/` is part of the test contract.** Any setting pinned there is something the tests in that fixture cannot override at the Global scope, period. When in doubt, leave the setting unpinned and rely on the package.json default — defaults yield to all `update()` calls regardless of target.
+
+This anti-pattern surfaced as 3 simultaneous extension-test failures (K71 + K72 + a `lastAcceptedVersion === undefined` assertion in `metadata-applier.test.ts`). All three had the same root cause and all three were fixed by deleting one line from `extension/test/fixtures/workspace/.vscode/settings.json`. The cost of finding it: most of an hour of speculation that the failures were the bug we'd already fixed twice. The cost of avoiding it: knowing the priority order.
+
 ---
 
 ## 12. The Bell System reference, in practice
