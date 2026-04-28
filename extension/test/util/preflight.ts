@@ -146,9 +146,32 @@ function locateClaudeAndUpdatePath(): string {
     { encoding: 'utf-8', timeout: 3_000 }
   );
   if (!fromPath.error && fromPath.status === 0) {
-    const first = (fromPath.stdout ?? '').split(/\r?\n/).find((l) => l.trim().length > 0);
-    if (first) {
-      return first.trim();
+    const lines = (fromPath.stdout ?? '')
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0);
+    if (lines.length > 0) {
+      // On Windows, `where claude` may return multiple files when both
+      // `claude` (POSIX shell script that ships in the pixi env) and
+      // `claude.cmd` (Windows launcher) live in the same directory.
+      // The first line is alphabetical (`claude` < `claude.cmd`), and
+      // Windows can't execute the extensionless POSIX script. Prefer
+      // a line ending in a Windows-executable extension (PATHEXT).
+      // POSIX where/which always returns extensionless paths so this
+      // filter is a no-op there.
+      if (process.platform === 'win32') {
+        const winExts = ['.cmd', '.exe', '.bat'];
+        const winnable = lines.find((l) =>
+          winExts.some((ext) => l.toLowerCase().endsWith(ext))
+        );
+        if (winnable) {
+          return winnable;
+        }
+        // No PATH entry has a Windows extension; fall through to the
+        // pixi-env probe below which explicitly looks for claude.cmd.
+      } else {
+        return lines[0];
+      }
     }
   }
   // Fallback: walk up from cwd looking for .pixi/envs/kernel.
@@ -161,22 +184,43 @@ function locateClaudeAndUpdatePath(): string {
     dir = parent;
   }
   for (const root of candidates) {
-    const envBin = process.platform === 'win32'
-      ? path.join(root, '.pixi', 'envs', 'kernel')
-      : path.join(root, '.pixi', 'envs', 'kernel', 'bin');
-    if (!fs.existsSync(envBin)) continue;
+    const envRoot = path.join(root, '.pixi', 'envs', 'kernel');
+    if (!fs.existsSync(envRoot)) continue;
+    // Pixi env binary directories per platform:
+    //   Windows: <env>/ holds the launchers shipped by pixi itself
+    //            (claude.cmd from npm-style packages); <env>/Scripts/
+    //            holds pip-installed entry-point exes (mitmdump.exe,
+    //            mitmproxy.exe, etc.) — the Python venv layout.
+    //   POSIX:   <env>/bin holds everything (single dir).
+    // Both must be on PATH for the kernel's downstream subprocess.Popen
+    // calls (claude AND mitmdump) to resolve. Activating "pixi shell -e
+    // kernel" prepends both dirs; we mirror that explicitly here.
+    const winBins = [envRoot, path.join(envRoot, 'Scripts')];
+    const posixBins = [path.join(envRoot, 'bin')];
+    const binDirs = process.platform === 'win32' ? winBins : posixBins;
     const exeName = process.platform === 'win32' ? 'claude.cmd' : 'claude';
-    const exe = path.join(envBin, exeName);
-    if (fs.existsSync(exe)) {
-      // Prepend so subsequent spawnSync('claude', ...) in this
-      // preflight, AND subprocess.Popen('claude', ...) inside the
-      // kernel that the live test will eventually spawn, both find it.
-      const sep = process.platform === 'win32' ? ';' : ':';
-      const currentPath = process.env.PATH || '';
-      if (!currentPath.split(sep).includes(envBin)) {
-        process.env.PATH = `${envBin}${sep}${currentPath}`;
+    let claudePath = '';
+    for (const bin of binDirs) {
+      const candidate = path.join(bin, exeName);
+      if (fs.existsSync(candidate)) {
+        claudePath = candidate;
+        break;
       }
-      return exe;
+    }
+    if (claudePath) {
+      // Prepend EVERY env bin dir so all pixi-installed binaries — not
+      // just claude — resolve cleanly. mitmdump (BSP-001 passthrough
+      // proxy) lives in Scripts/ on Windows and must be findable when
+      // the kernel later calls shutil.which("mitmdump").
+      const sep = process.platform === 'win32' ? ';' : ':';
+      const currentPathParts = (process.env.PATH || '').split(sep);
+      const additions = binDirs.filter(
+        (d) => fs.existsSync(d) && !currentPathParts.includes(d)
+      );
+      if (additions.length > 0) {
+        process.env.PATH = `${additions.join(sep)}${sep}${process.env.PATH || ''}`;
+      }
+      return claudePath;
     }
   }
   return '';
@@ -193,30 +237,102 @@ function checkClaudeCli(): CheckResult {
       remediation: 'install Claude Code per docs/setup.md, or run `pixi install -e kernel`'
     };
   }
+  // shell: true is required on Windows when invoking a .cmd / .bat
+  // launcher — Node's child_process.spawn cannot execute batch files
+  // directly, only PE binaries. POSIX shell scripts work without it.
+  const isCmd = process.platform === 'win32'
+    && /\.(cmd|bat)$/i.test(claudeBin);
   const r = spawnSync(claudeBin, ['--version'], {
     encoding: 'utf-8',
-    timeout: 5_000
+    timeout: 5_000,
+    shell: isCmd
   });
   if (r.error || r.status !== 0) {
+    const detail = r.error
+      ? `${(r.error as NodeJS.ErrnoException).code ?? 'error'}: ${r.error.message}`
+      : `exit=${r.status} stderr=${(r.stderr ?? '').trim().slice(0, 200)}`;
     return {
       ok: false,
-      reason: `claude --version failed at ${claudeBin}`,
+      reason: `claude --version failed at ${claudeBin} (${detail})`,
       remediation: 'reinstall Claude Code per docs/setup.md'
     };
   }
   return { ok: true };
 }
 
-/** Live-tier check: ANTHROPIC_API_KEY env or claude OAuth session.
- *  We treat presence of the env var as sufficient (cheapest signal); if
- *  absent, fall back to `claude /status` returning success. */
+/** Walk up from cwd looking for a .env file at any ancestor directory.
+ *  Returns the absolute path to the first match, or empty string if none.
+ *  Mirrors python-dotenv's find_dotenv(usecwd=True) which the kernel
+ *  uses (RFC-009 §4.4 — credentials are env-only; a .env at the repo
+ *  root is just shell env at process start, which preflight should
+ *  honor identically to a manually-exported var). */
+function findDotenv(): string {
+  let dir = process.cwd();
+  for (let i = 0; i < 8; i += 1) {
+    const candidate = path.join(dir, '.env');
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return '';
+}
+
+/** Read a .env file and return the parsed key/value map. Minimal
+ *  parser — handles `KEY=value` lines, quoted values, blank/comment
+ *  lines. We don't pull in the dotenv npm package because tests should
+ *  not add runtime deps and the format is trivial. */
+function parseDotenv(filePath: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  let raw: string;
+  try {
+    raw = fs.readFileSync(filePath, { encoding: 'utf-8' });
+  } catch {
+    return out;
+  }
+  for (const rawLine of raw.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (line.length === 0 || line.startsWith('#')) continue;
+    const eq = line.indexOf('=');
+    if (eq < 0) continue;
+    const key = line.slice(0, eq).trim();
+    let value = line.slice(eq + 1).trim();
+    // Strip matched surrounding quotes.
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    if (key) out[key] = value;
+  }
+  return out;
+}
+
+/** Live-tier check: ANTHROPIC_API_KEY env, .env file, or claude OAuth.
+ *  RFC-009 §4.4 — credentials are env-only. We honor a .env at the
+ *  repo root as "env at process start" (matching the kernel's dotenv
+ *  loader). On match the variable is also exported to process.env so
+ *  the kernel inherits it on spawn. */
 function checkAnthropicCredentials(): CheckResult {
+  // 1) env var already set
   if (process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY.length > 0) {
     return { ok: true };
   }
-  // Fallback: probe `claude` for a healthy session. Some installs
-  // expose `claude /status`; others expose `claude auth status`. We
-  // try /status first per FSP-003.
+  // 2) .env at repo root (matches kernel's find_dotenv usage)
+  const envPath = findDotenv();
+  if (envPath) {
+    const parsed = parseDotenv(envPath);
+    const fromFile = parsed.ANTHROPIC_API_KEY;
+    if (fromFile && fromFile.length > 0) {
+      // Export so the kernel subprocess inherits it.
+      process.env.ANTHROPIC_API_KEY = fromFile;
+      return { ok: true };
+    }
+  }
+  // 3) Fallback: claude OAuth session probe
   for (const argv of [['/status'], ['auth', 'status']]) {
     const r = spawnSync('claude', argv, { encoding: 'utf-8', timeout: 8_000 });
     if (!r.error && r.status === 0) {
@@ -225,8 +341,8 @@ function checkAnthropicCredentials(): CheckResult {
   }
   return {
     ok: false,
-    reason: 'no Anthropic credentials (no ANTHROPIC_API_KEY env, no valid claude OAuth session)',
-    remediation: 'set ANTHROPIC_API_KEY or run `claude login`'
+    reason: 'no Anthropic credentials (no ANTHROPIC_API_KEY env, no .env at repo root, no valid claude OAuth session)',
+    remediation: 'set ANTHROPIC_API_KEY env var, add it to .env at repo root, or run `claude login`'
   };
 }
 
