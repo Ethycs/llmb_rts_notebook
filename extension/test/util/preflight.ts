@@ -125,17 +125,83 @@ function checkPixiKernelEnv(): CheckResult {
   return { ok: true };
 }
 
-/** Live-tier check: claude CLI on PATH. */
+/** Locate the claude binary either on PATH or under the repo's pixi
+ *  kernel env. The Extension Host's child_process inherits env from
+ *  VS Code, which on Windows does not inherit pixi shell-activation.
+ *  Looking up the pixi env explicitly as a fallback makes preflight
+ *  (and the live test infrastructure that follows) work without
+ *  requiring `pixi shell -e kernel` to have been run first.
+ *
+ *  Returns the absolute path to a known-good claude executable, or
+ *  empty string if none is found. As a side effect, prepends the
+ *  pixi env's bin dir to process.env.PATH so subsequent spawnSync
+ *  calls in this preflight (and any subprocess.Popen inside the
+ *  test's kernel) resolve `claude` naturally without each call site
+ *  needing to know the absolute path. */
+function locateClaudeAndUpdatePath(): string {
+  // Try PATH first — if claude is already resolvable, no env munging.
+  const fromPath = spawnSync(
+    process.platform === 'win32' ? 'where' : 'which',
+    ['claude'],
+    { encoding: 'utf-8', timeout: 3_000 }
+  );
+  if (!fromPath.error && fromPath.status === 0) {
+    const first = (fromPath.stdout ?? '').split(/\r?\n/).find((l) => l.trim().length > 0);
+    if (first) {
+      return first.trim();
+    }
+  }
+  // Fallback: walk up from cwd looking for .pixi/envs/kernel.
+  const candidates: string[] = [];
+  let dir = process.cwd();
+  for (let i = 0; i < 6; i += 1) {
+    candidates.push(dir);
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  for (const root of candidates) {
+    const envBin = process.platform === 'win32'
+      ? path.join(root, '.pixi', 'envs', 'kernel')
+      : path.join(root, '.pixi', 'envs', 'kernel', 'bin');
+    if (!fs.existsSync(envBin)) continue;
+    const exeName = process.platform === 'win32' ? 'claude.cmd' : 'claude';
+    const exe = path.join(envBin, exeName);
+    if (fs.existsSync(exe)) {
+      // Prepend so subsequent spawnSync('claude', ...) in this
+      // preflight, AND subprocess.Popen('claude', ...) inside the
+      // kernel that the live test will eventually spawn, both find it.
+      const sep = process.platform === 'win32' ? ';' : ':';
+      const currentPath = process.env.PATH || '';
+      if (!currentPath.split(sep).includes(envBin)) {
+        process.env.PATH = `${envBin}${sep}${currentPath}`;
+      }
+      return exe;
+    }
+  }
+  return '';
+}
+
+/** Live-tier check: claude CLI is locatable (PATH or pixi env fallback)
+ *  and `--version` succeeds. */
 function checkClaudeCli(): CheckResult {
-  const r = spawnSync('claude', ['--version'], {
+  const claudeBin = locateClaudeAndUpdatePath();
+  if (!claudeBin) {
+    return {
+      ok: false,
+      reason: 'claude CLI not on PATH and not found under .pixi/envs/kernel/',
+      remediation: 'install Claude Code per docs/setup.md, or run `pixi install -e kernel`'
+    };
+  }
+  const r = spawnSync(claudeBin, ['--version'], {
     encoding: 'utf-8',
     timeout: 5_000
   });
   if (r.error || r.status !== 0) {
     return {
       ok: false,
-      reason: 'claude CLI not on PATH or `--version` failed',
-      remediation: 'install Claude Code per docs/setup.md'
+      reason: `claude --version failed at ${claudeBin}`,
+      remediation: 'reinstall Claude Code per docs/setup.md'
     };
   }
   return { ok: true };
