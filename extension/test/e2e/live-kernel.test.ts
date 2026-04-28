@@ -205,24 +205,11 @@ suite('e2e: live kernel against real Pixi Python', () => {
         { ranges: [{ start: 0, end: 1 }] },
         doc.uri
       );
-      // Wait for a CLOSED span specifically (endTimeUnixNano set), not
-      // just any output — the kernel emits an OPEN span first, and a
-      // race between waitFor resolving on length>0 and the close event
-      // being appended would otherwise fail the assertion below.
-      await waitFor(() => {
-        const items = doc.cellAt(0).outputs.flatMap((o) => o.items);
-        const runItems = items.filter((i) => i.mime === RTS_RUN_MIME);
-        return runItems.some((i) => {
-          try {
-            const d = JSON.parse(new TextDecoder('utf-8').decode(i.data)) as {
-              endTimeUnixNano?: string | null;
-            };
-            return typeof d.endTimeUnixNano === 'string' && d.endTimeUnixNano.length > 0;
-          } catch {
-            return false;
-          }
-        });
-      }, 150000);
+      // FSP-003 K72 — terminal span never observed. Awaits a CLOSED
+      // RTS_RUN_MIME span on the cell (endTimeUnixNano set + status
+      // non-UNSET); on timeout the error carries the marker tail so
+      // operators can see the last kernel stage that fired.
+      await waitForCellComplete(doc, 0, 150000);
 
       const items = doc.cellAt(0).outputs.flatMap((o) => o.items);
       const runItems = items.filter((i) => i.mime === RTS_RUN_MIME);
@@ -315,17 +302,6 @@ suite('e2e: live kernel against real Pixi Python', () => {
     assert.ok(doc, 'document opened cleanly under hydrate path');
   });
 });
-
-async function waitFor(predicate: () => boolean, timeoutMs: number): Promise<void> {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    if (predicate()) {
-      return;
-    }
-    await new Promise((r) => setTimeout(r, 50));
-  }
-  throw new Error(`waitFor: predicate did not become true within ${timeoutMs}ms`);
-}
 
 /** Read the kernel's stage markers, parsing one JSON record per line. */
 function readMarkers(markerFile: string): Array<{ stage: string; ts: number; [k: string]: unknown }> {

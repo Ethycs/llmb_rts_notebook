@@ -17,6 +17,7 @@ import * as vscode from 'vscode';
 import { ExtensionApi, StubKernelClient } from './extension.js';
 import { RTS_RUN_MIME } from './notebook/controller.js';
 import type { OtlpSpan } from './otel/attrs.js';
+import { waitForCellComplete } from '../test/util/typed-waits.js';
 
 const EXT_ID = 'ethycs.llmb-rts-notebook';
 
@@ -51,8 +52,8 @@ suite('llmnb V1 smoke', () => {
       doc.uri
     );
 
-    // Allow time for the controller to flush outputs from the closed span.
-    await waitFor(() => doc.cellAt(0).outputs.length > 0, 2000);
+    // FSP-003 K72 — terminal span never observed.
+    await waitForCellComplete(doc, 0, 5000);
 
     const kernel = api.getKernelClient() as StubKernelClient;
     const spans = kernel.lastPayloads.filter(
@@ -73,13 +74,3 @@ suite('llmnb V1 smoke', () => {
   });
 });
 
-async function waitFor(predicate: () => boolean, timeoutMs: number): Promise<void> {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    if (predicate()) {
-      return;
-    }
-    await new Promise((r) => setTimeout(r, 25));
-  }
-  throw new Error(`waitFor: predicate did not become true within ${timeoutMs}ms`);
-}
