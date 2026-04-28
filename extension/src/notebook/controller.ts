@@ -38,6 +38,12 @@ export interface KernelClient {
    *  `endTimeUnixNano` set and a non-UNSET status) via the supplied sink.
    *  Streaming events MAY be emitted via the partial `{spanId, event}` shape. */
   executeCell(input: KernelExecuteRequest, sink: KernelEventSink): Promise<void>;
+  /** True once the kernel is ready to accept executeCell traffic.
+   *  PtyKernelClient flips this true after the `kernel.ready` handshake
+   *  (RFC-008 §4); StubKernelClient flips this true immediately after
+   *  `attachRouter()` (no remote side). FSP-003 Pillar A — what
+   *  `waitForKernelReady` polls so a K71 timeout has a clean predicate. */
+  readonly isReady: boolean;
 }
 
 export interface KernelExecuteRequest {
@@ -191,6 +197,20 @@ export class LlmnbNotebookController implements vscode.Disposable, RunLifecycleO
     }
     const item = vscode.NotebookCellOutputItem.json(span, RTS_RUN_MIME);
     const ok = span.status?.code === 'STATUS_CODE_OK';
+    // Synchronously claim the inflight slot. runOne()'s sync fallback after
+    // executeCell() returns checks inflight.has(cellKey) as the predicate
+    // for "no terminal span observed; end unsuccessfully." If we leave the
+    // entry in place while we await appendOutput, the fallback fires
+    // exec.end(false) before our async commit, discarding pending Thenables
+    // and finalizing the cell empty. This race surfaces with the stub
+    // kernel (synchronous emit-and-return); the live PtyKernelClient avoids
+    // it by awaiting the terminal span before executeCell() resolves.
+    for (const [k, v] of this.inflight) {
+      if (v === exec) {
+        this.inflight.delete(k);
+        break;
+      }
+    }
     // Await the append before calling end(): NotebookCellExecution.end()
     // finalizes the cell, and pending Thenables from appendOutput can be
     // discarded if they haven't committed yet, leaving the close payload
@@ -201,12 +221,6 @@ export class LlmnbNotebookController implements vscode.Disposable, RunLifecycleO
         await exec.appendOutput(new vscode.NotebookCellOutput([item]));
       } finally {
         exec.end(ok, Date.now());
-        for (const [k, v] of this.inflight) {
-          if (v === exec) {
-            this.inflight.delete(k);
-            break;
-          }
-        }
         this.cellByCorrelation.delete(span.spanId);
       }
     })();

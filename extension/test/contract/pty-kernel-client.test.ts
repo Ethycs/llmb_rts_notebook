@@ -41,6 +41,7 @@ import {
 } from '../../src/notebook/pty-kernel-client.js';
 import { encodeAttrs } from '../../src/otel/attrs.js';
 import type { RtsV2Envelope, RunMimePayload } from '../../src/messaging/types.js';
+import { waitForPredicate } from '../util/typed-waits.js';
 
 function silentLogger(): vscode.LogOutputChannel {
   const noop = (): void => {
@@ -196,18 +197,21 @@ suite('contract: PtyKernelClient (RFC-008)', () => {
     __setPtyModule(undefined);
   });
 
-  // RFC-008 §2 — UDS path on POSIX, named pipe on Windows.
+  // RFC-008 §2 — UDS path on POSIX, loopback TCP on Windows.
+  // (Windows named pipes need pywin32 on the kernel side, which is not wired
+  // up in V1; the kernel's parse_address raises NotImplementedError for
+  // pipe: addresses and recommends tcp:127.0.0.1:<port> instead.)
   test('allocateSocketAddress() picks platform-appropriate transport', () => {
     const router = new MessageRouter(silentLogger());
     const sessionId = 'test-session-aaa';
     const c = new PtyKernelClient(
-      { sessionId, pythonPath: 'python', socketAddress: 'tcp:127.0.0.1:0' },
+      { sessionId, pythonPath: 'python' },
       router,
       silentLogger()
     );
     const computed = c.allocateSocketAddress();
     if (process.platform === 'win32') {
-      assert.equal(computed, `\\\\.\\pipe\\llmnb-${sessionId}`);
+      assert.equal(computed, 'tcp:127.0.0.1:0');
     } else {
       assert.match(computed, new RegExp(`llmnb-${sessionId}\\.sock$`));
     }
@@ -227,7 +231,7 @@ suite('contract: PtyKernelClient (RFC-008)', () => {
     const startPromise = c.start();
     // The fake spawn is synchronous within the fake module; after the
     // listenSocket binds the kernel client calls spawn().
-    await waitFor(() => fakeMod.spawned.length === 1, 1000);
+    await waitForPredicate(() => fakeMod.spawned.length === 1, 1000);
 
     assert.equal(fakeMod.lastFile, 'python');
     assert.deepEqual(fakeMod.lastArgs, ['-m', 'llm_kernel', 'pty-mode']);
@@ -251,7 +255,7 @@ suite('contract: PtyKernelClient (RFC-008)', () => {
       silentLogger()
     );
     const startPromise = c.start();
-    await waitFor(() => fakeMod.spawned.length === 1, 1000);
+    await waitForPredicate(() => fakeMod.spawned.length === 1, 1000);
 
     const sock = await connectKernelSocket(port.toString());
     sock.write(JSON.stringify(readyRecord(sessionId)) + '\n');
@@ -298,7 +302,7 @@ suite('contract: PtyKernelClient (RFC-008)', () => {
       silentLogger()
     );
     const p = c.start();
-    await waitFor(() => fakeMod.spawned.length === 1, 1000);
+    await waitForPredicate(() => fakeMod.spawned.length === 1, 1000);
     fakeMod.spawned[0].fireExit(2);
     await assert.rejects(() => p, /exited before ready handshake/);
     c.dispose();
@@ -320,7 +324,7 @@ suite('contract: PtyKernelClient (RFC-008)', () => {
       onRunComplete: () => { /* noop */ }
     });
     const startPromise = c.start();
-    await waitFor(() => fakeMod.spawned.length === 1, 1000);
+    await waitForPredicate(() => fakeMod.spawned.length === 1, 1000);
     const sock = await connectKernelSocket(port.toString());
     sock.write(JSON.stringify(readyRecord('sess-disp-span')) + '\n');
     await startPromise;
@@ -336,7 +340,7 @@ suite('contract: PtyKernelClient (RFC-008)', () => {
       status: { code: 'STATUS_CODE_UNSET', message: '' }
     };
     sock.write(JSON.stringify(span) + '\n');
-    await waitFor(() => seenSpans.length >= 1, 1000);
+    await waitForPredicate(() => seenSpans.length >= 1, 1000);
     assert.equal(seenSpans[0].spanId, 'b'.repeat(16));
     sock.destroy();
     c.dispose();
@@ -353,7 +357,7 @@ suite('contract: PtyKernelClient (RFC-008)', () => {
     const seenLogs: OtlpLogRecord[] = [];
     router.registerLogRecordHandler((r) => seenLogs.push(r));
     const startPromise = c.start();
-    await waitFor(() => fakeMod.spawned.length === 1, 1000);
+    await waitForPredicate(() => fakeMod.spawned.length === 1, 1000);
     const sock = await connectKernelSocket(port.toString());
     // The ready record IS a LogRecord; it reaches the LogRecordObserver too.
     sock.write(JSON.stringify(readyRecord('sess-disp-log')) + '\n');
@@ -367,7 +371,7 @@ suite('contract: PtyKernelClient (RFC-008)', () => {
       attributes: []
     };
     sock.write(JSON.stringify(log) + '\n');
-    await waitFor(() => seenLogs.some((l) => l.severityNumber === 13), 1000);
+    await waitForPredicate(() => seenLogs.some((l) => l.severityNumber === 13), 1000);
     const warn = seenLogs.find((l) => l.severityNumber === 13);
     assert.ok(warn);
     assert.equal(warn?.body?.stringValue, 'oh no');
@@ -386,7 +390,7 @@ suite('contract: PtyKernelClient (RFC-008)', () => {
     const seenEnv: RtsV2Envelope<unknown>[] = [];
     c.setCommSink({ emit: (env) => seenEnv.push(env) });
     const startPromise = c.start();
-    await waitFor(() => fakeMod.spawned.length === 1, 1000);
+    await waitForPredicate(() => fakeMod.spawned.length === 1, 1000);
     const sock = await connectKernelSocket(port.toString());
     sock.write(JSON.stringify(readyRecord('sess-disp-env')) + '\n');
     await startPromise;
@@ -396,7 +400,7 @@ suite('contract: PtyKernelClient (RFC-008)', () => {
       payload: { snapshot_version: 1, tree: { id: 'r', type: 'workspace', children: [] } }
     };
     sock.write(JSON.stringify(env) + '\n');
-    await waitFor(() => seenEnv.length >= 1, 1000);
+    await waitForPredicate(() => seenEnv.length >= 1, 1000);
     assert.equal(seenEnv[0].type, 'layout.update');
     sock.destroy();
     c.dispose();
@@ -440,7 +444,7 @@ suite('contract: PtyKernelClient (RFC-008)', () => {
     c.onDrift((d) => captured.push(d));
 
     const startPromise = c.start();
-    await waitFor(() => fakeMod.spawned.length === 1, 1000);
+    await waitForPredicate(() => fakeMod.spawned.length === 1, 1000);
 
     const sock = await connectKernelSocket(port.toString());
     // RFC-006 v2 → v3: major mismatch.
@@ -467,7 +471,7 @@ suite('contract: PtyKernelClient (RFC-008)', () => {
       silentLogger()
     );
     const startPromise = c.start();
-    await waitFor(() => fakeMod.spawned.length === 1, 1000);
+    await waitForPredicate(() => fakeMod.spawned.length === 1, 1000);
 
     const first = await connectKernelSocket(port.toString());
     first.write(JSON.stringify(readyRecord(sessionId)) + '\n');
@@ -495,7 +499,7 @@ suite('contract: PtyKernelClient (RFC-008)', () => {
       silentLogger()
     );
     const startPromise = c.start();
-    await waitFor(() => fakeMod.spawned.length === 1, 1000);
+    await waitForPredicate(() => fakeMod.spawned.length === 1, 1000);
 
     const sock = await connectKernelSocket(port.toString());
     sock.write(JSON.stringify(readyRecord(sessionId)) + '\n');
@@ -518,7 +522,7 @@ suite('contract: PtyKernelClient (RFC-008)', () => {
       silentLogger()
     );
     const startPromise = c.start();
-    await waitFor(() => fakeMod.spawned.length === 1, 1000);
+    await waitForPredicate(() => fakeMod.spawned.length === 1, 1000);
     const sock = await connectKernelSocket(port.toString());
     sock.write(JSON.stringify(readyRecord('sess-int')) + '\n');
     await startPromise;
@@ -547,7 +551,7 @@ suite('contract: PtyKernelClient (RFC-008)', () => {
       silentLogger()
     );
     const startPromise = c.start();
-    await waitFor(() => fakeMod.spawned.length === 1, 1000);
+    await waitForPredicate(() => fakeMod.spawned.length === 1, 1000);
     const sock = await connectKernelSocket(port.toString());
     sock.write(JSON.stringify(readyRecord(sessionId)) + '\n');
     await startPromise;
@@ -565,7 +569,7 @@ suite('contract: PtyKernelClient (RFC-008)', () => {
 
     const shutdownPromise = c.shutdown();
     // Wait for the shutdown_request frame to appear.
-    await waitFor(() => received.some((l) => l.includes('kernel.shutdown_request')), 1000);
+    await waitForPredicate(() => received.some((l) => l.includes('kernel.shutdown_request')), 1000);
     // After shutdownGraceMs (50ms) the client SIGTERMs the PTY; the FakePty
     // fires its exit on SIGTERM, which resolves shutdown.
     await shutdownPromise;
@@ -585,7 +589,7 @@ suite('contract: PtyKernelClient (RFC-008)', () => {
     const collected: string[] = [];
     c.onPtyData((d) => collected.push(d));
     const startPromise = c.start();
-    await waitFor(() => fakeMod.spawned.length === 1, 1000);
+    await waitForPredicate(() => fakeMod.spawned.length === 1, 1000);
     fakeMod.spawned[0]._emitData('LLMKernel pty-mode v1.0.0\r\n');
     const sock = await connectKernelSocket(port.toString());
     sock.write(JSON.stringify(readyRecord('sess-ptydata')) + '\n');
@@ -596,13 +600,5 @@ suite('contract: PtyKernelClient (RFC-008)', () => {
   });
 });
 
-async function waitFor(predicate: () => boolean, timeoutMs: number): Promise<void> {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    if (predicate()) {
-      return;
-    }
-    await new Promise((r) => setTimeout(r, 5));
-  }
-  throw new Error(`waitFor: predicate did not become true within ${timeoutMs}ms`);
-}
+// Local waitFor removed in FSP-003 Pillar A — use waitForPredicate (this
+// suite polls fixture-internal fake-module state, not extension lifecycle).
