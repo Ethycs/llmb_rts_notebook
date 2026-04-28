@@ -11,7 +11,7 @@ This BSP specifies how cells, agents, and turns relate. It answers five question
 1. **What is a zone?** — one notebook = one zone. Each `.llmnb` file is its own zone; the file is the canonical record.
 2. **Can different cells use different agents/providers?** — yes. Cells declare which agent (and provider) they target. Cells with no agent declaration extend the most recently used agent.
 3. **What context does a cell see?** — the linear prefix of all turns above it in the notebook, regardless of which agent produced each. The notebook is a single shared transcript that all agents read from.
-4. **Can the operator branch and revert?** — yes, with git-style ref semantics on agents (BSP-002 v1.x defines the data model; full UX for branch-switching ships V1.5+).
+4. **Can the operator branch and revert?** — yes, with git-style ref semantics on agents (BSP-002 v1.x defines the data model; full UX for branch-switching ships V2+).
 5. **Where is the canonical record?** — the `.llmnb` file (`metadata.rts.zone`). The agent is a runtime executor; the notebook is the score.
 
 **Core axioms:**
@@ -51,11 +51,11 @@ A `turn` is one operator-or-agent message contributed to the notebook. Immutable
 }
 ```
 
-`parent_id: null` denotes the zone's root turn. `parent_id` defines the DAG; the linear "mainline" is the chain of turns reachable from the document's last cell by following `parent_id` backward. Multiple turns sharing one parent are sibling branches (V1.5+ for branch-switching UX).
+`parent_id: null` denotes the zone's root turn. `parent_id` defines the DAG; the linear "mainline" is the chain of turns reachable from the document's last cell by following `parent_id` backward. Multiple turns sharing one parent are sibling branches (V2+ for branch-switching UX).
 
 `agent_id` identifies which agent produced or received the turn. `null` for operator turns that target the most-recent agent (the kernel resolves the target at execution time and rewrites this field on persistence).
 
-`provider` is the runtime that produced the agent turn (`claude-code` for V1; `gpt-cli`, `gemini`, `ollama` reserved for V1.5+). Operator turns carry the provider that will execute the *next* agent turn so the spec is unambiguous.
+`provider` is the runtime that produced the agent turn (`claude-code` for V1; `gpt-cli`, `gemini`, `ollama` reserved for V2+). Operator turns carry the provider that will execute the *next* agent turn so the spec is unambiguous.
 
 `claude_session_id` is the underlying claude-code session UUID for that turn. Different turns by the same agent may have different session IDs after a revert (see §5).
 
@@ -239,7 +239,7 @@ The cell's bound agent is persisted in cell metadata (`vscode.NotebookCellData.m
 
 **Re-execution.** Re-running a cell produces a NEW turn (new `id`). The previous turn stays in the DAG but is no longer this cell's `cell_id` target. The cell's `bound_agent_id` may change if the operator edited the directive (e.g., changed `@alpha:` to `@beta:` and re-ran). The decoration updates accordingly.
 
-**Branching UX.** Branching produces parallel cell sequences in the document. V1 just appends new cells in document order; the operator reads the cell decorations + directive prefixes to follow which branch they're in. V1.5+ adds a sidebar / picker for switching the rendered branch.
+**Branching UX.** Branching produces parallel cell sequences in the document. V1 just appends new cells in document order; the operator reads the cell decorations + directive prefixes to follow which branch they're in. V2+ adds a sidebar / picker for switching the rendered branch.
 
 ## 7. Failure modes (K-class numbering, continued from BSP-001 K11–K13)
 
@@ -252,11 +252,26 @@ The cell's bound agent is persisted in cell metadata (`vscode.NotebookCellData.m
 | K24 | `--resume <session_id>` failed (claude reports session not found) | `agent_resume_failed` with `claude_session_id` | The session expired in claude's local cache; replay from turn DAG (kernel falls back automatically; no operator action) |
 | K25 | Plain-text cell with no prior agent in the zone | `cell_directive_no_agent_in_zone` | Use `/spawn` to create the first agent in this notebook |
 | K26 | Cross-agent handoff failed (provider rejected synthesized context messages) | `agent_handoff_failed` with `agent_id`, `missed_turn_count` | Provider may have token-limit or format issues; consider a fresh spawn or revert |
-| K27 | Provider for `/spawn provider:<name>` is unknown to the kernel | `cell_directive_unknown_provider` with `provider` | V1 supports `claude-code` only; V1.5+ adds others |
+| K27 | Provider for `/spawn provider:<name>` is unknown to the kernel | `cell_directive_unknown_provider` with `provider` | V1 supports `claude-code` only; V2+ adds others |
 
-## 8. Storage in `metadata.rts`
+## 8. Storage in `metadata.rts` — directory-mirroring JSON
 
-Adds a new top-level key. The notebook IS the zone, so all turns and agents live under one `zone` object:
+The notebook IS the zone. The JSON layout under `metadata.rts.zone` is **structured so that mechanical conversion to a directory format is one-to-one** — each nested object key = directory name, each array = ordered file list, each leaf = file content. The directory format itself is a deferred spec (RFC-005 v2); the V1 single-file format below is the canonical store today, but its shape is fixed now so the future conversion is naive.
+
+### 8.1 Convertibility invariant
+
+```
+JSON path                                      ↔  Future directory path
+metadata.rts.zone.zone_id                      ↔  zone-id (in metadata.rts.json)
+metadata.rts.zone.agents.<id>.session          ↔  agents/<id>/session.json
+metadata.rts.zone.agents.<id>.turns[N]         ↔  agents/<id>/turns/<NNN>-<kind>.{md|json}
+metadata.rts.zone.blobs.<hash>                 ↔  blobs/<hash>/{content,meta.json}
+metadata.rts.zone.ordering[N]                  ↔  ordering.json (entry N)
+```
+
+Conversion is `flatten` (file → directory) and `inline` (directory → file), nothing more. No re-keying, no schema massage. Tests assert round-trip equivalence.
+
+### 8.2 Schema
 
 ```json
 {
@@ -264,16 +279,90 @@ Adds a new top-level key. The notebook IS the zone, so all turns and agents live
     "schema_version": "1.1.0",
     ...,
     "zone": {
-      "zone_id": "00000000-...",
+      "zone_id": "00000000-0000-0000-0000-...",
       "version": 1,
-      "agents": [...],
-      "turns": [...]
+
+      "agents": {
+        "alpha": {
+          "session": {
+            "id": "alpha",
+            "head_turn_id": "002-agent-response",
+            "last_seen_turn_id": "002-agent-response",
+            "claude_session_id": "9d4f-...",
+            "provider": "claude-code",
+            "runtime_status": "alive",
+            "pid": 32856,
+            "model": "claude-haiku-4-5-20251001",
+            "work_dir": ".llmnb-agents/alpha",
+            "created_at": "..."
+          },
+          "turns": [
+            {
+              "id": "001-operator-spawn",
+              "parent_id": null,
+              "kind": "operator",
+              "body": "/spawn alpha task:\"design a schema\"",
+              "cell_id": "vscode-notebook-cell:.../#abc",
+              "spans": [],
+              "created_at": "..."
+            },
+            {
+              "id": "002-agent-response",
+              "parent_id": "001-operator-spawn",
+              "kind": "agent_response",
+              "body": "Here is a schema...",
+              "cell_id": "vscode-notebook-cell:.../#def",
+              "spans": [...],
+              "created_at": "..."
+            }
+          ]
+        },
+        "beta": { "session": {...}, "turns": [...] }
+      },
+
+      "blobs": {
+        "sha256-abc123...": {
+          "content": "<base64 or utf8>",
+          "meta": {
+            "mime": "text/x-python",
+            "source": "tool:read_file",
+            "size_bytes": 4912,
+            "created_at": "..."
+          }
+        }
+      },
+
+      "ordering": [
+        { "agent_id": "alpha", "turn_id": "001-operator-spawn" },
+        { "agent_id": "alpha", "turn_id": "002-agent-response" },
+        { "agent_id": "beta",  "turn_id": "001-operator-spawn" },
+        { "agent_id": "beta",  "turn_id": "002-agent-response" }
+      ]
     }
   }
 }
 ```
 
+### 8.3 Navigation paths (stable, used by kernel + extension)
+
+These dot-paths are part of the contract; producers and consumers must agree:
+
+| Operation | Path |
+|---|---|
+| Look up an agent | `zone.agents.<id>.session` |
+| List an agent's turns | `zone.agents.<id>.turns` |
+| Read a specific turn | `zone.agents.<id>.turns[N]` (where N is array index; turn `id` is the human-readable filename) |
+| Resolve a blob ref | `zone.blobs.<hash>` |
+| Render the linear notebook | walk `zone.ordering[]` and resolve each `(agent_id, turn_id)` to `zone.agents.<agent_id>.turns.find(t => t.id === turn_id)` |
+| Find an agent's head | `zone.agents.<id>.session.head_turn_id` |
+
+`<id>` and `<hash>` are object keys (string-typed); they appear as path components. `[N]` is array index. Both forms are JSONPath-compatible.
+
+### 8.4 Schema bump
+
 This is additive to RFC-005 v1.0.x; the schema bump is `1.0.x → 1.1.0` (minor — backward-compatible with kernels that ignore the new key but lose multi-turn semantics on resume). DriftDetector should warn but not block on this version mismatch.
+
+### 8.5 Event log additions
 
 The existing `event_log.runs[]` continues to record OTLP spans per turn. New events for ref moves and handoffs:
 
@@ -281,15 +370,15 @@ The existing `event_log.runs[]` continues to record OTLP spans per turn. New eve
 {
   "type": "agent_ref_move",
   "agent_id": "alpha",
-  "from_turn_id": "t_03",
-  "to_turn_id": "t_02",
+  "from_turn_id": "002-agent-response",
+  "to_turn_id": "001-operator-spawn",
   "reason": "operator_revert" | "operator_branch" | "turn_committed",
   "timestamp": "..."
 }
 {
   "type": "agent_context_handoff",
   "agent_id": "alpha",
-  "missed_turn_ids": ["t_03"],
+  "missed_turn_ids": ["beta/003-tool-read_file"],
   "synthesized_messages": 1,
   "timestamp": "..."
 }
@@ -305,7 +394,7 @@ Three independent slices. None blocks the others.
 
 3. **X-EXT** (extension): cell directive parser extended with the four verbs (§3). Cell decoration showing `agent.id` + `agent.runtime_status`. Routes parsed directives to the kernel via the existing `operator.action` envelope (new `action_type`s: `agent_continue`, `agent_branch`, `agent_revert`, `agent_stop`).
 
-V1 ships with `/spawn` and `@<agent>:` working. `/branch` and `/revert` are V1.5 if the lifetime work is more complex than estimated. The data model in §2 is ratified now so we don't have to migrate later.
+V1 ships with `/spawn` and `@<agent>:` working. `/branch` and `/revert` are V2 if the lifetime work is more complex than estimated. The data model in §2 is ratified now so we don't have to migrate later.
 
 ## 10. Open questions
 
@@ -314,11 +403,139 @@ These resolve before slices 2 and 3 ship; not blockers for §2 or §9 slice 1.
 1. Does claude-code's `--input-format=stream-json` actually accept *new* user turns mid-process, or only the initial conversation prefix? If only the prefix, all "continuations" become re-spawn-with-replay (Case B mechanics from §4.4 applied universally). The user-facing semantics in §3 stay identical; only K-AS's implementation changes.
 2. ~~Cross-agent context handoff (§4.6): should synthesized messages be tagged so the agent knows they came from a different agent, or should they be presented as if the agent itself wrote them?~~ **Resolved Issue 3**: handoff messages are NOT tagged at the text level. Cell-as-agent-identity (§6) makes the notebook itself the attribution surface; the operator sees which cells produced which turns. Handoff content is fed verbatim.
 3. How should the cell render when its bound agent's `runtime_status: "exited"`? Surface a clear "this conversation is closed" state, or auto-resume on next `@`? (Suggest: surface clearly; require explicit `@` to re-engage.)
-4. UX for branch switching in the document — V1.5+ scope; deferred. V1 just appends new cells in document order; the operator reads the cell decorations + directive prefixes to follow which branch they're in.
+4. UX for branch switching in the document — V2+ scope; deferred. V1 just appends new cells in document order; the operator reads the cell decorations + directive prefixes to follow which branch they're in.
 5. Should `provider:<name>` be a per-cell hint (this turn uses GPT) or a sticky attribute on the agent (alpha is forever a Claude agent)? **Recommended sticky** — providers have different context formats and switching mid-conversation is a footgun. `/spawn beta provider:gpt` creates a separate agent.
+
+## 11. Views: notebook is one rendering, sidebar is another
+
+The notebook IS the canonical operator surface — a linear chat-like sequence of cells. The graph view is a **second rendering of the same `metadata.rts.zone` data**, no new data, no new state. Pinning two views to one source of truth is what keeps "modify without getting lost" tractable: editing a cell's bound agent, branching, reverting all show up in both views immediately because both views just re-render from the data.
+
+### 11.1 V1 — vertical list (top-to-bottom mirror)
+
+Right-hand sidebar (VS Code's secondary sidebar, or a tab in the explorer activity). Each entry is one cell in `zone.ordering[]` sequence. For each entry the sidebar shows:
+
+- icon by `turn.kind` (operator / agent_response / tool_call / system)
+- agent badge (the same one rendered on the cell, §6)
+- one-line label: agent_id + first ~40 chars of `turn.body` (or `tool_name` for tool_call)
+- click → `vscode.window.activeNotebookEditor.revealRange(...)` on the corresponding cell
+
+The sidebar is read-only in V1. Bidirectional highlight: notebook cell focus → sidebar selection follows; sidebar click → notebook cell reveal.
+
+### 11.2 V2 — graph (DAG with branches)
+
+Same data source. Different visualization: walk `zone.agents.<id>.turns[]` and follow each turn's `parent_id` to render a tree. Branches show as forks; the active branch (currently in the notebook) is highlighted. The operator can switch the rendered branch by clicking a fork point.
+
+Branch switching = updating `zone.ordering[]` to walk a different path through the DAG. The notebook re-renders. The DAG itself doesn't change (turns are immutable per §2). Defer to V2+ implementation; V1 freezes the contract.
+
+### 11.3 The lift property
+
+V2's graph view doesn't extend the data model. It just changes the rendering algorithm from "linear walk of `ordering[]`" to "DAG layout from `parent_id`." The notebook is always one path through the DAG (whichever path `ordering[]` describes). V1's sidebar is the trivial case where the DAG is a line.
+
+This is why §8's directory-mirroring JSON layout matters: per-agent storage (`agents.<id>.turns[]`) directly enables the DAG view because each agent's turns are already a coherent sequence. The graph view layout algorithm can be naive — pull each agent's chain, render parent edges, group by zone.
+
+## 12. Overlays — operator edits as a second git-style graph
+
+Computation turns are locked (§2: immutable). To let the operator annotate, correct, redact, or tag an emitted output without losing the original, this BSP adds a **second graph** with the same mechanism: immutable overlay nodes + mutable overlay refs.
+
+### 12.1 The two-graph stack
+
+| Graph | Nodes | Refs (mutable head) | Authored by | Render role |
+|---|---|---|---|---|
+| Computation (BSP-002 §2) | `turns[]` | `agent.head_turn_id` | agents + operator inputs | base — what happened |
+| Overlay (this section)   | `overlays{}` | `overlay_refs{turn_id → overlay_id}` | operator only | applied at render time |
+
+The overlay graph branches and reverts independently of the computation graph. An operator may have three overlay versions on one turn and zero on another. Branching the conversation (`/branch alpha as beta`) does NOT branch overlays — overlays are pinned to specific turn IDs in the computation graph and follow those turns into any branch that includes them.
+
+### 12.2 Schema (extends §8.2)
+
+```json
+"zone": {
+  ...,
+  "overlays": {
+    "ovr_<id>": {
+      "id": "ovr_<id>",
+      "parent_overlay_id": "ovr_<id>" | null,
+      "target_turn_id": "<agent_id>/<turn_id>",
+      "overlay_kind": "annotation" | "replacement" | "redaction" | "tag",
+      "context_modifying": false,
+      "content": "<overlay payload — text for annotation, blob ref for replacement, byte ranges for redaction>",
+      "author": "operator",
+      "created_at": "..."
+    }
+  },
+  "overlay_refs": {
+    "<agent_id>/<turn_id>": "ovr_<id>"
+  }
+}
+```
+
+Directory-mirror: `overlays/ovr_<id>.json` and `overlay_refs.json` (one file). Same convertibility invariant as §8.1.
+
+### 12.3 Overlay kinds
+
+- **`annotation`** — operator notes attached to a turn. Always `context_modifying: false` (notes never alter agent context).
+- **`replacement`** — swaps the rendered content of a turn (text or blob). May be `context_modifying`.
+- **`redaction`** — masks bytes/regions in the turn's content. May be `context_modifying` (e.g., scrub API keys before downstream agents see them).
+- **`tag`** — operator-applied labels for filtering/search. Always `context_modifying: false`.
+
+### 12.4 Composition at render time
+
+```
+renderCell(turn_id):
+  turn = lookup(turn_id)
+  base = turn.body  # locked to computation
+  if overlay_refs[turn_id]:
+    ovr = overlays[overlay_refs[turn_id]]
+    base = applyOverlay(base, ovr)
+  return base
+```
+
+`applyOverlay` is overlay_kind-specific. For tool_call cells, replacement may swap `output_ref` to a different blob; redaction may mask byte ranges in the referenced blob's rendering.
+
+### 12.5 Context-modifying overlays and cross-agent handoff (§4.6)
+
+When agent beta receives missed turns from agent alpha, the kernel checks `overlay_refs[<alpha turn>]`:
+
+- If no overlay, or overlay has `context_modifying: false` → beta sees the base computation.
+- If overlay has `context_modifying: true` → beta sees the composed (overlaid) version.
+
+This is the operator's signed receipt: setting `context_modifying: true` is an explicit decision to alter what downstream agents perceive as alpha's actual output. Default is `false`. The operator-facing edit UI (§12.6) requires an explicit checkbox to set this flag.
+
+Replay determinism is preserved: the overlay graph is part of `metadata.rts.zone`, so re-running the zone with the same overlay state produces the same composed context.
+
+### 12.6 UX — the edit affordance
+
+Computation cells (`kind: agent_response | tool_call`) render as **read-only** with a lock icon next to the agent badge (§6). The cell text cannot be directly edited.
+
+To add an overlay:
+
+1. Right-click the cell → "Add overlay…" (or click the lock icon)
+2. A panel opens with overlay_kind picker, content editor, and a `context_modifying` checkbox (default unchecked, with a warning when checked: "Downstream agents will see this version, not the original")
+3. Saving creates a new overlay version; `overlay_refs[<turn_id>]` advances to it
+
+An overlaid cell renders an "✎ overlay vN (kind)" badge alongside the agent badge. Click → shows the overlay's own mini DAG (the chain of overlay versions for this turn). From there: revert (move ref backward), branch (create alternative version), delete (remove ref → base shows again).
+
+### 12.7 Failure modes (continued from §7)
+
+| Code | Symptom | Marker | Operator action |
+|---|---|---|---|
+| K30 | Overlay's `target_turn_id` references a turn that doesn't exist | `overlay_invalid_target` with `target_turn_id` | Likely a corrupted file; check the `.llmnb` |
+| K31 | Overlay parent chain has a cycle | `overlay_parent_cycle` with `overlay_id` | Corrupt graph; rebuild from a valid checkpoint |
+| K32 | `context_modifying: true` overlay on a turn whose parent is in a different zone | `overlay_cross_zone_context_modify` | Disallowed by zone-scope axiom (§1); kernel refuses |
+
+### 12.8 Why this is the right shape (game-dev rationale)
+
+- **Maya animation layers**: base animation + override tracks. Each override has its own timeline (versions). Overlays here are exactly that — base + override, layered at render time, each with its own history.
+- **Photoshop layers + layer history**: identical. Source pixels (computation) + edit layers (overlays) + each layer has undo history.
+- **Source assets vs derived assets in a build pipeline**: source is sacred; derived can be regenerated; manual overrides are tracked separately so they survive regeneration. Same pattern.
+
+**The key design discipline:** the locked computation node is sacred — it's the agent's actual emission, evidence that this run happened. Overlays are operator-applied transformations. Two graphs is one more concept but it preserves both "agent output is real" and "operator can edit without destruction." Mixing them into one would force a choice between those two; keeping them separate gives you both.
 
 ## Changelog
 
 - **Issue 1, 2026-04-27**: initial draft.
 - **Issue 2, 2026-04-27**: incorporate operator constraints. Notebook = zone (§1). Turns are zone-scoped (§2; collapse "conversation" entity into zone). Add §4.6 cross-agent context handoff. Grammar §3 adds plain-text-as-continuation, `provider:` hint, `/stop`. Failure modes K25–K27 added.
 - **Issue 3, 2026-04-27**: cell-as-agent-identity promoted to V1 requirement (§6). Cell renders agent decoration; binding determined at execution; persisted in cell metadata as a render-time cache with the directive remaining source of truth. §10 Q2 resolved (handoffs not text-tagged because cells already attribute).
+- **Issue 4, 2026-04-27**: storage layout (§8) restructured to mirror the eventual directory format 1:1. Convertibility invariant + stable navigation paths (§8.1, §8.3). Directory format itself deferred to RFC-005 v2; this issue is the JSON spec only. Inspired by Scratch's per-sprite project.json layout: stage rendering (linear ordering) is separate from per-sprite (per-agent) storage.
+- **Issue 5, 2026-04-27**: views (§11). The notebook is the canonical chat-like surface; the graph view is a second rendering of the same data. V1 ships a vertical list mirror (right sidebar); V2 lifts to DAG visualization with branch-switching. Both views read from `metadata.rts.zone` directly — no second source of truth. The lift property keeps "modify without getting lost" tractable.
+- **Issue 6, 2026-04-27**: overlay graph (§12). Computation turns stay locked to their emission events; operator edits live in a second git-style graph attached to specific turns. Composition at render time. `context_modifying: true` opt-in for overlays that should affect downstream agents' context handoff — preserves the "agent output is real" invariant by default. Game-dev framing: animation-layer / Photoshop-layer pattern, two graphs, one mechanism.
