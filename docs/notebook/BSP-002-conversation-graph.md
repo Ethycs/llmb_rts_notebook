@@ -1,8 +1,8 @@
 # BSP-002: Conversation Graph and Agent Refs
 
-**Status**: Issue 1 — Draft, 2026-04-27
+**Status**: Issue 2 — Draft, 2026-04-28 (amends Issue 1, 2026-04-27)
 **Supersedes**: One-shot `/spawn` cell directive grammar (RFC-006 §6 v2.0.3); the per-cell ephemeral agent model in `agent_supervisor.spawn`
-**Related**: BSP-001 (proxy lifecycle), RFC-005 (`.llmnb` file format), RFC-006 (wire format)
+**Related**: BSP-001 (proxy lifecycle), RFC-005 (`.llmnb` file format), RFC-006 (wire format), BSP-005 (cell roadmap), BSP-007 (overlay git semantics — sibling), BSP-008 (ContextPacker + RunFrames — sibling), KB-notebook-target.md §0 (V1 amendments source)
 
 ## 1. Scope
 
@@ -531,6 +531,333 @@ An overlaid cell renders an "✎ overlay vN (kind)" badge alongside the agent ba
 
 **The key design discipline:** the locked computation node is sacred — it's the agent's actual emission, evidence that this run happened. Overlays are operator-applied transformations. Two graphs is one more concept but it preserves both "agent output is real" and "operator can edit without destruction." Mixing them into one would force a choice between those two; keeping them separate gives you both.
 
+## 13. Issue 2 — 2026-04-28 amendment
+
+This section amends Issue 1 to lock in the V1 decisions captured in `docs/notebook/KB-notebook-target.md §0`. The amendment is **additive** — Issue 1's data model in §2, the directive grammar in §3, the lifecycle in §4, and the storage layout in §8 are unchanged. Issue 2 introduces:
+
+- **Sections** as a new operator-side overlay-graph concept distinct from kernel-side `zone_id` (§13.1).
+- A typed **cell kinds enum** under `metadata.rts.cells[<id>].kind` (§13.2).
+- **Sub-turns as merge artifacts**, not native cell substructure (§13.3).
+- **Tool calls bound to their parent turn** by default, with the operator-explicit `tool_cell` kind reserved for V2+ (§13.4).
+- **Reserved metadata slots** for V2+ capabilities, output-kind tags, and ArtifactRef shape on blob refs (§13.5).
+
+When Issue 2 and Issue 1 disagree, Issue 2 wins for V1.
+
+### 13.1 Section as overlay-graph concept (KB-target §0.1, KB-target §6)
+
+Issue 1 §1 reads: "**Zone = notebook.** No sub-zone or cross-zone concept in V1." That axiom remains true for the **kernel-side** `zone_id` field used by RFC-006 (`llmnb.zone_id` OTLP attribute) and by `metadata.rts.zone.zone_id` (§2.3). Kernel `zone_id` = notebook session and keeps its meaning across all wire and storage layers.
+
+KB-target §6 introduces a separate concept also named "Zone" — an operator-defined narrative range over the cell overlay graph. To avoid the name collision, **V1 renames the operator-narrative concept to `Section`**. The kernel-side `zone_id` is not renamed; the two concepts coexist:
+
+| Term | Scope | Storage | Lifecycle |
+|---|---|---|---|
+| `zone_id` (kernel-side) | The notebook session | `metadata.rts.zone.zone_id` (§2.3) | One per `.llmnb` file; immutable for the file's lifetime |
+| `section_id` (operator-side, **new**) | A narrative range across cells in one notebook | `metadata.rts.zone.sections[]` (§13.1.1) | Operator-created; mutable; multiple per notebook |
+
+Sections are **overlay objects** — their existence and membership are operator state, not agent state. A section is created, renamed, recoloured, collapsed, deleted, and re-membered by the operator without touching the immutable turn DAG (§2). This places sections in the same conceptual layer as the overlay graph (§12); the distinction is that overlays attach to specific turns, while sections attach to ranges of cells.
+
+Cross-reference: BSP-007 (sibling) defines overlay-graph commit/branch/diff semantics. Section creation, edits, and membership changes flow through the same overlay-commit primitive as turn-targeted overlays — the operator's section reorganization is recorded as a series of overlay commits per BSP-007.
+
+#### 13.1.1 Schema — `metadata.rts.zone.sections[]`
+
+```json
+"zone": {
+  ...,
+  "sections": [
+    {
+      "id": "sec_01HZX...",
+      "title": "Architecture",
+      "parent_section_id": null,
+      "cell_range": [
+        "vscode-notebook-cell:.../#abc",
+        "vscode-notebook-cell:.../#def",
+        "vscode-notebook-cell:.../#ghi"
+      ],
+      "summary": null,
+      "status": "open",
+      "collapsed": false,
+      "flow_policy": null
+    }
+  ]
+}
+```
+
+Field semantics:
+
+- `id` (string, required) — operator-stable section identifier (`sec_<ULID>` recommended). Survives reordering and rename.
+- `title` (string, required) — operator-facing label. Renders in the section header in the notebook UI.
+- `parent_section_id` (string | null, required) — for nested sections (e.g., `Architecture > Runtime`). `null` for top-level. V1 supports arbitrary nesting depth; the renderer caps practical depth.
+- `cell_range[]` (array of cell ids, required, **ordered**) — the cells in this section, in operator-chosen display order. The order in this array is the section's display order; it MAY differ from notebook chronological order (operators reorder within sections via overlay commits).
+- `summary` (string | null) — optional operator- or agent-authored summary. Used by ContextPacker (BSP-008) when including the section as a checkpoint instead of inlining its full cell range.
+- `status` (string, required) — `"open" | "in_progress" | "complete" | "frozen"`. V1 ships these four; additional values reserved.
+- `collapsed` (bool, required) — render-state hint for the notebook UI. The notebook surface persists this so reload preserves collapse state.
+- `flow_policy` (object | null, **V2+ reserved slot**) — reserved for future flow-control rules at section granularity (e.g., "agent context is bounded by this section unless pinned"). V1 SHOULD set this to `null` and V1 receivers MUST ignore non-null values.
+
+#### 13.1.2 Convertibility (extends §8.1)
+
+```
+JSON path                                ↔  Future directory path
+metadata.rts.zone.sections[N]            ↔  sections/<NNN>-<id>.json
+```
+
+Sections fit the directory-mirror invariant from §8.1 directly. No re-keying.
+
+#### 13.1.3 Why the rename matters for the wire
+
+RFC-006 §1 specifies `llmnb.zone_id` as a mandatory OTLP attribute on every Family A span. **That attribute keeps its meaning** — it identifies the notebook session, not the operator-side section. Family A spans MAY additionally carry `llmnb.section_id` as a situational attribute when the kernel knows which operator section a turn was issued from (the cell carries `metadata.rts.cell.section_id` — see §13.2.1). RFC-006 wire impact is therefore **additive only**: no existing attribute changes meaning; one new optional attribute is reserved.
+
+### 13.2 Cell kinds typed enum (KB-target §0.4)
+
+KB-target §13.1 enumerates eight cell kinds; merge-correctness rules in KB-target §22.1 require "same primary cell kind" as a precondition. To make those rules enforceable from V1, the cell's kind is typed at the metadata level from day one.
+
+#### 13.2.1 Schema — `metadata.rts.cells[<id>].kind`
+
+```json
+"cells": {
+  "vscode-notebook-cell:.../#abc": {
+    "kind": "agent",
+    "bound_agent_id": "alpha",
+    "section_id": "sec_01HZX...",
+    "capabilities": [],
+    "..."
+  }
+}
+```
+
+The `kind` field is **required** in V1. Permitted values:
+
+| Value | V1 status | Role (per KB-target §13.1) |
+|---|---|---|
+| `agent` | **Shipped** | Dispatches a turn to one registered agent executor. The default for any cell carrying an agent directive (`/spawn`, `@<agent>`, plain text continuing the most-recent agent). |
+| `markdown` | **Shipped** | Human prose / notes; no agent, no execution. Maps to the comment cell M1 from BSP-005. |
+| `scratch` | **Shipped** | Temporary operator workspace. Excluded from default ContextPacker output (BSP-008 §0.6). Visually marked in the notebook UI. May be promoted to another kind by an overlay commit. |
+| `checkpoint` | **Shipped** | Summarizes a contiguous range or section. Substitutes its summary for the underlying turns when included in an agent's context. Trust model deferred to BSP-008. |
+| `tool` | **Reserved** | Operator-explicit invocation of one registered tool/device outside an agent's reasoning (e.g., `/run tests` as a control directive). **V1 directive parser does NOT recognize this kind.** When agents call tools internally, those tool calls live in the parent turn (§13.4). |
+| `artifact` | **Reserved** | Displays or lenses a single ArtifactRef range. V2+ — depends on the streaming materializer (KB-target §0.9). |
+| `control` | **Reserved** | Notebook-level control directives (`/branch`, `/revert`, `/stop`). In V1 these directives execute through agent cells (§3) without spawning a separate `control` cell kind; the reserved slot is for V2+ when control affordances become first-class cells. |
+| `native` | **Reserved** | Low-level instruction/runtime directive (`%notebook.inspect`, `%notebook.rebind`). Isolated from agent calls per KB-target §13.3. V2+ only. |
+
+V1 directive parsers MUST recognize `agent | markdown | scratch | checkpoint`. Receiving a cell whose `kind` is one of the four reserved values (`tool | artifact | control | native`) MUST be treated as a forward-compat marker: the cell is preserved verbatim, rendered as inert (kind label visible), and no action is dispatched.
+
+#### 13.2.2 Default and back-compat
+
+A cell with no `kind` field (e.g., a cell written by a pre-Issue-2 producer or hand-edited `.llmnb`) **defaults to `kind: "agent"`** at load time. This preserves the Issue 1 semantics — every cell pre-Issue-2 was implicitly an agent cell. The `MetadataWriter` (BSP-005 S6) MUST write the resolved `kind` back into `metadata.rts.cells[<id>].kind` on the next snapshot so the default is materialized.
+
+Validation rules:
+
+- If `kind` is present, it MUST be one of the eight enum values above. Unknown values MUST be rejected at load with a `wire-failure` LogRecord (RFC-006 §"Failure modes" W4).
+- For `kind: "markdown"`, fields `bound_agent_id`, `directive`, and any agent-coupled metadata MUST be absent or `null`. Producers that emit a markdown cell with a stale `bound_agent_id` are buggy; loaders SHOULD log and clear.
+- For `kind: "scratch"`, the cell SHOULD carry `bound_agent_id: null` to prevent accidental inclusion in a continuation chain. ContextPacker (BSP-008) treats scratch cells as excluded by default.
+- For `kind: "checkpoint"`, the cell SHOULD carry `summary_text` and `summarized_cell_range[]` (schema TBD in BSP-005 S6 / BSP-008); these fields are not ratified in Issue 2.
+
+#### 13.2.3 Cell-kind merge invariants (KB-target §22.1 forward reference)
+
+KB-target §22.1 requires that merge candidates share the **same primary cell kind**. Issue 2 ratifies the typed `kind` field so that BSP-007's merge operation (overlay commit of `merge(c_a, c_b)`) can enforce this rule structurally. Merge-correctness:
+
+```
+merge(c_a, c_b) is allowed only if:
+  c_a.kind == c_b.kind
+  AND (if kind == "agent") c_a.bound_agent_id == c_b.bound_agent_id
+  AND neither cell is currently executing
+  AND no pin/exclude/checkpoint boundary lies between them
+```
+
+Cross-reference: BSP-007 (sibling) specifies the merge operation as an overlay commit; the cell-kind rule above is one precondition on that commit.
+
+### 13.3 Sub-turns as merge artifacts (KB-target §0.2)
+
+KB-target §4 shows `In[5] alpha · schema design / 5.1 / 5.2 / 5.3` as if sub-turn numbering were native to cells. **V1 says: it is not.** A freshly created cell carrying one operator turn has no sub-turn numbering. Sub-turn structure emerges only when the operator merges two or more cells.
+
+#### 13.3.1 Addressing
+
+The stable handle for a turn-bearing cell is:
+
+| Form | Meaning | When used |
+|---|---|---|
+| `cell:<cell_id>` | The whole cell (one or more sub-turns combined) | A cell that has never been merged; references its single turn |
+| `cell:<cell_id>.<n>` | The n-th sub-turn within a merged cell, **1-indexed** in operator-display order | A cell that has been the target of one or more merge commits |
+
+Sub-turn indices are 1-indexed because they're operator-facing. Index 0 is reserved (never emitted; invalid).
+
+#### 13.3.2 Worked example — the merge that produces sub-turns
+
+```
+Initial state (no merges):
+  cell c_5 — bound_agent_id: alpha — turns: [t_a]
+  cell c_6 — bound_agent_id: alpha — turns: [t_b]
+
+  Addresses: cell:c_5  → t_a
+             cell:c_6  → t_b
+
+Operator: merge(c_5, c_6)
+  Preconditions per §13.2.3 are met (same kind, same agent, no boundary).
+  BSP-007 records the merge as an overlay commit.
+
+Post-merge state:
+  cell c_5 — bound_agent_id: alpha — turns: [t_a, t_b] (in display order)
+  cell c_6 — removed by the merge overlay commit
+
+  Addresses: cell:c_5     → the whole cell (still resolves)
+             cell:c_5.1   → t_a (first sub-turn)
+             cell:c_5.2   → t_b (second sub-turn)
+             cell:c_6     → invalid (returns a "merged into c_5" hint per BSP-007 ref-resolution)
+```
+
+Each sub-turn retains its original immutable turn record under `metadata.rts.zone.agents.<id>.turns[]`; the merge commits only the cell-overlay change (the new `cell_range` ordering, the deletion of c_6's cell metadata). The DAG is unaffected.
+
+#### 13.3.3 Splitting back
+
+A `split(c_5, at=t_b)` overlay commit is the inverse: it moves t_b's record into a new cell c_7 and re-parents the cell metadata accordingly. After split, `cell:c_5.2` is no longer valid; the operator addresses t_b as `cell:c_7` going forward. BSP-007 specifies the split commit as a sibling of merge.
+
+Cross-reference: BSP-007 (sibling) defines the merge / split commits as overlay-graph operations. The sub-turn semantics in this section are the data shape those commits produce; BSP-007 defines the mechanism, this section ratifies the addressing contract.
+
+### 13.4 Tool calls live in their parent turn (KB-target §0.3)
+
+Issue 1 §2.1 specifies the `turn` schema with a `spans[]` array. Tool calls made by an agent DURING a turn are recorded as spans on that turn — they are **not** separate turns and **not** separate cells.
+
+#### 13.4.1 Rule — agent-initiated tool calls
+
+When an agent makes a tool call as part of its own reasoning (e.g., alpha calls `read_file` while answering an operator turn), the tool call is recorded as one or more OTLP spans on the **parent agent turn's** `spans[]`:
+
+```json
+{
+  "id": "002-agent-response",
+  "parent_id": "001-operator-spawn",
+  "agent_id": "alpha",
+  "role": "agent",
+  "body": "Here is a schema based on the file you provided...",
+  "spans": [
+    { "name": "agent_emit", "spanId": "...", "..." },
+    { "name": "read_file",  "spanId": "...", "..." },
+    { "name": "agent_emit", "spanId": "...", "..." },
+    { "name": "report_completion", "spanId": "...", "..." }
+  ],
+  "cell_id": "vscode-notebook-cell:.../#def",
+  "..."
+}
+```
+
+A single turn carries an arbitrary number of tool-call spans without spawning child cells. The cell↔turn binding from §6 is preserved: one cell, one turn, many spans.
+
+This clarifies the V1 cell discipline (KB-target §13.1's "one cell, one system role"): the cell's role is `agent` (it dispatches a turn to alpha), and tool calls are part of alpha's reasoning within that role. The cell does not become a multi-role artifact when alpha reads a file, runs a search, and proposes an edit during one turn.
+
+#### 13.4.2 Operator-explicit tool calls (the `tool` cell kind)
+
+The `tool` cell kind (§13.2.1) is reserved for the case where the operator **explicitly invokes a tool outside an agent's reasoning** — e.g., a future control directive `/run tests` that calls a registered test runner without dispatching to any agent. In that case the tool's invocation, arguments, and result are the cell's primary content; no parent agent turn exists.
+
+V1 does not ship the `tool` cell kind. The directive parser (§3) recognizes only `/spawn`, `@<agent>`, `/branch`, `/revert`, `/stop`. Operator-explicit tool invocation arrives in V2+ when the device-call mechanism (KB-target §11) is wired through the kernel.
+
+#### 13.4.3 Why this matters for cell↔turn binding
+
+Issue 1 §6 specifies "one cell = one turn" as the V1 rule. §13.4.1 confirms that rule does not weaken when agents make tool calls — the tool call's record stays inside the parent turn's `spans[]`, so the cell still carries one turn. The bound_agent_id of the cell is the agent that made the turn; tool spans inherit that attribution via `llmnb.agent_id` per RFC-006 §1.
+
+### 13.5 Reserved metadata slots (KB-target §0.7-§0.9)
+
+Issue 2 reserves four metadata slots for V2+ capabilities so that V1-written `.llmnb` files are forward-compatible without a schema major bump.
+
+#### 13.5.1 `metadata.rts.cells[<id>].capabilities[]` (KB-target §0.7 — V2)
+
+V1 reserves an empty `capabilities[]` array on every cell:
+
+```json
+"cells": {
+  "vscode-notebook-cell:.../#abc": {
+    "kind": "agent",
+    "bound_agent_id": "alpha",
+    "capabilities": []
+  }
+}
+```
+
+V2 will populate this array with capability tokens (`read_context | read_files | write_files | run_commands | call_tools | call_agents | modify_overlay | checkpoint | export | access_secrets` per KB-target §20). V1 producers MUST write `capabilities: []` and V1 consumers MUST ignore non-empty arrays (forward-compat: a V2 producer's capabilities are not enforced by V1 kernels, but the metadata round-trips intact).
+
+#### 13.5.2 OTLP attribute `llmnb.output.kind` (KB-target §0.8 — V1 tag, V2 lenses)
+
+Every output span emitted on Family A SHOULD carry an `llmnb.output.kind` attribute typing the output. Permitted values per KB-target §15:
+
+```
+prose | code | diff | patch | decision | plan | artifact_ref
+| test_result | diagnostic | checkpoint | question | warning
+```
+
+This attribute is **additive on the wire** (RFC-006 §1 "Mandatory attributes per run" is unchanged; this is one more optional attribute). V1 ships only the tag; V2 ships the lens UI ("show decisions only") that filters spans by this attribute. V1 producers SHOULD emit it; V1 consumers MUST tolerate its absence (treat as untyped output).
+
+#### 13.5.3 `ArtifactRef` shape on `metadata.rts.zone.blobs.<sha256>` (KB-target §0.9)
+
+Issue 1 §8.2 specifies blob storage as:
+
+```json
+"blobs": {
+  "sha256-abc123...": {
+    "content": "<base64 or utf8>",
+    "meta": { "mime": "...", "size_bytes": 4912, "..." }
+  }
+}
+```
+
+Issue 2 amends the blob entry to align with the `ArtifactRef` shape (KB-target §16):
+
+```json
+"blobs": {
+  "sha256-abc123...": {
+    "id": "sha256-abc123...",
+    "kind": "text/x-python",
+    "size": 4912,
+    "content_hash": "sha256-abc123...",
+    "body": "<base64 or utf8>",
+    "meta": {
+      "mime": "text/x-python",
+      "source": "tool:read_file",
+      "created_at": "..."
+    }
+  }
+}
+```
+
+The amendment is **additive** — `id`, `kind`, `size`, `content_hash`, `body` are new top-level fields on each blob entry; `meta` (with its existing children) is preserved unchanged. V1 stores body inline (`body: "<utf8 or base64>"`, never `null`). V2 will permit `body: null` when the artifact is externalized, plus add `byte_index`, `line_index`, `semantic_index`, `loaded_windows`, `pinned_ranges`, and `summaries` per KB-target §16. The cell-side ArtifactRef references stay valid across the V1→V2 transition because the *shape* doesn't change; only `body: null` becomes legal.
+
+Convertibility (extends §8.1):
+
+```
+JSON path                                ↔  Future directory path
+metadata.rts.zone.blobs.<hash>           ↔  blobs/<hash>/{body,meta.json,artifact.json}
+```
+
+The flatten/inline rule continues to hold. `id`, `kind`, `size`, `content_hash` flatten into `artifact.json`; `body` flattens into a dedicated file (so directory diffs don't have to re-emit large bodies); `meta` flattens into `meta.json`.
+
+#### 13.5.4 Section `flow_policy` slot (V2+)
+
+Already declared in §13.1.1; reiterated here for completeness. V1 producers MUST write `flow_policy: null`; V1 consumers MUST ignore non-null values. The slot reserves a per-section flow-control rule space (e.g., context bounding, executor pinning) for V2+ without a schema bump.
+
+### 13.6 Cross-references to sibling specs
+
+Issue 2 leans on two sibling BSPs being written concurrently and one wire-format spec:
+
+- **BSP-007 (overlay git semantics, sibling)** — defines the overlay-graph commit model that records section creation/edits (§13.1), cell merges that produce sub-turns (§13.3.2), and splits that undo them (§13.3.3). Issue 2 ratifies the data shapes those commits produce; BSP-007 defines the commit primitives.
+- **BSP-008 (ContextPacker + RunFrames, sibling)** — consumes the typed `kind` field (§13.2) to filter scratch and checkpoint cells, consumes `section_id` (§13.1.1) to scope context, and reads the `summary` field on sections and checkpoint cells.
+- **RFC-006 v2.0.3 (kernel↔extension wire format)** — Issue 2 has wire impact only via §13.1.3 (new optional `llmnb.section_id` OTLP attribute) and §13.5.2 (new optional `llmnb.output.kind` attribute). Both are additive; no existing attribute changes meaning; the kernel `zone_id` keeps its semantics.
+
+### 13.7 Validation summary (forward-compat checklist for V1 implementations)
+
+Producers (kernel `MetadataWriter`, extension `metadata-applier`):
+
+- MUST emit `metadata.rts.cells[<id>].kind` for every cell.
+- MUST emit `metadata.rts.cells[<id>].capabilities: []` for every cell (V2 expansion slot).
+- MAY emit `metadata.rts.cells[<id>].section_id` when the cell is part of a section.
+- MUST emit `metadata.rts.zone.sections[]` with valid section objects when sections exist; MUST NOT emit `flow_policy: <non-null>` in V1.
+- SHOULD emit `llmnb.output.kind` on output spans where the kind is known.
+- MUST emit blob entries with `id`, `kind`, `size`, `content_hash`, `body` fields populated; `body` MUST NOT be `null` in V1.
+
+Consumers (kernel handlers, extension renderers):
+
+- MUST default missing `kind` to `"agent"` and write the resolved value back on next snapshot.
+- MUST reject unknown `kind` values with a `wire-failure` LogRecord.
+- MUST tolerate the four reserved `kind` values (`tool | artifact | control | native`) by rendering inert without dispatch.
+- MUST ignore non-empty `capabilities[]` arrays from forward-version producers.
+- MUST ignore non-null `flow_policy` on sections from forward-version producers.
+- MUST tolerate absence of `llmnb.output.kind` (treat as untyped output).
+- MUST tolerate `body: null` on blob entries from forward-version producers; SHOULD surface "artifact externalized — open lens to materialize" in the cell UI when encountered.
+
 ## Changelog
 
 - **Issue 1, 2026-04-27**: initial draft.
@@ -539,3 +866,4 @@ An overlaid cell renders an "✎ overlay vN (kind)" badge alongside the agent ba
 - **Issue 4, 2026-04-27**: storage layout (§8) restructured to mirror the eventual directory format 1:1. Convertibility invariant + stable navigation paths (§8.1, §8.3). Directory format itself deferred to RFC-005 v2; this issue is the JSON spec only. Inspired by Scratch's per-sprite project.json layout: stage rendering (linear ordering) is separate from per-sprite (per-agent) storage.
 - **Issue 5, 2026-04-27**: views (§11). The notebook is the canonical chat-like surface; the graph view is a second rendering of the same data. V1 ships a vertical list mirror (right sidebar); V2 lifts to DAG visualization with branch-switching. Both views read from `metadata.rts.zone` directly — no second source of truth. The lift property keeps "modify without getting lost" tractable.
 - **Issue 6, 2026-04-27**: overlay graph (§12). Computation turns stay locked to their emission events; operator edits live in a second git-style graph attached to specific turns. Composition at render time. `context_modifying: true` opt-in for overlays that should affect downstream agents' context handoff — preserves the "agent output is real" invariant by default. Game-dev framing: animation-layer / Photoshop-layer pattern, two graphs, one mechanism.
+- **Issue 2, 2026-04-28** (this amendment, §13): locks in the V1 decisions from KB-notebook-target.md §0. Introduces **Section** as an operator-side overlay-graph concept distinct from the kernel-side `zone_id` (which keeps its meaning) — schema at `metadata.rts.zone.sections[]` with `id`, `title`, `parent_section_id`, `cell_range[]`, `summary`, `status`, `collapsed`, and a V2-reserved `flow_policy` slot (§13.1). Adds typed cell kinds enum at `metadata.rts.cells[<id>].kind` — V1 ships `agent | markdown | scratch | checkpoint`; reserves `tool | artifact | control | native` for V2+; missing-kind defaults to `agent` for back-compat (§13.2). Specifies sub-turns as merge artifacts only (cells get sub-turn numbering only after a merge overlay commit; addressing `cell:<id>.<n>` is 1-indexed) (§13.3). Specifies tool calls live in their parent agent turn's `spans[]` and don't spawn child cells; the `tool` cell kind is for operator-explicit tool invocation only and is V2+ (§13.4). Reserves four V2+ metadata slots: `cells[<id>].capabilities[]` (KB-target §0.7), `llmnb.output.kind` OTLP attribute on output spans (KB-target §0.8), `ArtifactRef` shape on `zone.blobs.<sha256>` with `id | kind | size | content_hash | body` fields — body stays inline in V1 (KB-target §0.9), and the section `flow_policy` slot (§13.5). Wire impact (RFC-006) is additive only: two new optional OTLP attributes (`llmnb.section_id`, `llmnb.output.kind`); no existing attribute or family changes meaning. Cross-references BSP-007 (sibling — overlay commit primitives for section/merge/split) and BSP-008 (sibling — ContextPacker consumes the typed kinds and section scope).
