@@ -60,6 +60,11 @@ import {
 import { HeartbeatConsumer } from './messaging/heartbeat-consumer.js';
 import { BlobResolver } from './llmnb/blob-resolver.js';
 import type { BlobEntry } from './llmnb/blob-resolver.js';
+import {
+  AgentRegistryImpl,
+  CellBadgeStatusBarProvider,
+  GutterColorManager
+} from './notebook/cell-badge.js';
 
 const NOTEBOOK_TYPE = 'llmnb';
 
@@ -72,6 +77,9 @@ let activeLoader: MetadataLoader | undefined;
 let activeHeartbeat: HeartbeatConsumer | undefined;
 let activeBlobResolver: BlobResolver | undefined;
 let activeSessionId: string | undefined;
+let activeAgentRegistry: AgentRegistryImpl | undefined;
+let activeBadgeProvider: CellBadgeStatusBarProvider | undefined;
+let activeGutterManager: GutterColorManager | undefined;
 
 // Diagnostic ring buffers — populated only when LLMNB_E2E_VERBOSE === '1'.
 // Tests subscribe via the ExtensionApi accessors; production builds zero
@@ -302,6 +310,28 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
   heartbeat.start();
   context.subscriptions.push({ dispose: () => heartbeat.dispose() });
 
+  // BSP-005 S1 — cell-as-agent identity badges + per-agent gutter colors.
+  // The agent registry consumes notebook.metadata snapshots (Family F) so
+  // runtime_status flips re-render the badge text. The status-bar provider is
+  // registered against the llmnb notebook type. The gutter-color manager
+  // persists agent→color assignments in workspaceState so the same agent
+  // keeps its color across reloads.
+  const agentRegistry = new AgentRegistryImpl();
+  activeAgentRegistry = agentRegistry;
+  context.subscriptions.push({ dispose: () => agentRegistry.dispose() });
+  context.subscriptions.push(router.registerMetadataObserver(agentRegistry));
+
+  const badgeProvider = new CellBadgeStatusBarProvider(agentRegistry);
+  activeBadgeProvider = badgeProvider;
+  context.subscriptions.push({ dispose: () => badgeProvider.dispose() });
+  context.subscriptions.push(
+    vscode.notebooks.registerNotebookCellStatusBarItemProvider(NOTEBOOK_TYPE, badgeProvider)
+  );
+
+  const gutterManager = new GutterColorManager(context.workspaceState);
+  activeGutterManager = gutterManager;
+  context.subscriptions.push({ dispose: () => gutterManager.dispose() });
+
   // RFC-005 §"metadata.rts.blobs" — instantiate a per-session BlobResolver so
   // renderers can resolve `$blob:sha256:` sentinels in attribute values. The
   // table refreshes whenever a notebook.metadata snapshot lands; the loader
@@ -446,6 +476,9 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
     getHeartbeatConsumer: () => activeHeartbeat,
     getBlobResolver: () => activeBlobResolver,
     getSessionId: () => activeSessionId,
+    getAgentRegistry: () => activeAgentRegistry,
+    getCellBadgeProvider: () => activeBadgeProvider,
+    getGutterColorManager: () => activeGutterManager,
     getRecentPtyBytes: () => ptyByteRing.join(''),
     getRecentLogRecords: () => [...logRecordRing],
     getRecentFrames: () => [...frameRing],
@@ -473,6 +506,9 @@ export function deactivate(): void {
   activeHeartbeat = undefined;
   activeBlobResolver = undefined;
   activeSessionId = undefined;
+  activeAgentRegistry = undefined;
+  activeBadgeProvider = undefined;
+  activeGutterManager = undefined;
 }
 
 /** Load PtyKernelClient connection settings from VS Code configuration.
@@ -524,6 +560,12 @@ export interface ExtensionApi {
   getHeartbeatConsumer(): HeartbeatConsumer | undefined;
   getBlobResolver(): BlobResolver | undefined;
   getSessionId(): string | undefined;
+  /** BSP-005 S1 — agent registry feeding cell-badge runtime_status. */
+  getAgentRegistry(): AgentRegistryImpl | undefined;
+  /** BSP-005 S1.1 — status-bar item provider; tests poke `provideCellStatusBarItems`. */
+  getCellBadgeProvider(): CellBadgeStatusBarProvider | undefined;
+  /** BSP-005 S1.2 — agent → gutter color manager (workspaceState-backed). */
+  getGutterColorManager(): GutterColorManager | undefined;
   // Diagnostic surfaces — populated only when LLMNB_E2E_VERBOSE === '1'.
   // Tests subscribe to introspect what the extension actually saw when
   // a Tier 4 e2e run fails. See Testing.md §6.
