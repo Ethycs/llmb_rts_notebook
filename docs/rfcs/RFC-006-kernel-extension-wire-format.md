@@ -2,9 +2,10 @@
 
 ## Status
 
-Draft. Date: 2026-04-27. Version: 2.0.3. Supersedes [RFC-003](RFC-003-custom-message-format.md) v1.0.0.
+Draft. Date: 2026-04-28. Version: 2.0.4. Supersedes [RFC-003](RFC-003-custom-message-format.md) v1.0.0.
 
 **Changelog**:
+- v2.0.4 (additive, atom-refactor Phase 4 Op-4, 2026-04-28): §1 "Mandatory attributes per run" gains two new **optional / situational** Family A span attributes: `llmnb.section_id` (operator-side section the cell was issued from; see [section atom](../atoms/concepts/section.md)) and `llmnb.output.kind` (12-value typed-output enum; see [output-kind atom](../atoms/concepts/output-kind.md)). Both are situational — V1 producers SHOULD emit when known; V1 consumers MUST tolerate absence (treat as untyped / no-section). Per [BSP-002 §13.5.2](../notebook/BSP-002-conversation-graph.md) and [KB-notebook-target.md §0.8](../notebook/KB-notebook-target.md#08-typed-outputs--v1-ships-the-tag-v2-ships-lenses). Definitions now live in `docs/atoms/`. No behavioral or wire-format breaking changes.
 - v2.0.3 (additive): §6 `operator.action` `action_type` enum gains `agent_spawn` — extension's parsed `/spawn <agent_id> task:"..."` cell directive arrives as this action_type with parameters `{agent_id, task, cell_id}`. Kernel handler delegates to `AgentSupervisor.spawn(...)`. Required by V1 hero-loop "type /spawn in a cell → agent runs → notify renders."
 - v2.0.2 (additive): §7 Family E heartbeat is now asymmetric for V1 — `heartbeat.kernel` MUST be emitted by the kernel every 5s (drives the operator-facing kernel-state indicator and detects "kernel alive but stuck" cases that PTY-EOF cannot catch); `heartbeat.extension` is `SHOULD` in V1 (`MUST` in V1.5+). §8 Family F `notebook.metadata` becomes bidirectional with new `mode: "hydrate"` (extension→kernel) for `.llmnb` load path.
 - v2.0.1 (additive): added `kernel.shutdown_request` (§7.1) for RFC-008 graceful-shutdown signal compatibility.
@@ -71,6 +72,16 @@ The receiver MUST treat each emission as the authoritative current state of the 
 #### Mandatory attributes
 
 Every Family A span MUST carry the attributes specified in [RFC-005 §"Mandatory attributes per run"](RFC-005-llmnb-file-format.md#mandatory-attributes-per-run): `llmnb.run_type`, `llmnb.agent_id`, plus the situational `llmnb.zone_id`, `llmnb.cell_id`, `llmnb.tool_name`. LLM and tool runs SHOULD use OTel GenAI semconv and OpenInference attributes per RFC-005.
+
+#### Situational / optional attributes (additive in v2.0.4)
+
+The following situational attributes are **optional** on Family A spans. V1 producers SHOULD emit when the value is known; V1 consumers MUST tolerate absence (treat as untyped / no-section), MUST tolerate unknown enum values from forward-version producers, and MUST round-trip both attributes verbatim into [RFC-005](RFC-005-llmnb-file-format.md) `event_log.runs[]` storage.
+
+- `llmnb.section_id` (string, optional) — operator-side [section](../atoms/concepts/section.md) the cell was issued from. The section is an overlay-graph narrative range over cells; this attribute lets receivers filter or group spans by section without re-walking the overlay. Distinct from `llmnb.zone_id` (kernel-side notebook session id; one per `.llmnb` file). Absence MUST be treated as "no section context"; producers MUST omit (not emit empty string) when no section is bound. Per [BSP-002 §13.5.2](../notebook/BSP-002-conversation-graph.md) and [KB-notebook-target.md §0.1](../notebook/KB-notebook-target.md#01-naming-reconciliation) (the zone→section rename).
+
+- `llmnb.output.kind` (string, optional) — output classification per the [output-kind atom](../atoms/concepts/output-kind.md). One of: `prose | code | diff | patch | decision | plan | artifact_ref | test_result | diagnostic | checkpoint | question | warning`. Absence MUST be treated as untyped output; producers SHOULD emit when the kind is known. Receivers seeing a forward-version value MUST treat the span as untyped rather than reject it (the 12-value list is V1-normative; the field accepts forward-compat values). The V2 lens UI ("show decisions only", "show failed tests") consumes this attribute; V1 ships only the tag, no lens. Per [BSP-002 §13.5.2](../notebook/BSP-002-conversation-graph.md) and [KB-notebook-target.md §0.8](../notebook/KB-notebook-target.md#08-typed-outputs--v1-ships-the-tag-v2-ships-lenses).
+
+Both attributes are additive on the wire — RFC-005's mandatory-attribute set is unchanged; old receivers ignore the new keys per the additive-evolution rules in §"Backward-compatibility analysis" below.
 
 #### `agent_emit` over Family A
 
@@ -549,3 +560,8 @@ Extension applies the snapshot via `vscode.NotebookEdit.updateNotebookMetadata`.
 - Superseded RFC: [RFC-003 v1.0.0](RFC-003-custom-message-format.md)
 - Sibling: [RFC-005 — `.llmnb` file format](RFC-005-llmnb-file-format.md) (the persistent counterpart of this wire)
 - External: [opentelemetry-proto OTLP/JSON encoding](https://github.com/open-telemetry/opentelemetry-proto/blob/main/docs/specification.md), [Jupyter messaging — display_data and update_display_data](https://jupyter-client.readthedocs.io/en/latest/messaging.html#display-data), [Jupyter messaging — comm messages](https://jupyter-client.readthedocs.io/en/latest/messaging.html#opening-a-comm)
+
+## Changelog
+
+- **2026-04-28 (atom-refactor Phase 4 Op-4)**: §1 Family A "Mandatory attributes per run" gains a "Situational / optional attributes" subsection registering two new optional Family A span attributes — `llmnb.section_id` (operator-side [section](../atoms/concepts/section.md) the cell was issued from) and `llmnb.output.kind` (12-value typed-output enum per [output-kind atom](../atoms/concepts/output-kind.md)). Both are situational; V1 producers SHOULD emit when known, V1 consumers MUST tolerate absence. Per [BSP-002 §13.5.2](../notebook/BSP-002-conversation-graph.md) and [KB-notebook-target.md §0.8](../notebook/KB-notebook-target.md#08-typed-outputs--v1-ships-the-tag-v2-ships-lenses). Status bumped to v2.0.4. Definitions now live in `docs/atoms/`. No behavioral or wire-format breaking changes; existing consumers that don't read the new keys continue to work.
+- See `Status` changelog at the top of this RFC for prior versions (v2.0.3, v2.0.2, v2.0.1, v2.0.0).

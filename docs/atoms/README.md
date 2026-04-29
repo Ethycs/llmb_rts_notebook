@@ -24,7 +24,7 @@ Roughly 50-55 atoms total. Each 30-100 lines. Total corpus ~3000 lines.
 
 1. **Each atom is ≤120 lines.** If it grows past that, split or fold sections back into the consumer doc.
 2. **Atoms are NORMATIVE for definitions.** When an atom and a longer spec disagree on what a thing IS, the atom wins. Specs remain normative for *behavior*, *wire format*, and *interaction*.
-3. **Cross-references use stable section anchors** — `[BSP-002 §13.1](../../notebook/BSP-002-conversation-graph.md#131-section-as-overlay-graph-concept)` — not floating links.
+3. **Cross-references use stable section anchors** — from inside an atom (e.g., `concepts/cell.md`), write `[BSP-002 §13.1](../../notebook/BSP-002-conversation-graph.md#131-section-as-overlay-graph-concept)` — not floating links.
 4. **Each atom is referenced by ≥2 other docs.** If only one consumer cites it, fold it back. No orphan atoms.
 5. **No emojis. No backwards-compat shims for hypothetical past states.**
 6. **Atoms never move once shipped.** Stable relative paths under `docs/atoms/`. A rename creates a stub atom forwarding to the new path.

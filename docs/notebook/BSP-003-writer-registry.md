@@ -1,7 +1,8 @@
 # BSP-003: Zone Writer Registry and Append Discipline
 
-**Status**: Issue 1 — Draft, 2026-04-27
-**Related**: BSP-002 (conversation graph), RFC-005 (file format), RFC-006 (wire format)
+**Status**: Issue 1 amended — 2026-04-28 (atom-refactor Phase 4 Op-5; §5 registry gains 5 new intent_kinds for overlay-commit + ContextPacker + RunFrame writes). Issue 1 draft, 2026-04-27.
+**Related**: BSP-002 (conversation graph), BSP-007 (overlay-git semantics), BSP-008 (ContextPacker + RunFrames), RFC-005 (file format), RFC-006 (wire format)
+**Atom anchors**: definitions live in [`docs/atoms/`](../atoms/README.md). This BSP stays normative for the writer's apply discipline, idempotency rules, and the canonical intent registry.
 **Defers to V3/V4**: multi-kernel coordination, multi-operator conflict resolution, CRDT/OT machinery
 
 ## 1. Scope
@@ -70,21 +71,26 @@ Direct writes would let the extension and kernel both call `MetadataWriter.appen
 
 The complete enumeration of allowed mutations. Each is an `intent_kind`; each maps to an apply function on `MetadataWriter`. Adding a new intent kind requires a BSP/RFC amendment (no ad-hoc kinds).
 
-| `intent_kind` | Submitted by | Mutates | Notes |
+| `intent_kind` | Submitted by | Mutates | Notes / Atom |
 |---|---|---|---|
-| `append_turn` | kernel (agent emit) OR extension (operator input) | `agents.<id>.turns[]` | Append-only; turn is immutable thereafter |
-| `create_agent` | kernel (`/spawn`) | `agents.<id>` | Creates new agent record + first turn atomically |
-| `move_agent_head` | kernel (turn committed) OR extension (`/revert`) | `agents.<id>.session.head_turn_id` | CAS-friendly; the most contested write |
-| `fork_agent` | kernel (`/branch`) | `agents.<new_id>` | Creates new agent referencing source's transcript prefix |
-| `update_agent_session` | kernel | `agents.<id>.session.{runtime_status,pid,claude_session_id,last_seen_turn_id}` | Routine state updates from the supervisor |
+| `append_turn` | kernel (agent emit) OR extension (operator input) | `agents.<id>.turns[]` | Append-only; turn is immutable thereafter. [turn](../atoms/concepts/turn.md) |
+| `create_agent` | kernel (`/spawn`) | `agents.<id>` | Creates new agent record + first turn atomically. [spawn-agent](../atoms/operations/spawn-agent.md) |
+| `move_agent_head` | kernel (turn committed) OR extension (`/revert`) | `agents.<id>.session.head_turn_id` | CAS-friendly; the most contested write. [revert-agent](../atoms/operations/revert-agent.md) |
+| `fork_agent` | kernel (`/branch`) | `agents.<new_id>` | Creates new agent referencing source's transcript prefix. [branch-agent](../atoms/operations/branch-agent.md) |
+| `update_agent_session` | kernel | `agents.<id>.session.{runtime_status,pid,claude_session_id,last_seen_turn_id}` | Routine state updates from the supervisor. [agent](../atoms/concepts/agent.md) |
 | `add_overlay` | extension (operator) | `overlays.<id>` | Append-only |
 | `move_overlay_ref` | extension (operator) | `overlay_refs.<turn_id>` | Mutable head; like agent head |
-| `set_cell_metadata` | extension | `cells[].metadata.rts.cell.*` | Render-time cache (BSP-002 §6) |
+| `set_cell_metadata` | extension | `cells[].metadata.rts.cell.*` | Render-time cache (BSP-002 §6). [cell](../atoms/concepts/cell.md) |
 | `update_ordering` | extension (drag-cell-to-reorder) | `ordering[]` | Renumbers without touching turn DAG |
-| `add_blob` | kernel (tool emit) OR extension (overlay replacement) | `blobs.<hash>` | Content-addressed; idempotent on hash |
+| `add_blob` | kernel (tool emit) OR extension (overlay replacement) | `blobs.<hash>` | Content-addressed; idempotent on hash. [blob](../atoms/concepts/blob.md), [artifact-ref](../atoms/concepts/artifact-ref.md) |
 | `record_event` | any (writer-side log) | `event_log[]` | Append-only; ref-moves, handoffs, intent applications |
+| `apply_overlay_commit` | extension (operator) OR kernel (cell-manager-driven splits/merges) | `overlay_commits[]`, dependent overlay refs | Records an overlay-graph commit (cell split/merge/move, section create/rename/delete, flag toggle). Append-only; reversible only via `revert_overlay_to_commit`. [apply-overlay-commit](../atoms/operations/apply-overlay-commit.md) |
+| `revert_overlay_to_commit` | extension (operator) | `overlay_refs.<ref>`, `overlay_commits[]` | Reverses a previous overlay commit by moving the named ref backward. Underlying turn DAG unchanged (turns are immutable). [revert-overlay-commit](../atoms/operations/revert-overlay-commit.md) |
+| `create_overlay_ref` | extension (operator) | `overlay_refs.<new_name>` | Creates a new named overlay ref pointing at an existing commit. Like `git branch`. [create-overlay-ref](../atoms/operations/create-overlay-ref.md) |
+| `record_context_manifest` | kernel (AgentSupervisor wraps ContextPacker output) | `context_manifests.<manifest_id>` | Persists a ContextPacker output for one cell run. Append-only; deterministic re-walks collide on `manifest_id` and are idempotent. Validator rejects unknown turn refs (K103). [context-manifest](../atoms/concepts/context-manifest.md) |
+| `record_run_frame` | kernel (AgentSupervisor at run start + terminal status) | `run_frames.<run_id>` | Persists a RunFrame for one cell run. Idempotent on `run_id`: start writes placeholder; terminal update sets `status` + `ended_at`. Append-only otherwise. Validator rejects mismatched `cell_id` (K102). [run-frame](../atoms/concepts/run-frame.md) |
 
-Submitting an intent for an unknown `intent_kind` raises K40 (see §8).
+Submitting an intent for an unknown `intent_kind` raises K40 (see §8). The five rows added in the 2026-04-28 amendment (`apply_overlay_commit`, `revert_overlay_to_commit`, `create_overlay_ref`, `record_context_manifest`, `record_run_frame`) are required by BSP-005 S5/S5.5/S6 and BSP-007/BSP-008.
 
 ## 6. Apply discipline
 
@@ -166,4 +172,5 @@ The same discipline costs orders of magnitude more in V3 because each of those c
 
 ## Changelog
 
+- **2026-04-28 (atom-refactor Phase 4 Op-5)**: §5 intent registry gains 5 new rows for the overlay-commit + ContextPacker + RunFrame write paths required by BSP-005 S5/S5.5/S6: `apply_overlay_commit`, `revert_overlay_to_commit`, `create_overlay_ref`, `record_context_manifest`, `record_run_frame`. Each row links to its operation/concept atom. Status bumped to "Issue 1 amended." Definitions now live in `docs/atoms/`. No behavioral or wire-format changes; the apply discipline (§6), idempotency rules, and CAS semantics are unchanged.
 - **Issue 1, 2026-04-27**: initial draft. Single canonical writer + intent envelope pattern. V1 simplifications enumerated; V3/V4 forward-compat seam pinned. Intent registry §5 covers all BSP-002 mutations. Implementation slice §10 sized for K-MW.

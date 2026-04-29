@@ -2,11 +2,14 @@
 
 ## Status
 
-Draft. Date: 2026-04-27. Version: 1.0.1.
+Draft. Date: 2026-04-28. Version: 1.0.2.
 
 This RFC is the layer-1 (persistent storage) normative specification for the on-disk shape of an `.llmnb` notebook. It MUST be accepted before any code writes to the `metadata.rts` namespace. Conforming implementations attach to this exact version string; deviations require an RFC update, not a code workaround.
 
 **Changelog**:
+- v1.0.2 (additive, atom-refactor Phase 4 Op-3, 2026-04-28):
+  - `metadata.rts.blobs[<sha256>]` entry shape now mirrors the [ArtifactRef atom](../atoms/concepts/artifact-ref.md) — five normative top-level fields `{id, kind, size, content_hash, body, meta}` instead of the prior `{content_type, encoding, size_bytes, data}` shape. The new shape is the V1 ArtifactRef contract per [BSP-002 §13.5.3](../notebook/BSP-002-conversation-graph.md) and [KB-notebook-target.md §0.9](../notebook/KB-notebook-target.md#09-artifacts--v1-ships-the-shape-v2-ships-streaming). V1 stores `body` inline (never null); V2 permits `body: null` when the artifact is externalized — see [decisions/v1-artifact-shape](../atoms/decisions/v1-artifact-shape.md).
+  - Definitions now live in `docs/atoms/`. No behavioral or wire-format changes beyond the shape rename above; the storage location (`metadata.rts.blobs`), the SHA-256 keying, and the `$blob:sha256:...` sentinel resolution all stay normative in this RFC.
 - v1.0.1 (additive):
   - `config.recoverable.agents[]` schema gains two required fields surfaced during V1 mega-round implementation: `task` (string, the agent's job description; required for `AgentSupervisor.respawn_from_config(...)` to know what to spawn) and `work_dir` (string, optional; defaults to workspace root). Without these, the kernel cannot deterministically respawn agents on file open.
   - §F13 queue-overflow disk fallback file format locked: marker at `<workspace_root>/.llmnb-overflow-marker.json` with `{"kernel_session_id", "overflow_at" (ISO 8601), "snapshot_version", "queue_size_at_overflow"}`; snapshot at `<workspace_root>/.llmnb-overflow-snapshot.json` containing the full `metadata.rts` body. Atomic write via `<file>.tmp` + `os.replace`. Operator/extension may merge or discard on next file open.
@@ -438,24 +441,37 @@ The kernel's writer MUST format `event_log.runs[]` so each span occupies its own
 
 Pretty-printing inside the per-span line is not required (and reduces git delta efficiency). The kernel SHOULD emit each span as one line to maximize git pack-delta compression on append-heavy histories. The same convention applies to `layout.tree.children[]` and `agents.nodes[]`/`agents.edges[]` arrays where practical.
 
-### `metadata.rts.blobs` — content-addressed large attribute values
+### `metadata.rts.blobs` — content-addressed large attribute values (ArtifactRef-shaped)
 
 ```json
 {
   "sha256:c4f5e9b8a7d6...": {
-    "content_type": "text/plain",
-    "encoding": "utf-8",
-    "size_bytes": 130421,
-    "data": "...full content..."
+    "id":           "sha256:c4f5e9b8a7d6...",
+    "kind":         "text/plain",
+    "size":         130421,
+    "content_hash": "sha256:c4f5e9b8a7d6...",
+    "body":         "...full content...",
+    "meta": {
+      "mime":       "text/plain",
+      "encoding":   "utf-8",
+      "source":     "tool:read_file",
+      "created_at": "2026-04-26T13:22:45.000Z"
+    }
   },
   "sha256:7e8f9a0b1c2d...": {
-    "content_type": "application/json",
-    "encoding": "utf-8",
-    "size_bytes": 84112,
-    "data": "..."
+    "id":           "sha256:7e8f9a0b1c2d...",
+    "kind":         "application/json",
+    "size":         84112,
+    "content_hash": "sha256:7e8f9a0b1c2d...",
+    "body":         "...",
+    "meta": { "mime": "application/json", "encoding": "utf-8" }
   }
 }
 ```
+
+The blob entry shape mirrors the [ArtifactRef atom](../atoms/concepts/artifact-ref.md). V1 stores `body` inline (never null); V2 permits `body: null` when the artifact is externalized — see [decisions/v1-artifact-shape](../atoms/decisions/v1-artifact-shape.md). Five top-level fields are normative in V1: `id`, `kind`, `size`, `content_hash`, `body`. The `meta` object preserves provenance (`mime`, `encoding`, `source`, `created_at`); receivers MUST round-trip unknown `meta` keys verbatim.
+
+`id` and `content_hash` MUST be equal and MUST match the outer object key. Two writes of identical content collapse to one entry (content-addressed). The hash is the SHA-256 of `body`; the hash key validates the blob's integrity.
 
 Any attribute value whose serialized form exceeds `config.kernel.blob_threshold_bytes` (default 64 KiB) MUST be stored as a content-addressed blob. The originating attribute's value is replaced with a sentinel:
 
@@ -463,9 +479,9 @@ Any attribute value whose serialized form exceeds `config.kernel.blob_threshold_
 { "key": "output.value", "value": { "stringValue": "$blob:sha256:c4f5e9b8a7d6..." } }
 ```
 
-Receivers MUST recognize the `$blob:` prefix and resolve the content from `metadata.rts.blobs`. The hash MUST be the SHA-256 of the original `data` content (the hash key validates the blob's integrity).
+Receivers MUST recognize the `$blob:` prefix and resolve the content from `metadata.rts.blobs[<key>].body`. The hash MUST be the SHA-256 of the original `body` content (the hash key validates the blob's integrity).
 
-V1 supports text content only (`encoding: "utf-8"`). Binary content (images, archives) is not supported in V1; tools that produce binary outputs MUST either truncate, encode to text, or fail. V2 introduces `.llmnb-objects/` sidecar storage following git-LFS semantics.
+V1 supports text content only (`meta.encoding: "utf-8"`). Binary content (images, archives) is not supported in V1; tools that produce binary outputs MUST either truncate, encode to text, or fail. V2 introduces `.llmnb-objects/` sidecar storage following git-LFS semantics, AND permits `body: null` for entries materialized from sidecar storage on demand (see [v1-artifact-shape](../atoms/decisions/v1-artifact-shape.md)).
 
 #### Blob garbage collection
 
@@ -584,7 +600,7 @@ OTel itself versions its semantic conventions (`opentelemetry.io/schemas/1.32.0`
 | F2 | Forbidden secret field detected anywhere in `config` | Refuse to load with security error. MUST NOT log the offending value. | Operator manually edits the file or restores from a clean version. |
 | F3 | In-progress span (`endTimeUnixNano: null`) found at file open | Mark `status.code: STATUS_CODE_ERROR, message: "kernel restart truncated"`, set `endTimeUnixNano` to current wall-clock. Do NOT block load. | Operator sees a truncated run in cell output; can re-execute the cell to rerun. |
 | F4 | Attribute value carries `$blob:sha256:<hash>` but `metadata.rts.blobs` lacks that key | Render placeholder ("(blob missing: sha256:abc123...)"). Surface a file-corruption warning. Continue loading other content. | Operator can attempt git-restore of an earlier file revision. |
-| F5 | `metadata.rts.blobs[<key>].data`'s SHA-256 hash != `<key>` | Reject load. File is corrupted beyond safe interpretation. | Operator restores from git or accepts data loss and loads with `--ignore-blob-integrity` (V2 flag). |
+| F5 | `metadata.rts.blobs[<key>].body`'s SHA-256 hash != `<key>` (or `body == null` in V1) | Reject load. File is corrupted beyond safe interpretation in V1. (V2 readers tolerate `body: null` when externalized — see [v1-artifact-shape](../atoms/decisions/v1-artifact-shape.md).) | Operator restores from git or accepts data loss and loads with `--ignore-blob-integrity` (V2 flag). |
 | F6 | `cells[*].metadata.rts.trace_id` references no spans in `event_log.runs[]` | Tolerate. Render the cell as untouched. Not an error. | None. Common during edit-and-resend before the new cell has executed. |
 | F7 | `event_log.runs[]` references unknown `llmnb.cell_id` | Tolerate. The orphaned run still appears in the event log but no cell shows it. | Replay harness flags as orphaned-run anomaly. |
 | F8 | `cells[*].metadata.rts.target_agent` references an `agent_id` not in `config.agents[]` | Cell renders with an "orphaned agent" indicator. Operator may re-spawn or remove. | Surfaced via the sidebar Activity Bar; not blocking. |
@@ -732,10 +748,12 @@ A minimal session: one zone, one agent, two cells, one closed run, one in-progre
       },
       "blobs": {
         "sha256:c4f5e9b8a7d6e3f1c2d4b5a6978876543210abcdef0123456789abcdef0123": {
-          "content_type": "application/json",
-          "encoding": "utf-8",
-          "size_bytes": 87421,
-          "data": "{\"status\":\"...\",\"percent\":42,\"blockers\":[...87KB of detail...]}"
+          "id":           "sha256:c4f5e9b8a7d6e3f1c2d4b5a6978876543210abcdef0123456789abcdef0123",
+          "kind":         "application/json",
+          "size":         87421,
+          "content_hash": "sha256:c4f5e9b8a7d6e3f1c2d4b5a6978876543210abcdef0123456789abcdef0123",
+          "body":         "{\"status\":\"...\",\"percent\":42,\"blockers\":[...87KB of detail...]}",
+          "meta":         { "mime": "application/json", "encoding": "utf-8" }
         }
       },
       "drift_log": [
@@ -844,3 +862,8 @@ If the operator has updated their kernel between sessions and `rfc_001_version` 
 - Dev-guide chapter: [07 — Subtractive fork and storage](../dev-guide/07-subtractive-fork-and-storage.md) (storage structures + ipynb derivation rationale)
 - Sibling RFCs: [RFC-001](RFC-001-mcp-tool-taxonomy.md) (referenced by `config.kernel.rfc_001_version`), [RFC-002](RFC-002-claude-code-provisioning.md) (referenced by `config.agents[*].system_prompt_template_id`), [RFC-003](RFC-003-custom-message-format.md) (wire form; this RFC is the persistent counterpart), [RFC-004](RFC-004-failure-modes.md) (replay harness consumes this format)
 - External: [opentelemetry-proto OTLP/JSON encoding](https://github.com/open-telemetry/opentelemetry-proto/blob/main/docs/specification.md), [OTel GenAI semantic conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/), [OpenInference conventions](https://github.com/Arize-ai/openinference)
+
+## Changelog
+
+- **2026-04-28 (atom-refactor Phase 4 Op-3)**: §"`metadata.rts.blobs`" subsection updated so blob entries mirror the [ArtifactRef atom](../atoms/concepts/artifact-ref.md) shape (`{id, kind, size, content_hash, body, meta}`) per [BSP-002 §13.5.3](../notebook/BSP-002-conversation-graph.md) and [KB-notebook-target.md §0.9](../notebook/KB-notebook-target.md#09-artifacts--v1-ships-the-shape-v2-ships-streaming). V1 stores `body` inline (never null); V2 permits `body: null` per [decisions/v1-artifact-shape](../atoms/decisions/v1-artifact-shape.md). F5 failure-mode row + worked-example blob updated to match. Status bumped to v1.0.2. Definitions now live in `docs/atoms/`. No behavioral or wire-format changes beyond the field rename; the storage location, SHA-256 keying, and `$blob:` sentinel resolution are unchanged.
+- See `Status` changelog at the top of this RFC for prior versions (v1.0.1, v1.0.0).

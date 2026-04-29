@@ -85,50 +85,27 @@ The current cell/section arrangement is the result of folding `commits[]` from r
 
 ## 3. Operations enumerated
 
-The overlay supports the following operation kinds. Several already exist in BSP-003's intent registry (§5); their inclusion here connects them to the commit model. New kinds (split, merge, move, section ops, promote, checkpoint) are additive to BSP-003 — see §8 and the report's intent registry additions.
+Operations are documented as atoms under [docs/atoms/operations/](../atoms/operations/). Each atom carries the operation's contract, signature, invariants, and decision-row mappings (D/S/M/SD/CK).
 
-### 3.1 Cell-level (existing in BSP-003 §5; now wrapped in commits)
+Quick index of overlay-commit operations:
 
-| `kind` | Parameters | Effect |
-|---|---|---|
-| `set_cell_metadata` | `cell_id`, `path`, `value` | Update `metadata.rts.cells[<id>].*` (BSP-002 §6 cell render-time cache, plus toggles) |
-| `update_ordering` | `cell_id`, `new_index` | Re-position one cell within its section |
-| `set_pin` | `cell_id`, `pinned: bool` | Toggle pin flag (KB-target §22.1 boundary) |
-| `set_exclude` | `cell_id`, `excluded: bool` | Toggle exclude flag |
-| `set_scratch` | `cell_id`, `scratch: bool` | Toggle scratch flag (KB-target §13.4) |
-| `set_checkpoint` | `cell_id`, `checkpoint: bool` | Promote/demote to checkpoint cell (KB-target §22.1 boundary) |
-| `add_overlay` | `target_turn_id`, `overlay_kind`, `content`, `context_modifying` | Within-turn overlay (BSP-002 §12). Listed here because the overlay-commit model envelops *all* operator structural+editorial changes; per-turn overlays compose under it. |
-| `move_overlay_ref` | `target_turn_id`, `overlay_id` | Advance the per-turn overlay ref (BSP-002 §12.4) |
+- [apply-overlay-commit](../atoms/operations/apply-overlay-commit.md) — the primitive that lands a commit
+- [revert-overlay-commit](../atoms/operations/revert-overlay-commit.md) — rewind HEAD
+- [create-overlay-ref](../atoms/operations/create-overlay-ref.md) — named refs (V1 tags)
+- [split-cell](../atoms/operations/split-cell.md)
+- [merge-cells](../atoms/operations/merge-cells.md)
+- [move-cell](../atoms/operations/move-cell.md)
+- [promote-span](../atoms/operations/promote-span.md)
+- [pin-exclude-scratch-checkpoint](../atoms/operations/pin-exclude-scratch-checkpoint.md) — the four flag-toggle ops, collected
+- [create-section](../atoms/operations/create-section.md)
+- [delete-section](../atoms/operations/delete-section.md)
+- [rename-section](../atoms/operations/rename-section.md)
 
-### 3.2 Cell-structural (new in this BSP)
-
-| `kind` | Parameters | Effect |
-|---|---|---|
-| `split_cell` | `cell_id`, `at_turn_id` | Split the cell at the boundary before `at_turn_id`; returns `new_cell_id` (deterministic from commit_id + parent cell_id). Preconditions per §6.2. |
-| `merge_cells` | `cell_a`, `cell_b` | Append cell_b's turns into cell_a as sub-turns (KB-target §0.2). cell_b is removed; cell_a survives. Preconditions per §6.1. |
-| `move_cell` | `cell_id`, `target_section`, `position` | Relocate a cell into another section at the given index. Crossing a hard provenance boundary (pin/exclude/checkpoint) is allowed but the cell carries its boundary; merge across the boundary remains forbidden (§6). |
-
-### 3.3 Section-level (new; per KB-target §0.1, KB-target §6)
-
-| `kind` | Parameters | Effect |
-|---|---|---|
-| `create_section` | `section_id`, `title`, `parent_section_id` | Create a new Section. `parent_section_id` may be null (top-level). |
-| `delete_section` | `section_id` | Remove a Section. The Section must be empty (no cells) or the operation must include explicit `move_cells_into_section` ops in the same commit moving all cells out first. |
-| `rename_section` | `section_id`, `title` | Update the visible title. |
-| `move_cells_into_section` | `cell_ids[]`, `target_section_id`, `position` | Bulk-move cells into a Section. Equivalent to a sequence of `move_cell` operations; included as a single op for atomicity in checkpointing/exporting workflows. |
-
-### 3.4 Promote / checkpoint (new; per KB-target §5, §13)
-
-| `kind` | Parameters | Effect |
-|---|---|---|
-| `promote_span` | `span_id`, `cell_kind`, `section_id` | Promote an artifact span (KB-target §16) into a new addressable cell. Returns `new_cell_id`. Cell starts empty of turns; carries the span as a binding. |
-| `checkpoint_section` | `section_id`, `summary`, `range[]?` | Create a checkpoint cell summarizing a Section (or a sub-range of cells within it). Adds the checkpoint cell at the end of the range and marks the range `checkpointed` (KB-target §22.6). |
-
-**Operation count:** 8 cell-level + 3 cell-structural + 4 section-level + 2 promote/checkpoint = 17 distinct kinds.
+Operation kinds appear inside the `OverlayCommit.operations[]` array (§2.1). The set spans cell-level toggles (`set_pin`, `set_exclude`, `set_scratch`, `set_checkpoint`, plus `set_cell_metadata`, `update_ordering`, `add_overlay`, `move_overlay_ref`), cell-structural (`split_cell`, `merge_cells`, `move_cell`), section-level (`create_section`, `delete_section`, `rename_section`, `move_cells_into_section`), and promote/checkpoint (`promote_span`, `checkpoint_section`) — 17 distinct kinds in V1. The atoms above are the canonical contracts; per-op preconditions and parameter shapes live there.
 
 ## 4. Operations primitives
 
-The four operations on the overlay graph itself.
+Operations referenced below are defined as atoms under [docs/atoms/operations/](../atoms/operations/). The four primitives on the overlay graph itself follow.
 
 ### 4.1 `apply_commit(operations[]) → new_commit_id`
 
@@ -329,3 +306,4 @@ X-EXT downstream work (separate slice, sized by the extension team): a History-m
 ## Changelog
 
 - **Issue 1, 2026-04-28**: initial draft. Closes the BSP-007 gap from KB-target §0.11. Pins the overlay-commit data model, the four primitives, the V1 vs V2 vs V3 scope split, the cell-merge correctness rules pulled forward from KB-target §22.1, K90-K95 failure modes, BSP-003 intent envelope integration, and the K-OVERLAY 3-day slice. Calls out the BSP-003 §5 intent registry amendments needed.
+- **2026-04-28 (atom-refactor Phase 4)**: §3 operation enumeration collapsed to atom links per `docs/notebook/PLAN-atom-refactor.md`; the per-op contracts now live under `docs/atoms/operations/`. §2 `OverlayCommit` JSON shape kept (normative wire schema). §4 primitives, §5 V1/V2/V3 scope, §6 merge-correctness rules, §7 failure modes, §8-§11 wire integration / tests / forward-compat / slice all kept verbatim — they're behavioral. No behavioral or wire-format changes.

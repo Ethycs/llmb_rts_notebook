@@ -2,15 +2,17 @@
 
 **Status:** working system document
 **Frame:** notebook UI + state model + execution model
-**Core claim:** this is not merely “Jupyter for LLMs.” It is a notebook-shaped operating environment for stateful semantic execution.
+**Core claim:** this is not merely "Jupyter for LLMs." It is a notebook-shaped operating environment for stateful semantic execution.
 
 ---
 
 ## 0. V1 decisions and amendments (2026-04-28)
 
-This doc is the **target architecture** (V2+ vision in many places). The decisions below pin what V1 actually ships, what gets reshaped vs. what keeps its shape, and the naming reconciliations between this doc and the existing kernel/wire specs (BSP-002 / BSP-003 / RFC-005 / RFC-006).
+This doc is the **target architecture** (V2+ vision in many places). The §0 amendments below pin what V1 actually ships, what gets reshaped vs. what keeps its shape, and the naming reconciliations between this doc and the existing kernel/wire specs (BSP-002 / BSP-003 / RFC-005 / RFC-006).
 
 When this section and the doc body disagree, **this section wins for V1.** The body stays as the future target.
+
+Each §0.x decision now lives as a dedicated atom under [`docs/atoms/decisions/`](../atoms/decisions/). The subsections below collapse to the canonical link.
 
 ### 0.1 Naming reconciliation
 
@@ -21,91 +23,39 @@ When this section and the doc body disagree, **this section wins for V1.** The b
 | `current_zone` / `parent_zone` (§17, §22.1) | `current_section` / `parent_section` | Same fix |
 | Doc uses **Zone** in §6, §9, §13.4, §17, §22.1, §23, §24 — all are **Section** in V1 | | The body of this doc is unmodified; treat every "zone" / "Zone" outside this §0 as the operator-narrative concept named **Section** in implementation. |
 
+See [concepts/section.md](../atoms/concepts/section.md) and [concepts/zone.md](../atoms/concepts/zone.md) for the canonical definitions of each.
+
 ### 0.2 Sub-turns are merge artifacts, not fundamental
 
-Per §4 the doc shows `In[5] alpha · schema design / 5.1 / 5.2 / 5.3` as if sub-turn numbering were native. **V1 says: a freshly created cell containing one operator turn has no sub-turn numbering.** Sub-turns emerge when cells merge:
-
-```
-before: cell c_5 (one turn t_a)
-        cell c_6 (one turn t_b)
-operator: merge(c_5, c_6)
-after:  cell c_5 with sub-turns c_5.1 (= t_a) and c_5.2 (= t_b)
-```
-
-Sub-turn addressing (`cell:c_17.2`) per §14 stays as the V1 stable handle, but the addressing only carries a sub-index when merges have happened.
+See [decisions/v1-no-nesting.md](../atoms/decisions/v1-no-nesting.md) and [concepts/sub-turn.md](../atoms/concepts/sub-turn.md).
 
 ### 0.3 Tool calls live in their parent turn
 
-Per §11 tools are devices. **V1 clarifies**: when an agent makes a tool call without explicit operator intervention, the tool call's record stays inside the same cell as the agent's turn that triggered it. Tool calls are part of the agent's turn, not their own cells. **`tool_cell` (§13.1) exists only for cases where the operator explicitly invokes a tool outside an agent's reasoning** (e.g., `/run tests` as a control-cell directive).
+See [discipline/tool-calls-atomic.md](../atoms/discipline/tool-calls-atomic.md) and [concepts/tool-call.md](../atoms/concepts/tool-call.md).
 
 ### 0.4 Cell kinds typed in V1
 
-§13.1 enumerates 8 cell kinds. **V1 ships at minimum**: `agent_cell`, `markdown_cell` (= comment cell M1 from BSP-005), `scratch_cell`, `checkpoint_cell`. Other kinds (`tool_cell`, `artifact_cell`, `control_cell`, `native_cell`) are **reserved** in the enum from day one — declared but not necessarily wired. The kind is enforced at `metadata.rts.cells[<id>].kind` so the merge-correctness rules of §22.1 (which require `same primary cell kind`) work from V1.
+See [concepts/cell-kinds.md](../atoms/concepts/cell-kinds.md).
 
 ### 0.5 RunFrames — minimal V1 schema
 
-§9 lists the full RunFrame. **V1 ships the minimal subset**:
-
-```jsonc
-RunFrame: {
-  run_id: string,
-  cell_id: string,
-  executor_id: string,                  // agent_id
-  turn_head_before: string,             // turn_id
-  turn_head_after: string,              // turn_id
-  context_manifest_id: string,          // ContextPacker output
-  status: "complete" | "failed" | "interrupted"
-}
-```
-
-V1 does NOT yet ship `parent_run_id`, `source_snapshot_id`, `overlay_commit_id`, `artifact_windows[]`, full `tool_permissions`. Those are V2.
+See [decisions/v1-runframe-minimal.md](../atoms/decisions/v1-runframe-minimal.md) and [concepts/run-frame.md](../atoms/concepts/run-frame.md).
 
 ### 0.6 ContextPacker — simple V1 contract
 
-§22.2 lists what the full ContextPacker needs. **V1 ships a dumb structural walker**:
-
-```
-input:  current cell, current section, notebook overlay
-output: ordered list of turn_ids to include in the agent's context
-
-V1 rule: include in this order:
-  1. Pinned cells (anywhere in notebook)
-  2. Previous cells in current section (chronological)
-  3. Current cell (its prior sub-turns if merged)
-exclude:
-  - Cells flagged scratch
-  - Cells flagged excluded
-  - Cells flagged obsolete (superseded by branch/revert)
-no ranking. no budget overflow strategy. no summary trust.
-```
-
-V2 adds ranking policies, recency decay, budget overflow handling, summary trust, manifest diffing.
+See [decisions/v1-contextpacker-walk.md](../atoms/decisions/v1-contextpacker-walk.md) and [concepts/context-manifest.md](../atoms/concepts/context-manifest.md).
 
 ### 0.7 Capabilities — V2
 
-§20's full capabilities table (read_context / read_files / ... / access_secrets) and privilege levels (view/draft/edit/execute/admin) are **deferred to V2**. Single-operator V1 has one trust boundary (operator → kernel → agents). RFC-001's `--allowedTools` covers the agent→tool boundary today.
-
-V1 reserves `metadata.rts.cells[<id>].capabilities[]` as an empty array for V2 expansion.
+See [decisions/capabilities-deferred-v2.md](../atoms/decisions/capabilities-deferred-v2.md).
 
 ### 0.8 Typed outputs — V1 ships the tag, V2 ships lenses
 
-§15 enumerates 12 output kinds enabling lenses. **V1 ships only the tag** as an OTLP attribute `llmnb.output.kind` on every emitted span (`prose | code | diff | patch | decision | plan | artifact_ref | test_result | diagnostic | checkpoint | question | warning`). **V2 ships the lens UI** ("show decisions only") that filters on the tag.
+See [decisions/v1-output-kind-tag.md](../atoms/decisions/v1-output-kind-tag.md) and [concepts/output-kind.md](../atoms/concepts/output-kind.md).
 
 ### 0.9 Artifacts — V1 ships the shape, V2 ships streaming
 
-§16 specifies full ArtifactRef + viewport-driven streaming. **V1 ships the shape**:
-
-```jsonc
-ArtifactRef: {
-  id: string,
-  kind: string,
-  size: number,
-  content_hash: string,
-  body: string | null     // V1: inline body. V2: null when externalized.
-}
-```
-
-V1 stores body inline (matches today's `metadata.rts.zone.blobs` semantics). V2 adds `byte_index`, `line_index`, `semantic_index`, `loaded_windows`, `pinned_ranges`, `summaries`, and the streaming materializer. The cell-side ArtifactRef references stay valid across the V1→V2 transition because the *shape* hasn't changed.
+See [decisions/v1-artifact-shape.md](../atoms/decisions/v1-artifact-shape.md) and [concepts/artifact-ref.md](../atoms/concepts/artifact-ref.md).
 
 ### 0.10 Implementation slices on top of BSP-005
 
@@ -155,11 +105,13 @@ Agents            registered semantic executors
 Tools             registered devices/peripherals
 ContextPacker     explicit context/memory assembler
 Artifacts         addressable large outputs/files/logs/diffs
-Zones             narrative/workflow sections over cells
+Sections          narrative/workflow ranges over cells (formerly "Zones" in body prose)
 RunFrames         execution snapshots for cell runs
 Overlay commits   reversible structure edits
 Modes             progressive disclosure views
 ```
+
+Each noun above has a canonical atom under [`docs/atoms/concepts/`](../atoms/concepts/).
 
 The most important achievement is that the design has found its real objects. It is no longer just a chat UI, and it is no longer merely a notebook UI. It has the beginnings of a real state model and execution model.
 
@@ -188,11 +140,15 @@ In this notebook, history remains intact while presentation can be repaired.
 
 That lets the operator split, merge, collapse, summarize, checkpoint, reorder, label, pin, exclude, branch, and inspect without corrupting the underlying conversation trace.
 
-This is the architectural foundation.
+This is the architectural foundation. The discipline that makes it work is captured in [discipline/immutability-vs-mutability.md](../atoms/discipline/immutability-vs-mutability.md).
+
+For the canonical definitions of the nouns above see [concepts/turn.md](../atoms/concepts/turn.md), [concepts/cell.md](../atoms/concepts/cell.md), [concepts/overlay-commit.md](../atoms/concepts/overlay-commit.md).
 
 ---
 
 ## 4. What a cell is
+
+See [concepts/cell.md](../atoms/concepts/cell.md) for the definition. The remainder of this section is the operator-narrative for cell-as-issuance-unit.
 
 A cell is not a message.
 
@@ -200,21 +156,7 @@ A cell is not merely a prompt.
 
 A cell is an **issuance scope chosen by the operator**.
 
-```text
-Cell =
-  source directive
-  local scope policy
-  local flow policy
-  bound turns
-  bound spans
-  context manifest
-  artifact references
-  execution state
-  overlay metadata
-  provenance hooks
-```
-
-A cell may contain multiple sub-turns:
+A cell may contain multiple sub-turns (post-merge — see [concepts/sub-turn.md](../atoms/concepts/sub-turn.md) and [decisions/v1-no-nesting.md](../atoms/decisions/v1-no-nesting.md) for why sub-turns appear only as merge artifacts in V1):
 
 ```text
 In[5] alpha · schema design
@@ -249,9 +191,11 @@ merge(cell_a, cell_b)
 
 These are not destructive edits. They are overlay commits.
 
-The underlying Turn DAG does not change. The operator’s arrangement changes.
+The underlying Turn DAG does not change. The operator's arrangement changes.
 
 This gives the system a refactoring calculus for conversation.
+
+For the operations themselves see [operations/split-cell.md](../atoms/operations/split-cell.md) and [operations/merge-cells.md](../atoms/operations/merge-cells.md). The structural authority is captured in [discipline/cell-manager-owns-structure.md](../atoms/discipline/cell-manager-owns-structure.md).
 
 ### Why this matters
 
@@ -274,25 +218,11 @@ The principle:
 
 ## 6. Sections and zones
 
-Cells are local units. Zones are narrative/workflow units.
+See [concepts/section.md](../atoms/concepts/section.md) and [concepts/zone.md](../atoms/concepts/zone.md) for the definitions and the rename rationale (the operator-narrative concept this section formerly called "Zone" is named **Section** in implementation per §0.1).
 
-A zone is an operator-defined range over the cell overlay graph.
+Cells are local units. Sections are narrative/workflow units.
 
-```text
-Zone =
-  id
-  title
-  ordered cell range
-  optional parent zone
-  collapsed / expanded state
-  scope policy
-  flow policy
-  summary
-  status
-  open questions
-```
-
-Zones let the notebook preserve flow at a larger scale:
+Sections let the notebook preserve flow at a larger scale:
 
 ```text
 ## Architecture
@@ -306,7 +236,7 @@ Zones let the notebook preserve flow at a larger scale:
   In[6] scheduler and RunFrames
 ```
 
-Zones are not cosmetic headings. They are overlay objects.
+Sections are not cosmetic headings. They are overlay objects.
 
 They are the natural unit for:
 
@@ -323,7 +253,7 @@ freezing completed work
 
 The principle:
 
-> Cells preserve local issuance. Zones preserve narrative flow.
+> Cells preserve local issuance. Sections preserve narrative flow.
 
 ---
 
@@ -336,7 +266,7 @@ The user should not have to write nested scope configuration to make the noteboo
 ```text
 cell order
 cell kind
-zone membership
+section membership
 split/merge boundaries
 pinned cells
 excluded cells
@@ -345,12 +275,10 @@ scratch cells
 artifact lenses
 ```
 
-In V1, scope is controlled by **logical reorganization** of the notebook, not by complex local rules embedded in cells.
-
-The operator changes scope by doing notebook-native things:
+In V1, scope is controlled by **logical reorganization** of the notebook, not by complex local rules embedded in cells. The operator changes scope by doing notebook-native things:
 
 ```text
-move this cell into the implementation zone
+move this cell into the implementation section
 split this review into its own cell
 merge these compatible agent continuations
 pin this architecture cell
@@ -400,7 +328,7 @@ Better:
 
 ```text
 This cell is pinned.
-This zone has a checkpoint.
+This section has a checkpoint.
 This branch is excluded.
 This cell is scratch.
 The notebook order says what comes before this.
@@ -410,7 +338,7 @@ The invariant:
 
 > Cells do not contain complex scope machinery. The notebook structure determines scope, and the kernel materializes it.
 
-This preserves the Zachtronics-style discipline: visible pieces, simple roles, local movement, and emergent global behavior.
+This preserves the Zachtronics-style discipline (see [discipline/zachtronics.md](../atoms/discipline/zachtronics.md) and [discipline/scratch-beats-config.md](../atoms/discipline/scratch-beats-config.md)): visible pieces, simple roles, local movement, and emergent global behavior.
 
 ---
 
@@ -435,6 +363,8 @@ checkpoint(range)
 promote(span)
 route(condition, target)
 ```
+
+Several of these have canonical operation atoms: [continue-turn](../atoms/operations/continue-turn.md), [branch-agent](../atoms/operations/branch-agent.md), [revert-agent](../atoms/operations/revert-agent.md), [stop-agent](../atoms/operations/stop-agent.md), [promote-span](../atoms/operations/promote-span.md), [pin-exclude-scratch-checkpoint](../atoms/operations/pin-exclude-scratch-checkpoint.md).
 
 Flow state is related to but distinct from both the DAG and overlay.
 
@@ -483,7 +413,7 @@ Which branch did this output descend from?
 
 ## 9. Self-reference without paradox
 
-Cells can refer to themselves, previous cells, zones, turns, artifacts, and visible ranges.
+Cells can refer to themselves, previous cells, sections, turns, artifacts, and visible ranges.
 
 This is necessary for natural notebook work:
 
@@ -491,31 +421,14 @@ This is necessary for natural notebook work:
 @alpha: summarize this cell
 @beta: review the previous section
 @gamma: continue from In[12]
-@delta: checkpoint the current zone
+@delta: checkpoint the current section
 ```
 
 But self-reference must be snapshot-stable.
 
-Each run receives a RunFrame:
+Each run receives a RunFrame — see [concepts/run-frame.md](../atoms/concepts/run-frame.md) for the canonical schema.
 
-```text
-RunFrame:
-  run_id
-  cell_id
-  zone_id
-  executor_id
-  parent_run_id
-  source_snapshot_id
-  overlay_commit_id
-  turn_head_before
-  turn_head_after
-  context_manifest_id
-  artifact_windows
-  tool_permissions
-  status
-```
-
-When a cell says “this cell,” it means:
+When a cell says "this cell," it means:
 
 > this cell at the source snapshot and overlay commit where the run began.
 
@@ -531,6 +444,8 @@ This preserves conversational flow without creating recursive instability.
 
 ## 10. Agents as executors
 
+See [concepts/agent.md](../atoms/concepts/agent.md) for the canonical definition.
+
 The stronger execution model is:
 
 ```text
@@ -538,21 +453,6 @@ Agent / LLM = semantic executor / CPU-like core
 ```
 
 An agent is not ambient intelligence floating over the notebook. It is a registered executor.
-
-```text
-Executor:
-  id
-  kind: llm_agent
-  provider
-  role
-  session_id
-  head_turn_id
-  supported_opcodes
-  context_window
-  tool_capabilities
-  current_status
-  failure_modes
-```
 
 A cell run dispatches to an executor:
 
@@ -571,17 +471,9 @@ It also lets the scheduler reason about availability, capabilities, permissions,
 
 ## 11. Tools as devices
 
-Tools are not random functions. They are registered devices or peripherals.
+See [concepts/tool-call.md](../atoms/concepts/tool-call.md) for the canonical definition of an individual tool call.
 
-```text
-Device:
-  id
-  kind
-  driver
-  methods
-  permissions
-  event_stream
-```
+Tools are not random functions. They are registered devices or peripherals.
 
 Examples:
 
@@ -597,23 +489,7 @@ notebook_overlay_device
 vector_search_device
 ```
 
-A tool call becomes a device call:
-
-```text
-DeviceCallFrame:
-  run_id
-  executor_id
-  device_id
-  method
-  args
-  permissions_checked
-  input_artifacts
-  output_artifacts
-  status
-  logs
-```
-
-This gives the system:
+A tool call gives the system:
 
 ```text
 provenance
@@ -653,7 +529,7 @@ Example:
 
 ```text
 In[21] @alpha IMPLEMENT
-  scope: current_zone + pinned(:architecture)
+  scope: current_section + pinned(:architecture)
   devices: fs.read, diff.propose, tests.run
   writes: selected_span only
   returns: patch + test_result
@@ -674,7 +550,7 @@ InstructionBlock:
   artifact_windows:
     - artifact:a_14#L100-L240
   permissions:
-    read: current_zone
+    read: current_section
     write: selected_span
     execute: tests_only
   returns:
@@ -688,13 +564,15 @@ This gives the notebook an ISA-like structure without forcing the user to write 
 
 ## 13. Cell discipline: Zachtronics, not general ASM
 
-The ISA metaphor is useful only if it produces discipline.
+The ISA metaphor is useful only if it produces discipline. See [discipline/zachtronics.md](../atoms/discipline/zachtronics.md) for the canonical rule.
 
 The notebook should not become a general-purpose assembly language with arbitrary jumps, clever configuration, and hidden machine behavior. The better metaphor is **Zachtronics-style instruction tiles**: small, visible, constrained units that compose through placement, order, and simple rules.
 
 V1 should prefer obvious behavior over expressive cleverness.
 
 ### 13.1 One cell, one system role
+
+For the canonical cell-kinds enumeration see [concepts/cell-kinds.md](../atoms/concepts/cell-kinds.md). For the rule itself see [discipline/one-cell-one-role.md](../atoms/discipline/one-cell-one-role.md).
 
 A cell should not perform multiple system roles at once.
 
@@ -713,24 +591,11 @@ In[12] Review cell: beta reviews patch
 In[13] Checkpoint cell: summarize accepted result
 ```
 
-Each cell should have a primary kind:
-
-```text
-markdown_cell      human prose / notes
-agent_cell         dispatches to one registered agent executor
-tool_cell          invokes one registered tool/device operation
-artifact_cell      displays or lenses an artifact/range
-checkpoint_cell    summarizes a range or zone
-control_cell       simple notebook-level control, such as branch/revert/stop
-native_cell        low-level instruction/runtime directive, isolated from agent calls
-scratch_cell       temporary human workspace, not automatically part of agent context
-```
-
 A cell may reference other objects, but it should have only one dominant role.
 
 The invariant:
 
-> A cell has one primary system role. Composition happens through neighboring cells, zones, bindings, and notebook order.
+> A cell has one primary system role. Composition happens through neighboring cells, sections, bindings, and notebook order.
 
 ### 13.2 V1 order drives functionality
 
@@ -799,19 +664,9 @@ This protects the ordinary notebook from becoming a fragile scripting environmen
 
 ### 13.4 Scratch is notebook-level, not hidden configuration
 
+See [discipline/scratch-beats-config.md](../atoms/discipline/scratch-beats-config.md) for the canonical rule.
+
 The notebook should have Scratch-like clunkiness at the notebook level: visible, explicit, maybe a little manual.
-
-Scratch cells are temporary workpads:
-
-```text
-scratch_cell:
-  not automatically included in context
-  not part of default checkpoints
-  can be promoted to markdown/agent/artifact cell
-  visually marked as scratch
-```
-
-This is better than invisible configuration panels or elaborate hidden policies.
 
 A user should be able to create a scratch cell, paste messy notes, try an idea, then either promote it or discard it.
 
@@ -884,7 +739,7 @@ $agent        current/default executor
 $status       idle | running | waiting | failed | complete
 $head         latest bound turn
 $ctx          latest context manifest
-$zone         containing zone
+$section      containing section
 $artifact     primary artifact ref
 $selection    selected span/range
 $summary      current summary
@@ -909,9 +764,11 @@ divergent      overlay view differs from DAG lineage
 
 This is how the notebook becomes inspectable.
 
-A normal notebook says: “this cell ran.”
+A normal notebook says: "this cell ran."
 
-This notebook can say: “this cell ran, but its context is stale, its artifact changed, and its output was partial.”
+This notebook can say: "this cell ran, but its context is stale, its artifact changed, and its output was partial."
+
+The flag-toggle operations themselves live in [operations/pin-exclude-scratch-checkpoint.md](../atoms/operations/pin-exclude-scratch-checkpoint.md).
 
 ---
 
@@ -925,15 +782,15 @@ Friendly references can exist in the UI, but stored references should use stable
 this_cell
 previous_cell
 next_cell
-current_zone
-parent_zone
+current_section
+parent_section
 selected_span
 visible_range
 
 cell:c_17
 cell:c_17.2
 turn:t_381
-zone:z_4
+section:s_4
 artifact:a_22#L100-L180
 artifact:a_22@byte[1024:4096]
 ctx:ctx_92
@@ -956,28 +813,15 @@ fix artifact:a_22#L100-L180 using ctx:ctx_92
 
 This enables relocation. Cells can move, split, or merge while references remain stable.
 
+For the canonical sub-turn addressing convention (`cell:c_17.2`) see [concepts/sub-turn.md](../atoms/concepts/sub-turn.md).
+
 ---
 
 ## 15. Typed outputs
 
-Outputs should not just be blobs of text.
+See [concepts/output-kind.md](../atoms/concepts/output-kind.md) for the canonical enumeration.
 
-They should have types:
-
-```text
-prose
-code
-diff
-patch
-decision
-plan
-artifact_ref
-test_result
-diagnostic
-checkpoint
-question
-warning
-```
+Outputs should not just be blobs of text. They should have types.
 
 Typed outputs make lenses reliable:
 
@@ -996,24 +840,9 @@ This is much stronger than heuristic filtering over plain chat text.
 
 ## 16. Artifact streaming
 
-Large files, logs, traces, diffs, and generated outputs should not be stuffed directly into cells.
+See [concepts/artifact-ref.md](../atoms/concepts/artifact-ref.md) for the canonical schema and the V1 inline-body / V2 streaming distinction.
 
-A cell should point to an artifact.
-
-```text
-ArtifactRef:
-  id
-  kind
-  size
-  content_hash
-  byte_index
-  line_index
-  semantic_index
-  render_lens
-  loaded_windows
-  pinned_ranges
-  summaries
-```
+Large files, logs, traces, diffs, and generated outputs should not be stuffed directly into cells. A cell should point to an artifact.
 
 The cell becomes a portal:
 
@@ -1119,7 +948,7 @@ metadata
 agents
 turns
 cells
-zones
+sections
 overlay.commits
 bindings.cell_turn
 context_manifests
@@ -1152,13 +981,13 @@ Volatile:
 
 A regular notebook often hides state in the kernel.
 
-This notebook should persist explicit state and make volatile state inspectable.
+This notebook should persist explicit state and make volatile state inspectable. The save discipline is captured in [discipline/save-is-git-style.md](../atoms/discipline/save-is-git-style.md).
 
 ---
 
 ## 20. Security and capabilities
 
-Because agents can call devices, cells need capabilities.
+Capabilities are deferred to V2 for the single-operator case (see [decisions/capabilities-deferred-v2.md](../atoms/decisions/capabilities-deferred-v2.md)). The target shape:
 
 ```text
 capabilities:
@@ -1194,7 +1023,7 @@ Which cell authorized this tool call?
 Which artifact was exported?
 ```
 
-This matters because “what did the agent see?” is a core security primitive.
+This matters because "what did the agent see?" is a core security primitive.
 
 ---
 
@@ -1227,7 +1056,7 @@ That makes agent behavior debuggable.
 
 ### 21.4 We support long-running work
 
-Thread cells, zones, checkpoints, collapse, virtualized rendering, and artifact streams give the system a credible answer to saturation.
+Thread cells, sections, checkpoints, collapse, virtualized rendering, and artifact streams give the system a credible answer to saturation.
 
 ### 21.5 We preserve flow while allowing repair
 
@@ -1273,7 +1102,7 @@ Merge is allowed when cells are buffer-compatible:
 same primary cell kind
 same executor/provenance domain, if agent-owned
 same tool/device provenance, if tool-owned
-same zone or compatible parent zone
+same section or compatible parent section
 no pinned/excluded/checkpoint boundary between them
 no executing or partial run in either cell
 append preserves turn ordering
@@ -1310,9 +1139,13 @@ The invariant:
 
 > Merge preserves provenance or it is not a merge. Split preserves valid cell roles or it is not a split.
 
+This section is the canonical merge-correctness rule. The operation atoms ([operations/merge-cells.md](../atoms/operations/merge-cells.md), [operations/split-cell.md](../atoms/operations/split-cell.md)) and BSP-007 §6 cite this section as the source of truth.
+
 ### 22.2 ContextPacker algorithm
 
-Need exact rules for:
+The V1 contract is pinned in [decisions/v1-contextpacker-walk.md](../atoms/decisions/v1-contextpacker-walk.md); the algorithm is implemented in BSP-008 §3. The output schema is [concepts/context-manifest.md](../atoms/concepts/context-manifest.md).
+
+V2+ still needs exact rules for:
 
 ```text
 ranking included items
@@ -1415,7 +1248,7 @@ whether it substitutes for raw turns or supplements them
 
 V1 should borrow simple IPython-like rules.
 
-Executing cells preserve their output while running. The notebook may stream updates into the active output area, but overlay operations that would change the cell’s structural identity are blocked until execution completes or is stopped.
+Executing cells preserve their output while running. The notebook may stream updates into the active output area, but overlay operations that would change the cell's structural identity are blocked until execution completes or is stopped.
 
 Rules:
 
@@ -1423,7 +1256,7 @@ Rules:
 no merge during execution
 no split during execution unless the run is stopped first
 no rebinding an executing cell
-no moving an executing cell across zones
+no moving an executing cell across sections
 no checkpointing a running cell
 outputs remain attached to the cell/run that produced them
 rerun creates a new run/turn record rather than mutating old provenance
@@ -1506,7 +1339,7 @@ The notebook is best understood as a small operating system for agentic work.
 
 ```text
 Cells          instruction blocks
-Zones          segments
+Sections       segments
 Agents         semantic executors
 Tools          devices
 Context        memory/register snapshot
@@ -1547,7 +1380,7 @@ split/merge as refactoring
 context as manifest
 agents as executors
 tools as devices
-zones as workflow scopes
+sections as workflow scopes
 artifacts as streamed addressable memory
 progressive disclosure modes
 source/performance inspectability
@@ -1556,3 +1389,9 @@ source/performance inspectability
 The architecture has found its objects.
 
 Now it needs contracts: schemas, invariants, state transitions, permissions, failure modes, and a minimal slice that proves the model can scale without becoming magical.
+
+---
+
+## Changelog
+
+- **2026-04-28 (atom-refactor Phase 4)**: §0.2-§0.9 collapsed to atom links per `docs/notebook/PLAN-atom-refactor.md`; §0.1 retains the naming-reconciliation table (unique narrative). Body §§4, 6, 9, 10, 11, 13.1, 13.4, 15, 16 replaced inline schema/definition prose with one-line atom links into `docs/atoms/` (cell / section / cell-kinds / sub-turn / agent / tool-call / output-kind / artifact-ref / run-frame). §22.1 split/merge invariants kept verbatim — this is the canonical merge-correctness rule that the operation atoms cite. §22.3-§22.8 open-questions narrative kept verbatim. §23-§25 framing/verdict kept verbatim. Definitions now live in `docs/atoms/`. No behavioral or wire-format changes.

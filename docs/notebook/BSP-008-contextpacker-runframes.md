@@ -1,7 +1,7 @@
 # BSP-008: ContextPacker and RunFrames
 
 **Status**: Issue 1 — Draft, 2026-04-28
-**Related**: KB-notebook-target.md §0 (V1 amendments), §0.5 (RunFrames minimal), §0.6 (ContextPacker simple), §7 (scope from structure), §9 (RunFrame full schema), §18 (Inspect mode), §22.2 (ContextPacker open questions); BSP-002 (conversation graph; §4.6 cross-agent handoff is the V0 stand-in for ContextPacker); BSP-003 (writer registry — persistence path); BSP-007 (overlay git semantics — sibling, supplies stable `cell_id` across overlay commits); KB-cells-and-notebooks.md (V1 ladder slices)
+**Related**: KB-notebook-target.md §0 (V1 amendments), §0.5 (RunFrames minimal), §0.6 (ContextPacker simple), §7 (scope from structure), §9 (RunFrame full schema), §18 (Inspect mode), §22.2 (ContextPacker open questions); BSP-002 (conversation graph; §4.6 cross-agent handoff is the V0 stand-in for ContextPacker); BSP-003 (writer registry — persistence path); BSP-007 (overlay git semantics — sibling, supplies stable `cell_id` across overlay commits); BSP-005 (V1 cell-roadmap slice ladder)
 
 ## 1. Scope and motivation
 
@@ -48,7 +48,7 @@ ContextPacker is called by the AgentSupervisor (BSP-002 K-AS slice) before each 
 
 ## 3. ContextPacker V1 algorithm
 
-Per KB-target §0.6, V1 is a deterministic structural-only walk. No ranking, no budget overflow, no summary trust.
+The V1 contract is pinned in [decisions/v1-contextpacker-walk.md](../atoms/decisions/v1-contextpacker-walk.md); the algorithm below is the implementation. Per KB-target §0.6, V1 is a deterministic structural-only walk. No ranking, no budget overflow, no summary trust.
 
 ```
 input:  current cell c
@@ -98,6 +98,8 @@ V2 will add, per KB-target §22.2:
 V1 does none of those. The walk is structural and total.
 
 ## 4. ContextManifest schema
+
+See [context-manifest atom](../atoms/concepts/context-manifest.md) for the schema and invariants. The V1 fields are listed below for the kernel implementer's convenience.
 
 ```jsonc
 ContextManifest: {
@@ -159,7 +161,7 @@ Per KB-target §9, the full RunFrame includes more fields (parent run, snapshot,
 
 ## 7. RunFrame V1 minimal schema
 
-Per KB-target §0.5, V1 ships:
+See [run-frame atom](../atoms/concepts/run-frame.md) for the schema and invariants (and [decisions/v1-runframe-minimal.md](../atoms/decisions/v1-runframe-minimal.md) for the V1 minimal-shape decision). Per KB-target §0.5, V1 ships:
 
 ```jsonc
 RunFrame: {
@@ -299,3 +301,4 @@ The discipline: **V1 underdelivers in policy but commits to the schema shape.** 
 ## Changelog
 
 - **Issue 1, 2026-04-28**: initial draft. ContextPacker pure-function contract (§2, §3); ContextManifest schema (§4) and persistence (§5); RunFrame V1 minimal schema (§7) and persistence (§8); module placement (§9); K-class K100–K103 (§10); Inspect mode V1 (§11); single ~2-day implementation slice K-CTXR (§12); forward-compat notes (§13). Two new BSP-003 §5 intent kinds: `record_context_manifest`, `record_run_frame`.
+- **2026-04-28 (atom-refactor Phase 4)**: §3 algorithm pinned to [decisions/v1-contextpacker-walk](../atoms/decisions/v1-contextpacker-walk.md); §4 ContextManifest schema and §7 RunFrame schema collapsed to atom links per `docs/notebook/PLAN-atom-refactor.md`. JSON shapes preserved inline for the kernel implementer's convenience. Behavioral content (algorithm, persistence rules, module placement, failure modes, Inspect-mode minimum, slice plan) untouched. Definitions now live in `docs/atoms/`. No behavioral or wire-format changes.
