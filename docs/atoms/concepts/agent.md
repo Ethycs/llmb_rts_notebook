@@ -31,6 +31,8 @@ An **agent** is a named, mutable ref pointing into the [turn](turn.md) DAG, plus
 - `idle` — process exited gracefully; resumable via `claude --resume <claude_session_id>`.
 - `exited` — process exited and cannot be resumed; the conversation rebuilds from turn replay if re-engaged.
 
+**Note on `interrupting`**: the S9-kernel `AgentSupervisor.interrupt(agent_id)` (submodule commit `87cb127`) sends SIGINT to a live process so claude aborts its current generation; the process stays alive for the next turn. The kernel's enum stays at `alive | idle | exited` — `interrupting` is **extension-side optimistic-UI state**: when the X-EXT cell-toolbar interrupt button fires, the badge shows "interrupting…" until the next `alive`-state span confirms the abort completed. The kernel never persists `interrupting` to `metadata.rts.zone.agents.<id>.session.runtime_status`.
+
 **Registry-miss defaults** (pre-S2 hydrate path / agent metadata not yet in the registry):
 - `runtime_status` defaults to `"idle"` — the operator-recognisable "ran here, currently quiet" state. Until the S2 hydrate path lands the agent metadata, this is what the cell-decoration badge renders.
 - `provider` defaults to `"claude-code"` — V1's only-provider rule (BSP-002 §10 Q5); the badge therefore always names a valid provider even before the registry is populated.

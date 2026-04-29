@@ -1,23 +1,25 @@
 # Operation: pin / exclude / scratch / checkpoint flag toggles
 
-**Status**: V1 shipped (lands with overlay-commit infrastructure)
-**Source specs**: [BSP-007 §3.1](../../notebook/BSP-007-overlay-git-semantics.md#31-cell-level-existing-in-bsp-003-5-now-wrapped-in-commits) (operations), [KB-notebook-target.md §7](../../notebook/KB-notebook-target.md#7-scope-control) (visible-toggle discipline), [KB-notebook-target.md §13.4](../../notebook/KB-notebook-target.md#134-scratch-is-notebook-level-not-hidden-configuration) (scratch), [PLAN-atom-refactor.md §4 row F1](../../notebook/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms)
-**Related atoms**: [cell](../concepts/cell.md), [overlay-commit](../concepts/overlay-commit.md), [run-frame](../concepts/run-frame.md), [discipline/scratch-beats-config](../discipline/scratch-beats-config.md)
+**Status**: V1 shipped (flag-toggling via `@<line_magic>` lines in cell text, S5.0 commit `336a6c7` / submodule `e6620db`; lands with overlay-commit infrastructure)
+**Source specs**: [BSP-007 §3.1](../../notebook/BSP-007-overlay-git-semantics.md#31-cell-level-existing-in-bsp-003-5-now-wrapped-in-commits) (operations), [BSP-005 §S5.0](../../notebook/BSP-005-cell-roadmap.md), [PLAN-S5.0-cell-magic-vocabulary.md §3.4](../../notebook/PLAN-S5.0-cell-magic-vocabulary.md#34-line_magics-registry--same-module-120-loc), [KB-notebook-target.md §7](../../notebook/KB-notebook-target.md#7-scope-control) (visible-toggle discipline), [KB-notebook-target.md §13.4](../../notebook/KB-notebook-target.md#134-scratch-is-notebook-level-not-hidden-configuration) (scratch), [PLAN-atom-refactor.md §4 row F1](../../notebook/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms)
+**Related atoms**: [cell](../concepts/cell.md), [magic](../concepts/magic.md), [overlay-commit](../concepts/overlay-commit.md), [run-frame](../concepts/run-frame.md), [discipline/scratch-beats-config](../discipline/scratch-beats-config.md), [discipline/cell-manager-owns-structure](../discipline/cell-manager-owns-structure.md)
 
 ## Definition
 
-The four cell-flag toggles — **pin**, **exclude**, **scratch**, **checkpoint** — are kin: each is a one-field mutation on `metadata.rts.cells[<id>]`, recorded as one [overlay commit](../concepts/overlay-commit.md) via BSP-007. They are collected in this atom because the schema, validation, and effect shape are identical; only the field name and downstream semantics differ.
+The four cell-flag toggles — **pin**, **exclude**, **scratch**, **checkpoint** — are kin: each is a line-magic mutation on `cells[<id>].text` (post-S5.0; the flags themselves are *parse-derived* per [parse-cell](parse-cell.md)), recorded as one [overlay commit](../concepts/overlay-commit.md) via BSP-007. They are collected in this atom because the magic form, validation, and effect shape are identical; only the magic name and downstream semantics differ.
 
-## Operation signatures
+## Operation signatures (S5.0 line-magic form)
 
-```jsonc
-{ op: "set_pin",        cell_id: "...", pinned: bool }
-{ op: "set_exclude",    cell_id: "...", excluded: bool }
-{ op: "set_scratch",    cell_id: "...", scratch: bool }
-{ op: "set_checkpoint", cell_id: "...", checkpoint: bool }
-```
+The four toggles correspond to column-0 line magics in the cell's `text`. The Cell Manager primitives [insert_line_magic](../discipline/cell-manager-owns-structure.md#structural-api-text-mutation-primitives-s50) / `remove_line_magic` mutate the text; the writer commits via overlay-commit:
 
-All four wrap inside an `apply_overlay_commit` envelope per BSP-007 §8 — they may be batched in one commit (e.g., "pin all architecture cells, exclude obsolete branch").
+| Effect | Add line | Remove line |
+|---|---|---|
+| `pinned = true` | `@pin` | `@unpin` |
+| `excluded = true` | `@exclude` | `@include` |
+| `kind = scratch` | `@mark scratch` (or `@@scratch` declaration) | `@mark <other_kind>` |
+| `kind = checkpoint` | `@mark checkpoint` (or `@@checkpoint [covers:[…]]`) | `@mark <other_kind>` |
+
+Wrapped inside an `apply_overlay_commit` envelope per BSP-007 §8 — multiple line-magic insertions may be batched in one commit (e.g., "pin all architecture cells, exclude obsolete branch"). The pre-S5.0 typed `set_pin` / `set_exclude` / `set_scratch` / `set_checkpoint` operations are no longer the canonical surface; equivalents land as `cell_edit` / line-magic-insert overlay commits.
 
 ## Per-flag semantics
 

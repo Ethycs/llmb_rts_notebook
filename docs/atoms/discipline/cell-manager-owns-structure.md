@@ -1,8 +1,8 @@
 # Discipline: Cell Manager owns structure
 
-**Status**: discipline (V1 invariant)
-**Source specs**: [KB-notebook-target.md §2](../../notebook/KB-notebook-target.md#2-what-we-already-have) (Cell Manager named), [KB-notebook-target.md §17](../../notebook/KB-notebook-target.md#17-source-layer-and-performing-layer) (source/performing split), [BSP-002 §13.2.3](../../notebook/BSP-002-conversation-graph.md#1323-cell-kind-merge-invariants-kb-target-221-forward-reference) (merge invariants), [BSP-007 §2.4](../../notebook/BSP-007-overlay-git-semantics.md#24-materialization) (Cell Manager as resolver)
-**Related atoms**: [overlay-commit](../concepts/overlay-commit.md), [apply-overlay-commit](../operations/apply-overlay-commit.md), [discipline/save-is-git-style](save-is-git-style.md), [discipline/zachtronics](zachtronics.md)
+**Status**: discipline (V1 invariant; structural API is now the text-mutation primitives in `cell_manager.py`, S5.0 commit `336a6c7` / submodule `e6620db`)
+**Source specs**: [KB-notebook-target.md §2](../../notebook/KB-notebook-target.md#2-what-we-already-have) (Cell Manager named), [KB-notebook-target.md §17](../../notebook/KB-notebook-target.md#17-source-layer-and-performing-layer) (source/performing split), [BSP-002 §13.2.3](../../notebook/BSP-002-conversation-graph.md#1323-cell-kind-merge-invariants-kb-target-221-forward-reference) (merge invariants), [BSP-005 §S5.0](../../notebook/BSP-005-cell-roadmap.md), [PLAN-S5.0-cell-magic-vocabulary.md §3.8](../../notebook/PLAN-S5.0-cell-magic-vocabulary.md#38-cell-manager-text-operations--vendorllmkernelllm_kernelcell_managerpy-new-80-loc), [BSP-007 §2.4](../../notebook/BSP-007-overlay-git-semantics.md#24-materialization) (Cell Manager as resolver)
+**Related atoms**: [overlay-commit](../concepts/overlay-commit.md), [apply-overlay-commit](../operations/apply-overlay-commit.md), [magic](../concepts/magic.md), [text-as-canonical](text-as-canonical.md), [discipline/save-is-git-style](save-is-git-style.md), [discipline/zachtronics](zachtronics.md)
 
 ## The rule
 
@@ -14,6 +14,20 @@ The Cell Manager is the resolver between two truths:
 - The mutable overlay graph (operator truth, BSP-007)
 
 It materializes the visible cell arrangement by folding `commits[]` from the overlay root to HEAD over the bare turn DAG (BSP-007 §2.4). All operator structural intent must enter at the right end of the funnel — the overlay applier — not by direct metadata writes.
+
+## Structural API (text-mutation primitives, S5.0)
+
+Per [PLAN-S5.0-cell-magic-vocabulary.md §3.8](../../notebook/PLAN-S5.0-cell-magic-vocabulary.md#38-cell-manager-text-operations--vendorllmkernelllm_kernelcell_managerpy-new-80-loc), the Cell Manager's structural API is now five text-mutation primitives in `vendor/LLMKernel/llm_kernel/cell_manager.py`. Each operates on `cells[<id>].text` (the canonical source per [text-as-canonical](text-as-canonical.md)) and returns the mutated text; the writer is the only sink that persists it.
+
+| Primitive | Effect on `cells[<id>].text` |
+|---|---|
+| `split_at_break(cell_id, position)` | Slice the text at `position`; the left half stays in `cell_id`, the right half becomes a new cell. The `@@break` marker itself is the on-disk separator that the splitter consumes. |
+| `merge_cells(a, b)` | Concatenate `a.text + "\n" + b.text`; any intervening `@@break` is dropped at the join. `b` is deleted from the cells map. |
+| `insert_line_magic(cell_id, name, args)` | Prepend `@<name> [<args>]` below the leading `@@<kind>` declaration (or at the top if absent). Idempotent: a no-op if the same magic already appears. |
+| `remove_line_magic(cell_id, name)` | Strip column-0 `@<name>` lines from the text. Idempotent. |
+| `set_cell_kind(cell_id, kind, args)` | Replace or insert the leading `@@<kind>` declaration. Line magics that lived above body content keep their position. |
+
+Atomicity per BSP-007: each primitive returns a complete new text string; the caller commits via the writer's single-mutation lock so concurrent edits don't tear. The flag toggles in [pin-exclude-scratch-checkpoint](../operations/pin-exclude-scratch-checkpoint.md) are now thin wrappers over `insert_line_magic` / `remove_line_magic`.
 
 ## What this rules out
 

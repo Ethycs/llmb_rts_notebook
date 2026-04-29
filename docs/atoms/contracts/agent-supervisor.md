@@ -1,6 +1,6 @@
 # Contract: AgentSupervisor
 
-**Status**: `contract` (V1 shipped — `spawn`, `respawn_from_config`, `terminate_all`, `send_user_turn` (S3 / submodule commit `3d43efb`) present in code; resume path wired via S2 / submodule commit `7e65d9b`; `fork`, restart-window are V1 spec'd / partially implemented)
+**Status**: `contract` (V1 shipped — `spawn`, `respawn_from_config`, `terminate_all`, `send_user_turn` (S3 / submodule commit `3d43efb`), `interrupt` (S9-kernel, K-AS-A / submodule commit `87cb127`), restart-window (K-AS-B / submodule commit `c160332`) present in code; resume path wired via S2 / submodule commit `7e65d9b`; `fork` is V1 spec'd / not yet present)
 **Module**: `vendor/LLMKernel/llm_kernel/agent_supervisor.py` — `class AgentSupervisor` and `class AgentHandle`
 **Source specs**: [BSP-002 §4](../../notebook/BSP-002-conversation-graph.md#4-persistent-agent-lifecycle), [BSP-002 §9](../../notebook/BSP-002-conversation-graph.md#9-implementation-slices) (K-AS slice), [RFC-002 §"Process lifecycle"](../../rfcs/RFC-002-claude-code-provisioning.md), [RFC-006 §8](../../rfcs/RFC-006-kernel-extension-wire-format.md#8--family-f-notebook-metadata-bidirectional-in-v202) (post-hydrate respawn)
 **Related atoms**: [agent](../concepts/agent.md), [operations/spawn-agent](../operations/spawn-agent.md), [contracts/metadata-writer](metadata-writer.md), [protocols/family-d-event-log](../protocols/family-d-event-log.md)
@@ -48,6 +48,16 @@ Shipped in S3 (submodule commit `3d43efb`):
     def send_user_turn(self, agent_id: str, message: str) -> AgentHandle: ...        # BSP-002 §4.2
 ```
 
+Shipped in S9-kernel / K-AS-A (submodule commit `87cb127`):
+
+```python
+    def interrupt(self, agent_id: str) -> Dict[str, Any]: ...                        # BSP-005 §S9
+    # SIGINT to the live process; status: "interrupted" | "not_running" | "unknown".
+    # Pairs with the X-EXT cell-toolbar interrupt button (commit 5de3401).
+    # Distinct from /stop (clean SIGTERM → idle): interrupt is in-flight cancellation
+    # and the process stays alive for the next turn.
+```
+
 Spec'd but not yet present (BSP-002 §9 K-AS / V2 work):
 
 ```python
@@ -92,7 +102,8 @@ Spec'd but not yet present (BSP-002 §9 K-AS / V2 work):
 ## Code drift vs spec
 
 - **`spawn(...)` accepts only the initial task per cell.** Mid-turn continuations (`@<agent>: <message>`) ship via `send_user_turn` (BSP-002 §4.2 — landed in S3 / submodule commit `3d43efb`). The K-AS slice in BSP-002 §9 ratified the data model; the V1.0/V1.1 boundary is now closed.
-- **`fork(at_turn_id, ...)` and explicit `stop(agent_id)` are not present.** BSP-002 §4.4 / §4.3 are spec'd; the K-AS slice flagged them as may-slip-to-V2. Today an idle agent only resumes via the silence watchdog → exit → `--resume` path on the next cell.
+- **`fork(at_turn_id, ...)` and explicit `stop(agent_id)` are not present.** BSP-002 §4.4 / §4.3 are spec'd; the K-AS slice flagged them as may-slip-to-V2. Today an idle agent only resumes via the silence watchdog → exit → `--resume` path on the next cell. In-flight cancellation lands via `interrupt` (above) — SIGINT keeps the process alive, distinct from a future clean `/stop`.
+- **Restart-window confirmed shipped.** K-AS-B audit (submodule commit `c160332`) ratified the crash-restart window already present in the watchdog/respawn loop — G10 / G11 / G12 acceptance tests pass against the existing code path.
 - **`respawn_from_config` requires a synthetic `task` key inside each entry** (RFC-005's recoverable schema does not carry `task`). The spec acknowledges this as an open issue queued for RFC-005 v2.
 
 ## See also

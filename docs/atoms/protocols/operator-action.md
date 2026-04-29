@@ -1,14 +1,28 @@
 # Protocol: operator.action envelope
 
-**Status**: `protocol` (V1 shipped)
+**Status**: `protocol` (V1 shipped; envelopes now sourced from cell-magic parser dispatch, S5.0 commit `336a6c7` / submodule `e6620db`)
 **Family**: RFC-006 Family D outer envelope
 **Direction**: extension → kernel
-**Source specs**: [BSP-002 §9](../../notebook/BSP-002-conversation-graph.md#9-implementation-slices) (action_type registry), [RFC-006 §6](../../rfcs/RFC-006-kernel-extension-wire-format.md#6--family-d-operator-action), [BSP-003 §3](../../notebook/BSP-003-writer-registry.md#3-the-intent-envelope) (intent envelope rides this shape)
-**Related atoms**: [protocols/family-d-event-log](family-d-event-log.md), [protocols/submit-intent-envelope](submit-intent-envelope.md), [operations/spawn-agent](../operations/spawn-agent.md), [contracts/intent-dispatcher](../contracts/intent-dispatcher.md)
+**Source specs**: [BSP-002 §9](../../notebook/BSP-002-conversation-graph.md#9-implementation-slices) (action_type registry), [RFC-006 §6](../../rfcs/RFC-006-kernel-extension-wire-format.md#6--family-d-operator-action), [BSP-003 §3](../../notebook/BSP-003-writer-registry.md#3-the-intent-envelope) (intent envelope rides this shape), [PLAN-S5.0-cell-magic-vocabulary.md §3.6](../../notebook/PLAN-S5.0-cell-magic-vocabulary.md#36-extension-cell-directive-parser--extensionsrcnotebookcell-directivets-modest) (extension cell-magic dispatcher)
+**Related atoms**: [protocols/family-d-event-log](family-d-event-log.md), [protocols/submit-intent-envelope](submit-intent-envelope.md), [concepts/magic](../concepts/magic.md), [operations/spawn-agent](../operations/spawn-agent.md), [contracts/intent-dispatcher](../contracts/intent-dispatcher.md)
 
 ## Definition
 
 The `operator.action` envelope is the **outer wire shape** every operator-originated event uses to reach the kernel. It is the only Family D message type — the family is functionally one channel with `action_type` as the discriminator. BSP-002 §9 originally defined the action types for cell directives (`agent_continue`, `agent_branch`, `agent_revert`, `agent_stop`); BSP-003 §3 added `zone_mutate` to carry intent envelopes; v2.0.0 onward added drift/approval/notification action types; v2.0.3 added `agent_spawn`.
+
+## Source: cell-magic parser dispatch (S5.0)
+
+Per [PLAN-S5.0 §3.6](../../notebook/PLAN-S5.0-cell-magic-vocabulary.md#36-extension-cell-directive-parser--extensionsrcnotebookcell-directivets-modest), the extension's `cell-directive.ts` produces these envelopes by dispatching the [magic](../concepts/magic.md) vocabulary:
+
+| Cell text shape | Resulting `action_type` |
+|---|---|
+| `@@spawn <id> [args]` (or legacy `/spawn …`) | `agent_spawn` |
+| `@@agent <id>` body (or legacy `@<id>: …`, or plain prose continuing the binding) | `agent_continue` (with inner `intent_kind: "send_user_turn"`) |
+| `@<line_magic>` line (e.g. `@pin`, `@exclude`, `@mark scratch`) | `cell_edit` carrying the new canonical text |
+| `@@endpoint <name> …` | `set_notebook_setting` for the endpoint registration |
+| `@@break` line | NOT an envelope — consumed by [split-at-breaks](../operations/split-at-breaks.md) |
+
+The wire shape itself is unchanged from BSP-002 §9 / RFC-006 §6 — magics map to existing `intent_kind`s where they exist, and to additive ones for new cell magics. The parser is the producer of the envelopes; the kernel-side `intent_kind` discriminator is the consumer.
 
 ## Schema
 
