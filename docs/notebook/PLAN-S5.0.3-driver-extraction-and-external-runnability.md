@@ -149,6 +149,8 @@ Kernel rejects connections with mismatched major. Minor mismatch on either side 
 
 On version mismatch (major) or auth failure, kernel sends an error envelope and closes the transport. RFC-006 amendment captures this — register it in §"Round 0" below.
 
+**Capabilities are informational in V1.** Every V1 driver advertises the full Family A/B/C/F/G set and the kernel echoes them in `accepted_capabilities`. The kernel does not enforce capability subsets — a driver claiming `["family_a"]` and then sending a Family B envelope is processed normally; the field exists so V2+ partial-driver implementations (e.g., a read-only observer claiming only `family_f`) can negotiate without a wire-version bump. V1 lint check: drivers must include the full set.
+
 ### §4.4 JSON Schema export
 
 `llm_kernel/wire/schemas/*.json` — generated from the Python validators. Non-Python clients (extension TypeScript, future drivers) consume these directly. Generation happens at build time via `python -m llm_kernel.wire.export schemas/`.
@@ -180,7 +182,11 @@ python -m llm_kernel serve --transport tcp --bind 127.0.0.1:7474 --auth-token-en
 
 ### §5.3 Token storage
 
-- **Operator-side**: `LLMNB_AUTH_TOKEN` env var. Loaded from `.env` (already supported via `python-dotenv`). Never on argv (would leak to `ps`).
+- **Operator-side**: `LLMNB_AUTH_TOKEN` env var (default name). Loaded from `.env` (already supported via `python-dotenv`). Never on argv (would leak to `ps`).
+- **Custom var name**: `--token-env <NAME>` overrides the default. Resolution order:
+  1. If `--token-env <NAME>` is set, the kernel/driver reads `os.environ[<NAME>]`. Missing → `auth_failed`. Default `LLMNB_AUTH_TOKEN` is **ignored** even if also set (explicit overrides default; no implicit fallback that could leak the wrong token).
+  2. If `--token-env` is omitted, the kernel/driver reads `os.environ["LLMNB_AUTH_TOKEN"]`. Missing → `auth_failed`.
+  3. Both kernel and driver MUST agree on which env var to consult; mismatch presents as `auth_failed`. (Same-host operator typically sets one var; CI/devcontainers use `--token-env CI_LLMNB_TOKEN` to keep the project token namespaced.)
 - **Generation**: `llmnb auth init` generates a random token, writes to `.env` (gitignored; CLI errors if `.env` is tracked).
 - **No keychain integration in V1.** Could land in V2.
 
