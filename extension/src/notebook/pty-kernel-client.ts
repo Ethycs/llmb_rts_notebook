@@ -459,6 +459,26 @@ export class PtyKernelClient implements KernelClient {
           originating_cell_id: input.cellUri
         }
       };
+    } else if (input.directive && input.directive.kind === 'continue') {
+      // BSP-005 S3 — multi-turn continuation. Atom: continue-turn.md.
+      // The kernel's K-MCP dispatcher (mcp_server.py:_route_operator_action)
+      // routes action_type=agent_continue with intent_kind=send_user_turn
+      // to AgentSupervisor.send_user_turn(agent_id, text, cell_id), which
+      // writes one stream-json user line to the agent's stdin. Idle/exited
+      // agents resume via the S2 --resume plumbing first.
+      envelope = {
+        type: 'operator.action',
+        payload: {
+          action_type: 'agent_continue',
+          intent_kind: 'send_user_turn',
+          parameters: {
+            agent_id: input.directive.agent_id,
+            text: input.directive.text,
+            cell_id: input.cellUri
+          },
+          originating_cell_id: input.cellUri
+        }
+      };
     } else {
       // No directive recognized: ship the cell edit notification (logged
       // kernel-side per K-MCP). Resolve immediately — no span will arrive.

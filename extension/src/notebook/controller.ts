@@ -57,22 +57,65 @@ export interface KernelExecuteRequest {
   directive?: CellDirective | null;
 }
 
-/** V1 cell-directive grammar. Currently only `/spawn` is supported; future
- *  V1.5 may add `@agent ref` for cross-cell agent referencing. */
+/** V1 cell-directive grammar.
+ *
+ *  Two recognized verbs in V1 (BSP-002 §3 / atoms/operations/{spawn-agent,
+ *  continue-turn}.md):
+ *
+ *  * `/spawn <agent_id> [provider:<name>] task:"<initial task>"` —
+ *    creates a new agent in the zone (BSP-005 S2 path).
+ *  * `@<agent_id>: <message>` — multi-turn continuation against an
+ *    already-spawned agent (BSP-005 S3 path). The kernel routes this
+ *    to ``AgentSupervisor.send_user_turn``; if the target is idle/exited
+ *    the supervisor resumes via the S2 ``--resume`` plumbing first.
+ *
+ *  ``/branch``, ``/revert``, and ``/stop`` are spec'd in BSP-002 §3 but
+ *  reserved for S5; this parser does not recognize them yet.
+ */
 export type CellDirective =
   | { kind: 'spawn'; agent_id: string; task: string }
+  | { kind: 'continue'; agent_id: string; text: string }
   ;
 
 /** Parse a cell's text content for V1 directives. Returns null when the
- *  cell does not begin with a recognized directive. */
+ *  cell does not begin with a recognized directive.
+ *
+ *  Continuation grammar (BSP-005 S3): the cell's first line begins with
+ *  ``@`` followed by an `agent_id`, a literal colon, then the message
+ *  body. The message body may contain additional colons and runs to the
+ *  end of the cell text — only the FIRST colon after ``@<agent_id>``
+ *  is the directive separator. Newlines and arbitrary whitespace inside
+ *  the message body are preserved verbatim (the kernel's stream-json
+ *  user line accepts the entire body as ``message.content``).
+ *
+ *  ``agent_id`` accepts the same identifier shape the existing
+ *  ``/spawn`` parser does (one or more non-whitespace, non-colon
+ *  characters): BSP-002 §6 references the agent_id regex but does not
+ *  pin a strict character class in V1; the spawn parser already
+ *  tolerates path-like ids (``zone-1/alpha``) and the continuation
+ *  parser MUST agree so a re-run of `@<spawned-id>` always lands on
+ *  the same agent.
+ */
 export function parseCellDirective(text: string): CellDirective | null {
   // Match: /spawn <agent_id> task:"<task>"
   // <agent_id> is a non-whitespace token; task value is double-quoted.
   // Multi-line tasks are not supported in V1; embedded escaped quotes either.
   const trimmed = text.trim();
-  const m = trimmed.match(/^\/spawn\s+(\S+)\s+task:"([^"]*)"\s*$/);
-  if (m) {
-    return { kind: 'spawn', agent_id: m[1], task: m[2] };
+  const spawnMatch = trimmed.match(/^\/spawn\s+(\S+)\s+task:"([^"]*)"\s*$/);
+  if (spawnMatch) {
+    return { kind: 'spawn', agent_id: spawnMatch[1], task: spawnMatch[2] };
+  }
+  // BSP-005 S3 — `@<agent_id>: <message>`. The message body may contain
+  // additional colons; we capture only the FIRST colon as the
+  // separator. The agent_id excludes whitespace and colons.
+  const continueMatch = trimmed.match(/^@([^\s:]+)\s*:\s*([\s\S]+)$/);
+  if (continueMatch) {
+    const agent_id = continueMatch[1];
+    const body = continueMatch[2].trim();
+    if (agent_id.length === 0 || body.length === 0) {
+      return null;
+    }
+    return { kind: 'continue', agent_id, text: body };
   }
   return null;
 }
