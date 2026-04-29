@@ -78,6 +78,11 @@
         "command": "llmnb.showKernelTerminal",
         "title": "LLMNB: Show kernel terminal",
         "category": "LLMNB"
+      },
+      {
+        "command": "llmnb.interruptCell",
+        "title": "LLMNB: Interrupt agent for this cell",
+        "category": "LLMNB"
       }
     ],
     "configuration": {

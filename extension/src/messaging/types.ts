@@ -181,14 +181,21 @@ export interface AgentGraphResponsePayload {
 // ----- Family D: operator action -------------------------------------------
 
 /** RFC-006 §6 — `operator.action`. `drift_acknowledged` is added in v2 (the
- *  operator confirmed a drift event from RFC-005's drift log). */
+ *  operator confirmed a drift event from RFC-005's drift log).
+ *
+ *  BSP-005 S9 adds `agent_interrupt` — a mid-flight SIGINT against an active
+ *  agent, distinct from the clean-shutdown `agent_stop`. The kernel routes
+ *  `agent_interrupt` to `AgentSupervisor.interrupt(agent_id)` which signals
+ *  the agent's process. See atoms/operations/stop-agent.md for the
+ *  stop/interrupt distinction. */
 export type OperatorActionType =
   | 'cell_edit'
   | 'branch_switch'
   | 'zone_select'
   | 'approval_response'
   | 'dismiss_notification'
-  | 'drift_acknowledged';
+  | 'drift_acknowledged'
+  | 'agent_interrupt';
 
 export interface OperatorActionPayload {
   action_type: OperatorActionType;

@@ -65,6 +65,13 @@ import {
   CellBadgeStatusBarProvider,
   GutterColorManager
 } from './notebook/cell-badge.js';
+import {
+  InterruptButtonStatusBarProvider,
+  LocalOverrideStore,
+  INTERRUPT_COMMAND_ID,
+  postAgentInterrupt,
+  type InterruptCommandArgs
+} from './notebook/interrupt-button.js';
 
 const NOTEBOOK_TYPE = 'llmnb';
 
@@ -80,6 +87,8 @@ let activeSessionId: string | undefined;
 let activeAgentRegistry: AgentRegistryImpl | undefined;
 let activeBadgeProvider: CellBadgeStatusBarProvider | undefined;
 let activeGutterManager: GutterColorManager | undefined;
+let activeInterruptProvider: InterruptButtonStatusBarProvider | undefined;
+let activeInterruptOverrides: LocalOverrideStore | undefined;
 
 // Diagnostic ring buffers — populated only when LLMNB_E2E_VERBOSE === '1'.
 // Tests subscribe via the ExtensionApi accessors; production builds zero
@@ -332,6 +341,77 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
   activeGutterManager = gutterManager;
   context.subscriptions.push({ dispose: () => gutterManager.dispose() });
 
+  // BSP-005 S9 — cell-toolbar interrupt button. Sibling to the identity
+  // badge above; shares the agent registry as the source of truth for
+  // runtime_status, but uses an additional optimistic-override store so a
+  // clicked button hides immediately without waiting for the kernel's
+  // post-SIGINT status snapshot. The kernel half (AgentSupervisor.interrupt)
+  // lands in K-AS-S9 separately.
+  const interruptOverrides = new LocalOverrideStore();
+  activeInterruptOverrides = interruptOverrides;
+  context.subscriptions.push({ dispose: () => interruptOverrides.dispose() });
+
+  const interruptProvider = new InterruptButtonStatusBarProvider(
+    agentRegistry,
+    interruptOverrides
+  );
+  activeInterruptProvider = interruptProvider;
+  context.subscriptions.push({ dispose: () => interruptProvider.dispose() });
+  context.subscriptions.push(
+    vscode.notebooks.registerNotebookCellStatusBarItemProvider(NOTEBOOK_TYPE, interruptProvider)
+  );
+
+  // The status-bar item's `command` invocation will land here. The args
+  // object carries `{agent_id, cell_id}`; we forward it to the helper that
+  // builds + ships the envelope and sets the optimistic transient status.
+  context.subscriptions.push(
+    vscode.commands.registerCommand(INTERRUPT_COMMAND_ID, (args: InterruptCommandArgs) => {
+      if (!args || typeof args.agent_id !== 'string' || args.agent_id.length === 0) {
+        logger.warn('[llmnb.interruptCell] missing agent_id; ignoring click');
+        return;
+      }
+      const cellId = typeof args.cell_id === 'string' ? args.cell_id : '';
+      postAgentInterrupt(router, interruptOverrides, {
+        agent_id: args.agent_id,
+        cell_id: cellId
+      });
+    })
+  );
+
+  // When notebook.metadata snapshots arrive carrying an updated runtime_status
+  // for an agent we previously marked `interrupting`, clear the override so
+  // the button reflects the kernel's authoritative state again. We hook this
+  // here (not inside InterruptButtonStatusBarProvider) so the override
+  // lifecycle stays observable from outside the provider, which makes the
+  // contract test for optimistic-hide deterministic.
+  context.subscriptions.push(
+    router.registerMetadataObserver({
+      onNotebookMetadata: (payload) => {
+        if (payload.mode !== 'snapshot' || !payload.snapshot) {
+          return;
+        }
+        const zone = (payload.snapshot as { zone?: Record<string, unknown> }).zone;
+        const agents =
+          (zone && typeof zone === 'object'
+            ? (zone as { agents?: Record<string, unknown> }).agents
+            : undefined) ??
+          (payload.snapshot as { agents?: Record<string, unknown> }).agents;
+        if (!agents || typeof agents !== 'object') {
+          return;
+        }
+        for (const [id, raw] of Object.entries(agents)) {
+          if (!raw || typeof raw !== 'object') continue;
+          const session = (raw as { session?: Record<string, unknown> }).session;
+          const src = (session && typeof session === 'object' ? session : raw) as
+            Record<string, unknown>;
+          if (typeof src.runtime_status === 'string') {
+            interruptOverrides.clear(id);
+          }
+        }
+      }
+    })
+  );
+
   // RFC-005 §"metadata.rts.blobs" — instantiate a per-session BlobResolver so
   // renderers can resolve `$blob:sha256:` sentinels in attribute values. The
   // table refreshes whenever a notebook.metadata snapshot lands; the loader
@@ -479,6 +559,8 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
     getAgentRegistry: () => activeAgentRegistry,
     getCellBadgeProvider: () => activeBadgeProvider,
     getGutterColorManager: () => activeGutterManager,
+    getInterruptButtonProvider: () => activeInterruptProvider,
+    getInterruptOverrideStore: () => activeInterruptOverrides,
     getRecentPtyBytes: () => ptyByteRing.join(''),
     getRecentLogRecords: () => [...logRecordRing],
     getRecentFrames: () => [...frameRing],
@@ -509,6 +591,8 @@ export function deactivate(): void {
   activeAgentRegistry = undefined;
   activeBadgeProvider = undefined;
   activeGutterManager = undefined;
+  activeInterruptProvider = undefined;
+  activeInterruptOverrides = undefined;
 }
 
 /** Load PtyKernelClient connection settings from VS Code configuration.
@@ -566,6 +650,10 @@ export interface ExtensionApi {
   getCellBadgeProvider(): CellBadgeStatusBarProvider | undefined;
   /** BSP-005 S1.2 — agent → gutter color manager (workspaceState-backed). */
   getGutterColorManager(): GutterColorManager | undefined;
+  /** BSP-005 S9 — cell-toolbar interrupt button provider. */
+  getInterruptButtonProvider(): InterruptButtonStatusBarProvider | undefined;
+  /** BSP-005 S9 — optimistic-override store powering the post-click hide. */
+  getInterruptOverrideStore(): LocalOverrideStore | undefined;
   // Diagnostic surfaces — populated only when LLMNB_E2E_VERBOSE === '1'.
   // Tests subscribe to introspect what the extension actually saw when
   // a Tier 4 e2e run fails. See Testing.md §6.
