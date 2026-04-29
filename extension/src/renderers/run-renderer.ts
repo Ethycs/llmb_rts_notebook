@@ -33,7 +33,7 @@ import type { OtlpAttribute, OtlpSpan } from '../otel/attrs.js';
 import { BlobResolver } from '../llmnb/blob-resolver.js';
 import type { BlobEntry } from '../llmnb/blob-resolver.js';
 import {
-  renderNotify, renderRequestApproval, renderPropose,
+  renderNotify, renderRequestApproval, renderPropose, renderProposeEdit,
   renderReportProgress, renderReportCompletion, renderReportProblem,
   renderAsk, renderClarify, renderPresent, renderEscalate,
   renderReadFile, renderWriteFile, renderRunCommand,
@@ -48,11 +48,17 @@ type ToolRenderer = (
   runId: string
 ) => string;
 
-/** RFC-001 §Native + §Proxied tool dispatch table. */
+/** RFC-001 §Native + §Proxied tool dispatch table.
+ *
+ *  BSP-005 S8: `propose_edit` is added alongside the RFC-001 catalog. It is
+ *  not (yet) listed in the published RFC-001 tool taxonomy — see the
+ *  `BSP-005-cell-roadmap.md` §S8 callout that introduces it; this slice
+ *  pins the renderer-side ABI before the RFC catches up. */
 const TOOL_RENDERERS: Record<string, ToolRenderer> = {
   notify: renderNotify,
   request_approval: renderRequestApproval,
   propose: renderPropose,
+  propose_edit: renderProposeEdit,
   report_progress: renderReportProgress,
   report_completion: renderReportCompletion,
   report_problem: renderReportProblem,
@@ -148,6 +154,14 @@ function renderOpenSpan(
     name;
   if (runType === 'tool') {
     const args = parseInputValue(span.attributes);
+    // BSP-005 S8: surface the kernel-managed `decision_recorded` flag (set on
+    // the span attributes once the operator's Approve/Reject lands) into the
+    // args dict so the propose_edit renderer can hide buttons idempotently.
+    // Other approval-style tools may opt into the same convention later.
+    const recorded = getStringAttr(span.attributes, 'llmnb.approval.decision_recorded');
+    if (recorded === 'true') {
+      args['decision_recorded'] = true;
+    }
     const fn = TOOL_RENDERERS[toolName];
     if (fn) return fn(args, ctx, id);
     return `<div class="rts-tool-generic">[${escapeHtml(toolName)}] ${escapeHtml(JSON.stringify(args))}</div>`;
@@ -241,7 +255,16 @@ function collectParams(root: HTMLElement, t: HTMLElement): Record<string, unknow
   if (inputId) {
     const input = root.querySelector(`#${cssEscape(inputId)}`);
     if (input instanceof HTMLTextAreaElement || input instanceof HTMLInputElement) {
-      params['answer'] = input.value;
+      // BSP-005 S8: when the input belongs to a propose_edit card, the
+      // textarea carries the proposed file bytes the host bridge must hand
+      // to `vscode.diff` on the right-hand side. Surface it under a
+      // dedicated key so it never collides with `ask`/`clarify` answers.
+      const isProposed = input.classList?.contains('rts-propose-edit-payload') ?? false;
+      if (isProposed) {
+        params['proposed_content'] = input.value;
+      } else {
+        params['answer'] = input.value;
+      }
     }
   }
   const radioName = t.getAttribute('data-rts-radio-name');
@@ -257,6 +280,12 @@ function collectParams(root: HTMLElement, t: HTMLElement): Record<string, unknow
   if (au) params['artifact_uri'] = au;
   const p = t.getAttribute('data-rts-path');
   if (p) params['path'] = p;
+  // BSP-005 S8 — `approval_response` and `propose_edit_review` correlate via
+  // the kernel-issued `approval_id`. The renderer attaches it to every
+  // propose_edit button; passthrough as-is so the host bridge / kernel can
+  // tie a decision back to the originating tool call.
+  const ai = t.getAttribute('data-rts-approval-id');
+  if (ai) params['approval_id'] = ai;
   return params;
 }
 

@@ -5,7 +5,7 @@
 // reaching into each file individually.
 
 export { renderNotify } from './notify.js';
-export { renderRequestApproval, renderPropose } from './approval.js';
+export { renderRequestApproval, renderPropose, renderProposeEdit } from './approval.js';
 export {
   renderReportProgress,
   renderReportCompletion,

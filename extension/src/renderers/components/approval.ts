@@ -141,3 +141,66 @@ export function renderPropose(
     runId
   });
 }
+
+/** BSP-005 S8 — `propose_edit` inline diff affordance.
+ *
+ *  Spec deltas vs. the existing approval card:
+ *    1. Operator clicks "Review diff" → host opens `vscode.diff` against the
+ *       proposed file (the host bridge in `propose-edit-host.ts` translates
+ *       the renderer-emitted `propose_edit_review` action into the actual
+ *       `vscode.commands.executeCommand("vscode.diff", left, right, title)`
+ *       call).
+ *    2. Approve / Reject buttons emit the same `approval_response` action
+ *       wired by `request_approval` / `propose`; the kernel side accepts it
+ *       (`mcp_server.py`).
+ *    3. When the span re-emits with `decision_recorded: true` (set by the
+ *       kernel after it observes the operator's response), the buttons hide
+ *       so re-renders are idempotent.
+ *
+ *  The span attribute schema RFC-001 does not pin yet — invented here:
+ *    `path`              — file path the proposal targets (relative to ws).
+ *    `proposed_content`  — the new file content the agent wants written.
+ *    `approval_id`       — the kernel's correlation id for the decision; the
+ *                          response envelope echoes it as `run_id` per the
+ *                          `operator-action` atom catalogue.
+ *    `summary`           — optional one-liner ("file: +N -M"); falls back to
+ *                          a path-only summary when absent.
+ *    `decision_recorded` — boolean; true once the kernel has observed Approve
+ *                          or Reject. The renderer hides buttons when set.
+ */
+export function renderProposeEdit(
+  args: Record<string, unknown>,
+  _ctx: RendererContext<unknown>,
+  runId: string
+): string {
+  const cardId = nextCardId('propose_edit');
+  const path = String(args['path'] ?? '');
+  const proposedContent = String(args['proposed_content'] ?? '');
+  const approvalId = String(args['approval_id'] ?? runId);
+  const summary = String(args['summary'] ?? path);
+  const decisionRecorded = args['decision_recorded'] === true;
+  const runIdAttr = escapeAttr(runId);
+  const approvalIdAttr = escapeAttr(approvalId);
+  const pathAttr = escapeAttr(path);
+  const proposedAttr = escapeAttr(proposedContent);
+  // Hidden inputs carry the proposed_content payload so the host bridge can
+  // open `vscode.diff` with the agent-supplied bytes on the right pane
+  // without re-fetching from the kernel.
+  const proposedFieldId = `${cardId}-proposed`;
+  const buttonsBlock = decisionRecorded
+    ? `<div class="rts-card-body rts-mono">decision recorded.</div>`
+    : `
+  <div class="rts-button-row">
+    <button type="button" class="rts-button-secondary" data-rts-action="propose_edit_review" data-rts-path="${pathAttr}" data-rts-approval-id="${approvalIdAttr}" data-rts-input-id="${escapeAttr(proposedFieldId)}">Review diff</button>
+    <button type="button" class="rts-button-approve" data-rts-action="approval_response" data-rts-decision="approve" data-rts-run-id="${runIdAttr}" data-rts-approval-id="${approvalIdAttr}">Approve</button>
+    <button type="button" class="rts-button-reject" data-rts-action="approval_response" data-rts-decision="reject" data-rts-run-id="${runIdAttr}" data-rts-approval-id="${approvalIdAttr}">Reject</button>
+  </div>`;
+  return `
+<div class="rts-card rts-approval-card rts-propose-edit" data-scope="propose_edit" id="${escapeAttr(cardId)}" data-rts-tool="propose_edit" data-rts-run-id="${runIdAttr}" data-rts-approval-id="${approvalIdAttr}"${decisionRecorded ? ' data-rts-decision-recorded="true"' : ''}>
+  <div class="rts-card-title">[propose_edit] <span class="rts-mono">${escapeHtml(path)}</span></div>
+  <div class="rts-card-body">${escapeHtml(summary)}</div>
+  <textarea class="rts-propose-edit-payload" id="${escapeAttr(proposedFieldId)}" hidden readonly>${escapeHtml(proposedContent)}</textarea>
+  <input type="hidden" data-rts-proposed="true" value="${proposedAttr}" />
+  ${buttonsBlock}
+</div>`;
+}
