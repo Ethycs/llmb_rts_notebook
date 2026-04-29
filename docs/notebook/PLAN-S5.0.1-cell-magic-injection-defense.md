@@ -2,8 +2,8 @@
 
 **Status**: ready (follow-up to S5.0)
 **Audience**: an LLM (or operator) picking this up cold.
-**Goal**: defend the cell-magic vocabulary against prompt-injection. Two layers: (1) detect when an agent emits `@@`/`@` magic-like syntax (always on); (2) opt-in **HMAC hash mode** where every legitimate magic line carries `@@<HMAC(pin, magic_name)>:<args>` and the kernel is **forbidden from emitting any valid hashed-magic pattern** through agent/tool output channels.
-**Time budget**: ~2.0 days. Single cross-layer agent. Depends on S5.0 (cell-magic parser + registry) being landed.
+**Goal**: defend the cell-magic vocabulary against prompt-injection. Three layers: (1) detect when an agent emits `@@`/`@` magic-like syntax (always on); (2) opt-in **HMAC hash mode** where every legitimate magic line carries `@@<HMAC(pin, magic_name)>:<args>` and the kernel is **forbidden from emitting any valid hashed-magic pattern** through agent/tool output channels; (3) Cell Manager precondition gates that freeze running and contaminated cells against structural ops, plus a verbatim-string acceptance flag when the operator declines hash mode.
+**Time budget**: ~2.6 days. Single cross-layer agent. Depends on S5.0 (cell-magic parser + registry) being landed.
 
 ---
 
@@ -250,6 +250,11 @@ Re-stamp runs on `@@auth set` (first time) and `@@auth rotate`. Atomic across al
 | K39 | `magic_pin_collision` | pin matches a registered magic name or fingerprint salt; rejected |
 | K3A | `hashed_magic_emission_ban` | hashed-magic pattern detected in agent/tool output stream; line escaped + cell flagged |
 | K3B | `pin_fingerprint_mismatch` | operator entered wrong pin (fingerprint check fails); reject access |
+| K3C | `cell_running_blocks_structural_op` | split/merge/move/promote/set_kind on a cell with an active execution |
+| K3D | `cell_running_blocks_canonical_emit` | serializer / ContextPacker / clipboard-canonical-text on a running cell |
+| K3E | `contaminated_cell_blocks_structural_op` | structural op on a contaminated cell |
+| K3F | `contamination_clear_requires_explicit_op` | informational; any non-`clear_contamination` intent that tries to flip `contaminated` to false is rejected |
+| K3G | `injection_acceptance_recorded` | informational; emitted when the verbatim acceptance string is written to `metadata.rts.config.injection_acceptance` |
 
 ---
 
@@ -278,11 +283,75 @@ def _sanitize_outbound_line(self, line: str) -> str:
 def restamp_with_pin(self, old_pin: str | None, new_pin: str) -> int: ...
 
 # Wire envelope additions
-"set_magic_pin"     # parameters: { pin: <string>, length: <int> }
-"rotate_magic_pin"  # parameters: { new_pin: <string> }
-"clear_magic_pin"   # parameters: {}
-"verify_magic_pin"  # parameters: { pin: <string> } → returns ok/mismatch
+"set_magic_pin"               # parameters: { pin: <string>, length: <int> }
+"rotate_magic_pin"            # parameters: { new_pin: <string> }
+"clear_magic_pin"             # parameters: {}
+"verify_magic_pin"            # parameters: { pin: <string> } → returns ok/mismatch
+"clear_contamination"         # parameters: { cell_id: <string> } — operator-only
+"record_injection_acceptance" # parameters: { accepted_at: <ISO8601> } — idempotent
 ```
+
+---
+
+## §3.10 Cell Manager precondition gates (running + contaminated)
+
+Two structural-op invariants enforced at the Cell Manager surface:
+
+### Running-cell freeze
+
+A cell whose bound agent has an active execution (`cell_id ∈ AgentSupervisor.in_flight_cells`) is **edit-only**. Structural ops refuse with K3C; canonical-text emit refuses with K3D. Operator workflow: `@stop` the agent or wait for natural run completion before splitting / merging / moving / promoting / set-kind on the cell.
+
+| Op | Allowed? | Code on refusal |
+|---|---|---|
+| Edit cell text in editor | ✓ | — |
+| Receive output spans (runtime continues) | ✓ | — |
+| Split / merge / move / promote / set_kind | ✗ | K3C |
+| Canonical text emit (clipboard, ContextPacker, diff dump) | ✗ | K3D |
+
+### Contaminated-cell freeze
+
+A cell with `contaminated == true` (set by Layer 1 detector) refuses structural ops with K3E. The contamination flag is cleared **only** by the explicit `clear_contamination` operator-action intent — wired to a single dedicated cell-toolbar button (`llmnb.clearCellContamination`). No other code path on either side flips the flag to false.
+
+```python
+# vendor/LLMKernel/llm_kernel/cell_manager.py
+def _check_structural_op_preconditions(self, cell_id: str, op_name: str) -> None:
+    cell = self._writer.cell_view(cell_id)
+    if self._supervisor.is_running_in(cell_id):
+        raise StructuralOpRefused(code="K3C", reason=f"cell_running_cannot_{op_name}")
+    if cell.contaminated:
+        raise StructuralOpRefused(code="K3E", reason=f"contaminated_cell_cannot_{op_name}",
+                                  contamination_log_tail=cell.contamination_log[-3:])
+
+def clear_contamination(self, cell_id: str) -> None:
+    """Explicit operator-only entry point. Audit-logs the clear."""
+```
+
+`socket_writer.append_output` enforces only the existing emission ban (sanitization on output spans). The canonical-text emit ban (K3D) is enforced at the **serializer** + **ContextPacker** + **clipboard** entry points, NOT at output append (output spans flow normally during runs).
+
+## §3.11 Refusal flag — verbatim injection acceptance
+
+When contamination is detected and the operator clicks **Continue without protection**, after a confirmation modal, the kernel writes the literal string to `metadata.rts.config.injection_acceptance`:
+
+```
+"The Operator Has Accepted Arbitrary Code Injection at <ISO8601>"
+```
+
+Properties (per the spec):
+- **Verbatim format**: kernel writes the exact phrase. No abbreviation, no localization, no JSON-encoded variant. Every operator opening the notebook sees the same plain-English statement in any JSON inspection or git diff.
+- **Idempotent on first set**: re-running `record_injection_acceptance` does NOT overwrite the timestamp; the original "accepted at" record stays.
+- **Permanent in V1**: no clear command. The only way out is a future V2+ `clear_injection_acceptance` command behind a 3-step confirmation. Operator can enable hash mode AFTER acceptance — the marker stays as historical record alongside the new pin chip.
+- **Survives copy / fork / paste**: stored in `metadata.rts.config`, serialized to `.llmnb`. Forking carries the marker forward.
+- **Always-visible banner**: notebook header renders an orange/red banner: `⚠ This notebook accepts arbitrary code injection from agent outputs (recorded <timestamp>)`. Cannot be dismissed.
+
+```jsonc
+metadata.rts.config = {
+  ...,
+  injection_acceptance: <string> | null
+  // When set: literal "The Operator Has Accepted Arbitrary Code Injection at <ISO8601>"
+}
+```
+
+The wording is deliberately uncomfortable. Operator must explicitly click through a confirmation modal that quotes the string before it's written. Searchable across a notebook corpus.
 
 ---
 
@@ -322,14 +391,36 @@ def restamp_with_pin(self, old_pin: str | None, new_pin: str) -> int: ...
 21. `test_socket_writer_no_op_on_already_escaped_lines`
 22. `test_kernel_legitimate_emit_via_emit_magic_line_helper_passes_through` — kernel emits `@@<correct_hash>:checkpoint` directly into cell SOURCE (not outputs); not banned
 
+**Cell Manager precondition gates (§3.10)**:
+23. `test_split_cell_running_refused_with_K3C` — supervisor reports cell as running → split raises K3C
+24. `test_split_cell_contaminated_refused_with_K3E`
+25. `test_merge_running_or_contaminated_refused`
+26. `test_move_running_or_contaminated_refused`
+27. `test_promote_span_running_or_contaminated_refused`
+28. `test_canonical_emit_running_refused_with_K3D` — serializer / ContextPacker / clipboard-canonical-text path
+29. `test_running_cell_can_still_receive_output_spans` — emit ban is on canonical TEXT, not span append
+30. `test_running_cell_can_still_be_edited_in_editor` — text changes apply on next run
+31. `test_clear_contamination_only_via_explicit_intent_K3F` — try to flip `contaminated=false` via set_cell_metadata → rejected with K3F
+32. `test_clear_contamination_intent_appends_audit_log_entry`
+
+**Refusal flag — verbatim injection acceptance (§3.11)**:
+33. `test_record_injection_acceptance_writes_literal_string` — verify exact format `"The Operator Has Accepted Arbitrary Code Injection at <ISO8601>"`
+34. `test_record_injection_acceptance_idempotent` — re-call doesn't overwrite timestamp
+35. `test_injection_acceptance_persists_through_save_load` — round-trip through `.llmnb`
+36. `test_no_clear_path_in_v1` — no kernel intent or wire envelope can flip the field to null
+37. `test_record_injection_acceptance_emits_K3G_marker`
+
 `extension/test/contract/cell-magic-defense.test.ts` (NEW):
 1. `test_contamination_chip_renders_with_amber_warning`
 2. `test_pin_status_chip_shows_unprotected_when_disabled`
 3. `test_pin_status_chip_shows_hash_mode_with_fingerprint_when_enabled`
 4. `test_pin_dialog_verifies_against_fingerprint`
 5. `test_secret_storage_used_for_pin_persistence` — vscode.SecretStorage mock receives the pin
+6. `test_clear_contamination_button_only_command_path` — verify the `llmnb.clearCellContamination` command is the sole UI affordance bound to the contamination clear; no other command produces the intent
+7. `test_injection_acceptance_banner_renders_when_marker_set` — orange/red banner with the verbatim string is visible
+8. `test_injection_acceptance_banner_not_dismissible` — no close button; persists across reloads
 
-Targets: kernel **(post-S5.0) → +20**, extension contract **+5**.
+Targets: kernel **(post-S5.0) → +35** (was +20; absorbs the precondition + acceptance test additions), extension contract **+8** (was +5).
 
 ---
 
@@ -406,3 +497,4 @@ Targets: kernel **(post-S5.0) → +20**, extension contract **+5**.
 ## Changelog
 
 - **2026-04-29**: initial. HMAC-hash mode (operator pin never in notebook; only fingerprint). Emission ban: kernel forbids any agent/tool output line matching the canonical hashed-magic shape. Pin lifecycle via `@@auth set/rotate/off/verify/status`. Pin stored in `vscode.SecretStorage`. ~2.0d follow-up to S5.0.
+- **2026-04-29 (amendment)**: added §3.10 Cell Manager precondition gates (running cells edit-only with K3C/K3D; contaminated cells frozen with K3E; clear-contamination is operator-click-only with K3F audit), §3.11 verbatim-string injection acceptance flag (literal "The Operator Has Accepted Arbitrary Code Injection at <ISO8601>" with K3G), and 15 new tests covering the precondition gates + acceptance flag round-trip. Sizing updated to ~2.6d.
