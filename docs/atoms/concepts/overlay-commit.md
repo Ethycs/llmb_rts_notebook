@@ -17,9 +17,9 @@ An **overlay commit** is the immutable record of one structural or editorial edi
   "parent_id":  "ovc_01HZX7J9..." | null,  // null only for the root commit
   "author":     "operator",                // V1: literal "operator"; V3+ user id
   "timestamp":  "2026-04-28T14:00:00Z",
-  "message":    "split In[12] at t_381; checkpoint architecture section",
+  "message":    "split In[12] before span 4; checkpoint architecture section",
   "operations": [                          // ordered; applied in array order
-    { "kind": "split_cell",         "cell_id": "c_12", "at_turn_id": "t_381" },
+    { "kind": "split_cell",         "cell_id": "c_12", "at": { "kind": "span_boundary", "before_span_index": 4 } },
     { "kind": "checkpoint_section", "section_id": "s_arch", "summary": "..." }
   ]
 }

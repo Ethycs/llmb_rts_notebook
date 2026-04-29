@@ -243,7 +243,7 @@ Each sub-agent has a strict brief:
 Six docs need link-out refactoring:
 
 1. `docs/notebook/KB-notebook-target.md` — body still has prose definitions of Section, Cell, Sub-turn, RunFrame, etc. Replace with atom links: `See [Cell](atoms/concepts/cell.md), [Section](atoms/concepts/section.md).` Keep the architectural narrative. **§0 V1 amendments collapse — they're now in `decisions/v1-*.md` atoms.**
-2. `docs/notebook/KB-cells-and-notebooks.md` — fully delete. Its content is now spread across atoms + the spec navigation can rebuild from KB-target's body.
+2. `docs/notebook/KB-cells-and-notebooks.md` — delete the prose form, then restore as a ref-only navigation index (~200 lines). The §1 V1 narrative, §12 open-questions thread tracker, and §15 session chronology have no atom homes, so they survive. Definitions are removed; every former definition section now links to the relevant atom or spec. *Decision was originally "fully delete" but the 2026-04-28 A/B/C test showed the prose form actively misled agents while a ref-only index added value with low maintenance cost.*
 3. `docs/notebook/BSP-002-conversation-graph.md` — Issue 1 stays prose-heavy (it's the original spec). Issue 2 §13 collapses to "see atoms: [...]." Behavior + wire-format content stays in BSP-002.
 4. `docs/notebook/BSP-005-cell-roadmap.md` — slice ladder stays. Each slice cell links its dependent atoms.
 5. `docs/notebook/BSP-007-overlay-git-semantics.md` — operations §3 collapses to "see atoms/operations/*.md." Behavior (apply_commit, revert_to_commit) stays in BSP-007.
@@ -262,7 +262,7 @@ After Phase 4, every concept appears in EXACTLY ONE place (the atom). Behavioral
    ```
 2. **Drift check**: search for definition-style prose in originals that should have been replaced. Heuristic: any heading "## Definition" in BSPs / KBs — should not exist in originals after Phase 4.
 3. **Link integrity**: every link resolves. Use markdown-link-check or a simple grep for `[*](atoms/*)` patterns.
-4. **Git diff review**: scope correct (originals shrank or got linkier; atoms appeared; KB-cells deleted).
+4. **Git diff review**: scope correct (originals shrank or got linkier; atoms appeared; KB-cells reduced to ref-only index per §4.2 amendment).
 5. **One atomic commit** per phase, or one bigger commit for Phases 3+4+5 if the atom set is stable.
 
 ---
@@ -272,7 +272,7 @@ After Phase 4, every concept appears in EXACTLY ONE place (the atom). Behavioral
 Five items from the prior session's deconfliction commit message land naturally as part of Phase 4:
 
 - **Op-1**: BSP-005 Issue 2 — slice ladder updates (S0.5 cell kinds, S5.5 sections). Land in BSP-005 amendment + each new slice gets atom links.
-- **Op-2**: KB-cells-and-notebooks.md §3 — moot once KB-cells is deleted. Cell-types content lives in `atoms/concepts/cell-kinds.md`.
+- **Op-2**: KB-cells-and-notebooks.md §3 — closed by the §4.2 amendment. Cell-types content moved to `atoms/concepts/cell-kinds.md`; the reborn ref-only KB-cells links there.
 - **Op-3**: RFC-005 mirror ArtifactRef shape. Land as RFC-005 minor bump; RFC-005 §"Blobs" subsection links to `atoms/concepts/artifact-ref.md`.
 - **Op-4**: RFC-006 v2.0.4 register `llmnb.section_id` + `llmnb.output.kind` situational attributes. Land as RFC-006 minor amendment; subsections link to `atoms/concepts/section.md` and `atoms/concepts/output-kind.md`.
 - **Op-5**: BSP-003 §5 registry — add 5 new intent_kinds (`apply_overlay_commit`, `revert_overlay_to_commit`, `create_overlay_ref`, `record_context_manifest`, `record_run_frame`). Land as BSP-003 amendment; each entry links to its operation atom.
@@ -307,7 +307,7 @@ Before starting Phase 1, the executing LLM should read:
 7. `Engineering_Guide.md` §11 — anti-patterns.
 
 Optional but useful:
-- `docs/notebook/KB-cells-and-notebooks.md` — will be deleted in Phase 4 but is the closest existing model of "agent-ready single reference doc."
+- `docs/notebook/KB-cells-and-notebooks.md` — survives Phase 4 as a ref-only index after the §4.2 amendment; was the closest existing model of "agent-ready single reference doc," and the ref-only form proved its worth in the A/B/C test.
 - `docs/rfcs/RFC-009-zone-control-and-config.md` — for `decisions/path-propagation.md` and `anti-patterns/path-propagation.md` content.
 
 ---
@@ -318,7 +318,7 @@ The refactor is done when:
 
 1. `docs/atoms/` exists with ~50 atoms across 5 subdirectories.
 2. Every concept / operation / discipline / decision / anti-pattern from this session has a dedicated atom.
-3. KB-cells-and-notebooks.md is deleted.
+3. KB-cells-and-notebooks.md is reduced to a ~200-line ref-only navigation index per §4.2 amendment (down from 434 prose lines).
 4. KB-notebook-target.md, BSP-002, BSP-005, BSP-007, BSP-008 contain ≥80% link-outs (vs ≤20% prose definitions).
 5. Phase 5 verification passes:
    - No orphan atoms.

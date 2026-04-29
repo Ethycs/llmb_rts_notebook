@@ -28,9 +28,9 @@ Wire envelope (per BSP-007 §8 + BSP-003):
     action_type: "zone_mutate",
     intent_kind: "apply_overlay_commit",
     parameters: {
-      message: "split In[12] at t_381",
+      message: "split In[12] before span 4",
       operations: [
-        { kind: "split_cell", cell_id: "c_12", at_turn_id: "t_381" }
+        { kind: "split_cell", cell_id: "c_12", at: { kind: "span_boundary", before_span_index: 4 } }
       ]
     },
     intent_id: "01HZX7K3...",
