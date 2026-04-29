@@ -76,3 +76,4 @@ Every closed Family A span MUST appear byte-identical (modulo JSON serialization
 - [contracts/agent-supervisor](../contracts/agent-supervisor.md) — emits `agent_emit` Family A spans for any agent output bypassing structured channels.
 - [protocols/family-f-notebook-metadata](family-f-notebook-metadata.md) — paired persistence path; closed spans round-trip to `event_log.runs[]`.
 - [discipline/tool-calls-atomic](../discipline/tool-calls-atomic.md) — tool calls live as Family A spans on the parent turn, not as separate cells.
+- [protocols/jupyter-mapping](jupyter-mapping.md) — Family A is the one family that rides Jupyter IOPub `display_data` directly; mapping atom documents the broader correspondence.

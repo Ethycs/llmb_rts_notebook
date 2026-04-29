@@ -93,3 +93,4 @@ The envelope rides RFC-006 v2.x; the major-version is encoded in the Comm target
 - [contracts/intent-dispatcher](../contracts/intent-dispatcher.md) — registers per-kind handlers and emits `intent_applied`.
 - [overlay-commit](../concepts/overlay-commit.md) — the most-frequent intent payload.
 - [apply-overlay-commit](../operations/apply-overlay-commit.md) — `intent_kind: "apply_overlay_commit"` carrier.
+- [protocols/jupyter-mapping](jupyter-mapping.md) — submit_intent is the LLMKernel equivalent of Jupyter's Shell `execute_request/reply` pair.

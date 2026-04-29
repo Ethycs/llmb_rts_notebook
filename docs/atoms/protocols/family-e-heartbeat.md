@@ -64,3 +64,4 @@ Failure mode W9 (RFC-006 §"Failure modes"): heartbeat timeout surfaces a livene
 - [contracts/messaging-router](../contracts/messaging-router.md) — extension-side dispatcher fan-outs `heartbeat.kernel` to status-bar + watchdog observers.
 - [contracts/kernel-client](../contracts/kernel-client.md) — owns the PTY the heartbeat complements (RFC-008 §6 socket).
 - [protocols/family-f-notebook-metadata](family-f-notebook-metadata.md) — Family F emissions are gated by PTY health, not heartbeat absence.
+- [protocols/jupyter-mapping](jupyter-mapping.md) — Family E is the one LLMKernel family that's structurally identical to Jupyter (heartbeat REQ/REP echo).
