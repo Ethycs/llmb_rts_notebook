@@ -2,7 +2,7 @@
 
 **Status**: V1 shipped (cell-magic vocabulary, S5.0 commit `336a6c7` / submodule `e6620db`)
 **Source specs**: [BSP-005 §S5.0](../../notebook/BSP-005-cell-roadmap.md), [PLAN-S5.0-cell-magic-vocabulary.md §3](../../notebook/PLAN-S5.0-cell-magic-vocabulary.md#3-concrete-work), [PLAN-S5.0-cell-magic-vocabulary.md §4](../../notebook/PLAN-S5.0-cell-magic-vocabulary.md#4-interface-contracts), [KB-notebook-target.md §13](../../notebook/KB-notebook-target.md#13-cell-discipline-zachtronics-not-general-asm) (the design doctrine this operationalizes)
-**Related atoms**: [cell](cell.md), [cell-kinds](cell-kinds.md), [operations/parse-cell](../operations/parse-cell.md), [operations/split-at-breaks](../operations/split-at-breaks.md), [protocols/operator-action](../protocols/operator-action.md), [discipline/text-as-canonical](../discipline/text-as-canonical.md), [discipline/zachtronics](../discipline/zachtronics.md)
+**Related atoms**: [cell](cell.md), [cell-kinds](cell-kinds.md), [operations/parse-cell](../operations/parse-cell.md), [operations/split-at-breaks](../operations/split-at-breaks.md), [protocols/operator-action](../protocols/operator-action.md), [discipline/text-as-canonical](../discipline/text-as-canonical.md), [discipline/zachtronics](../discipline/zachtronics.md), [discipline/certified-magic-emitter](../discipline/certified-magic-emitter.md)
 
 ## Definition
 
@@ -96,3 +96,4 @@ K35 (plain magic in hash mode) is queued for [PLAN-S5.0.1](../../notebook/PLAN-S
 - [protocols/operator-action](../protocols/operator-action.md) — wire envelopes the parser produces.
 - [discipline/text-as-canonical](../discipline/text-as-canonical.md) — why `text` is the source of truth.
 - [discipline/zachtronics](../discipline/zachtronics.md) — visible-tile principle this vocabulary operationalizes.
+- [discipline/certified-magic-emitter](../discipline/certified-magic-emitter.md) — which code paths may produce dispatchable magic syntax (the dual of the agent-side emission ban).

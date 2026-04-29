@@ -84,3 +84,4 @@ The brief asked for `start, executeCell, hydrate, isReady, dispose` on the inter
 - [contracts/messaging-router](messaging-router.md) — receives inbound frames the kernel client decodes.
 - [contracts/metadata-applier](metadata-applier.md) — receives `notebook.metadata` envelopes via the router.
 - [anti-patterns/stub-kernel-race](../anti-patterns/stub-kernel-race.md) — terminal-span gating exists because of this hazard.
+- [concepts/driver](../concepts/driver.md) — `KernelClient` is one driver implementation (extension, TypeScript); the headless `llmnb execute` CLI is another (Python, peer of the extension).

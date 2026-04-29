@@ -59,3 +59,4 @@ An **agent** is a named, mutable ref pointing into the [turn](turn.md) DAG, plus
 - [cell](cell.md) — `bound_agent_id` makes the cell visibly attribute to one agent.
 - [run-frame](run-frame.md) — `executor_id` matches `agent.id`.
 - [discipline/immutability-vs-mutability](../discipline/immutability-vs-mutability.md) — agent ref mutable, turn DAG immutable.
+- [driver](driver.md) — distinct concept: a peer-of-extension client that drives the kernel via wire, not an in-notebook executor.

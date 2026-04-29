@@ -54,6 +54,12 @@ Per `vendor/LLMKernel/llm_kernel/metadata_writer.py:migrate_cells_to_canonical_t
 
 The pin in [PLAN-S5.0.1 cell-magic injection defense](../../notebook/PLAN-S5.0.1-cell-magic-injection-defense.md) is the one acknowledged exception: the HMAC pin in optional hash mode is the only operator-visible artifact that lives outside `text` (in OS keychain), justified by the prompt-injection threat model. That slice is queued, not yet shipped.
 
+## Authoring layer vs runtime layer
+
+Text-as-canonical names the **authoring** layer's source of truth: at edit time, in storage, and in git diffs, cell text is what the operator reads and what the kernel re-parses. It is not, however, the runtime contract surface — at the wire layer, the [driver](../concepts/driver.md) translates parsed text into Family A/B/C/F/G envelopes per [discipline/wire-as-public-api](wire-as-public-api.md). The kernel speaks only wire; the operator speaks only text.
+
+The two disciplines compose without tension. Operator authors in text → driver parses + ships envelopes → kernel applies → kernel emits Family F snapshot → driver writes back to text. Each layer has its own canonical form; the translation between layers is explicit, lossless within the round-trip vocabulary, and locked behind the [magic](../concepts/magic.md) parser. Drift between text and wire would mean a parser bug or a driver-internals shortcut; neither is allowed.
+
 ## See also
 
 - [discipline/zachtronics](zachtronics.md) — visible-tile parent rule.

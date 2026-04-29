@@ -28,6 +28,7 @@ The Claude Agent tool exposes `subagent_type` + `prompt` + optional `isolation: 
 | **Single end-to-end** | Slice is naturally one feature; cross-layer cohesion matters; brief is well-scoped (<3h of work) | Single point of failure mid-run; one report to integrate |
 | **File-disjoint pair** | Two slices touching different layers; minimal coordination via locked-in interface contracts | 2× wall-clock parallelism; verify file-disjointness or accept worktree isolation |
 | **Mega-round fan-out (3–7 parallel)** | Multiple file-disjoint slices ready at once | Highest parallelism; submodule branch races (kernel agents must serialize); merge complexity at the gate |
+| **Hybrid sequential+parallel fan-out** | A multi-slice plan with a sequential prefix that establishes shared scaffolding (e.g., a public API package, a contract module), then a file-disjoint parallel suffix on tail-slices that depend only on the prefix's published surface — e.g., PLAN-S5.0.3's a→b→c sequential, then d/e parallel after c | Lower wall-clock parallelism than full fan-out, but eliminates the contract-pre-locking burden because b/c lock the contracts in code as they go; the parallel tail dispatches against a real, importable surface rather than a paper spec |
 | **Serial kernel queue** | Multiple slices touching the same submodule (`vendor/LLMKernel/`) | Slowest reliable path; required because submodule HEAD is shared across worktrees |
 | **Worktree-isolated agents** | Extension slices safe to fork repo state | Stale worktrees occasionally surface; verify with `git branch` post-completion |
 | **Test-only follow-up** | Production code shipped without test coverage (typically because the slice agent errored mid-run) | Small (~0.5d), low-risk; closes coverage gap |
@@ -53,6 +54,8 @@ The "report format" rule is critical: it caps the integration cost. Long agent r
 When dispatching N file-disjoint agents whose work composes (e.g., extension calls kernel via wire envelope), the coordinator pre-locks the cross-module signatures in a §"Interface contracts" section in EVERY brief. Each agent codes to the agreed shape; integration falls out at verification time.
 
 This is the discipline that makes mega-round fan-out tractable: **no in-flight coordination required**. If contracts are well-locked, agents return self-consistent commits.
+
+The **hybrid sequential+parallel** pattern (table row above) is a relaxation: the sequential prefix replaces paper contracts with imported ones. By the time the parallel tail dispatches, the contract is a Python module the agents can read, not a section the coordinator copy-pastes into each brief. Use hybrid when the prefix's deliverable is an API surface (a package, a wire schema module); use mega-round when contracts can be specified textually without pre-implementation.
 
 ## Failure modes encountered (logged)
 

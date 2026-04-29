@@ -2,11 +2,11 @@
 
 **Status**: V2+ reserved (concept locked; slice queued as `PLAN-S5.0.2-magic-code-generators.md`, not yet authored)
 **Source specs**: [PLAN-S5.0.1 §3.10–§3.11](../../notebook/PLAN-S5.0.1-cell-magic-injection-defense.md) (the emission-ban context this concept resolves), [PLAN-S5.0 §3](../../notebook/PLAN-S5.0-cell-magic-vocabulary.md) (cell-magic registry this extends), [discipline/zachtronics](../discipline/zachtronics.md) (visible-tile constraint), [discipline/magic-injection-defense](../discipline/magic-injection-defense.md) *(forthcoming with S5.0.1)*
-**Related atoms**: [magic](magic.md), [cell](cell.md), [cell-kinds](cell-kinds.md), [protocols/operator-action](../protocols/operator-action.md), [discipline/text-as-canonical](../discipline/text-as-canonical.md)
+**Related atoms**: [magic](magic.md), [cell](cell.md), [cell-kinds](cell-kinds.md), [protocols/operator-action](../protocols/operator-action.md), [discipline/text-as-canonical](../discipline/text-as-canonical.md), [discipline/certified-magic-emitter](../discipline/certified-magic-emitter.md)
 
 ## Definition
 
-A **magic code generator** is a cell-magic whose execution produces valid magic syntax — text that the parser dispatches as **new cells** or as additional operations. Operator-designated and operator-trusted, generators are an explicit exception to the [emission ban](../discipline/magic-injection-defense.md) that S5.0.1 places on agent and tool output: agents must NEVER emit dispatchable magic syntax; generators legitimately do, because their entire purpose is to produce more magic.
+A **magic code generator** is a cell-magic whose execution produces valid magic syntax — text that the parser dispatches as **new cells** or as additional operations. Operator-designated and operator-trusted, generators are an explicit exception to the [emission ban](../discipline/magic-injection-defense.md) that S5.0.1 places on agent and tool output: agents must NEVER emit dispatchable magic syntax; generators legitimately do, because their entire purpose is to produce more magic. Generators are the recursive case of the [certified magic emitter](../discipline/certified-magic-emitter.md) standard — they satisfy clause 1 (operator-rooted intent) by virtue of the operator typing the generator-magic cell, and clauses 2–5 by routing through Cell Manager with `generated_by` provenance.
 
 The contrast holds:
 
@@ -91,6 +91,7 @@ What a generator is NOT: a "macro that runs hidden code with side effects beyond
 ## See also
 
 - [magic](magic.md) — the cell-magic vocabulary this extends
+- [discipline/certified-magic-emitter](../discipline/certified-magic-emitter.md) — the standard generators must satisfy to legitimately emit
 - [discipline/magic-injection-defense](../discipline/magic-injection-defense.md) — the emission ban this concept legitimately bypasses
 - [discipline/zachtronics](../discipline/zachtronics.md) — the visible-tile principle generators preserve
 - [discipline/text-as-canonical](../discipline/text-as-canonical.md) — generator-emitted cell text is canonical too
