@@ -41,19 +41,34 @@ A cell's section membership is mirrored on the cell side at `metadata.rts.cells[
 - **V1 sections are flat.** `parent_section_id` field exists in the schema but MUST be `null` in V1. Non-null is rejected. See [decisions/v1-flat-sections](../decisions/v1-flat-sections.md). (Decision D3.)
 - **`cell_range[]` is ordered.** Order in this array IS the section's display order; it MAY differ from notebook chronological order (operators reorder within sections via overlay commits).
 - **`flow_policy` is V2+ reserved.** V1 producers MUST emit `null`; V1 consumers MUST ignore non-null values.
+- **`status` is the interruptibility lock** (V1; supersedes PLAN §4 D1). Required field. Gates structural operations on member cells. See [Status semantics](#status-semantics) below and [decisions/v1-section-status-interruptibility](../decisions/v1-section-status-interruptibility.md).
 - **Sections don't span notebooks.** One section is wholly within one notebook; cross-notebook sections are not a concept.
 - **Deleting a non-empty section is forbidden.** K-class error. Operator must move/delete cells out first. (Decision SD1.)
-- **Section edits are overlay commits.** Creation, rename, collapse, deletion, membership change all flow through [apply-overlay-commit](../operations/apply-overlay-commit.md) per [BSP-007](../../notebook/BSP-007-overlay-git-semantics.md).
+- **Section edits are overlay commits.** Creation, rename, collapse, deletion, membership change all flow through [apply-overlay-commit](../operations/apply-overlay-commit.md) per [BSP-007](../../notebook/BSP-007-overlay-git-semantics.md). `status` transitions specifically go through [set-section-status](../operations/set-section-status.md).
+
+## Status semantics
+
+`status` is the section-level interruptibility lock. Each value gates structural operations on cells inside the section:
+
+| Value | What it blocks | Set by |
+|---|---|---|
+| `open` | Nothing. | Default at create. |
+| `in_progress` | All structural ops on member cells (split / merge / move / promote / delete-section). Aggregates the cell-level execution gate from [KB-target §22.7](../../notebook/KB-notebook-target.md#227-conflict-resolution). | Kernel-auto on first run start; operator may set manually. |
+| `complete` | Soft block — operator confirmation prompt before structural ops. | Operator only. |
+| `frozen` | Hard lock on all structural ops. | Operator only; only `set_section_status(_, "open")` lifts it. |
+
+Transitions go through [set-section-status](../operations/set-section-status.md) — direct mutation of the field is rejected. Forbidden transitions (e.g., `frozen → in_progress`) raise **K95**.
 
 ## V1 vs V2+
 
-- **V1**: flat sections, `flow_policy: null`, status enum dropped — only `collapsed: bool` + optional `summary` ship. The full status enum lands in V2 (decision D1).
-- **V2+**: nested sections via `parent_section_id`; `flow_policy` populated with per-section flow-control rules (e.g., "agent context bounded by this section unless pinned"); full `status` enum.
+- **V1**: flat sections (`parent_section_id` MUST be null); `flow_policy: null`; full `status` enum with the precondition checks above (per [decisions/v1-section-status-interruptibility](../decisions/v1-section-status-interruptibility.md), supersedes PLAN §4 D1).
+- **V2+**: nested sections via `parent_section_id`; `flow_policy` populated with per-section flow-control rules; status-driven lens UI ("show only complete sections"); status-aware ContextPacker (frozen sections collapse to summary-only inclusion).
 
 ## See also
 
 - [zone](zone.md) — the kernel-side concept this is NOT.
-- [operations/create-section](../operations/create-section.md), [operations/delete-section](../operations/delete-section.md), [operations/rename-section](../operations/rename-section.md).
+- [operations/create-section](../operations/create-section.md), [operations/delete-section](../operations/delete-section.md), [operations/rename-section](../operations/rename-section.md), [operations/set-section-status](../operations/set-section-status.md).
 - [operations/move-cell](../operations/move-cell.md) — cross-section moves are allowed (M1); cross-checkpoint moves are not (M2).
 - [decisions/v1-flat-sections](../decisions/v1-flat-sections.md) — why V1 forbids nesting.
+- [decisions/v1-section-status-interruptibility](../decisions/v1-section-status-interruptibility.md) — why `status` ships in V1.
 - [context-manifest](context-manifest.md) — ContextPacker uses `section_id` to scope context.

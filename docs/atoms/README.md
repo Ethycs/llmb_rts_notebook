@@ -8,7 +8,7 @@ This directory holds the canonical, single-place definition for every reusable n
 
 The same concept (Cell, Section, Turn, Overlay commit, RunFrame, ArtifactRef) was being restated in 3-5 specs each, with phrasing drift on every amendment. The cure: one canonical file per claim. Specs link out instead of restating; updates happen in the atom and propagate via the link graph.
 
-## Layout — five subdirectories
+## Layout — seven subdirectories
 
 | Folder | Holds | Status enum value |
 |---|---|---|
@@ -17,8 +17,10 @@ The same concept (Cell, Section, Turn, Overlay commit, RunFrame, ArtifactRef) wa
 | [discipline/](discipline/) | Project rules / invariants the design enforces | `discipline` |
 | [decisions/](decisions/) | V1 vs V2+ calls; pinned with rationale | `decision` |
 | [anti-patterns/](anti-patterns/) | Already-hit traps with the lesson recorded | `anti-pattern` |
+| [protocols/](protocols/) | Wire formats — direction, schema, error envelope, version handshake | `protocol` |
+| [contracts/](contracts/) | Code-internal interfaces — module location, signatures, invariants, K-class errors | `contract` |
 
-Roughly 50-55 atoms total. Each 30-100 lines. Total corpus ~3000 lines.
+Roughly 70-80 atoms total. Each 30-120 lines. Total corpus ~4500 lines.
 
 ## Atom rules
 
@@ -34,7 +36,7 @@ Roughly 50-55 atoms total. Each 30-100 lines. Total corpus ~3000 lines.
 ```markdown
 # {Concept name}
 
-**Status**: `V1 shipped | V1 spec'd | V2 reserved | V3+ | discipline | anti-pattern | decision`
+**Status**: `V1 shipped | V1 spec'd | V2 reserved | V3+ | discipline | anti-pattern | decision | protocol | contract`
 **Source specs**: links to the BSP / RFC / KB sections that originally defined this
 **Related atoms**: links to peers in this graph
 
