@@ -167,6 +167,22 @@ export class LlmnbNotebookController implements vscode.Disposable, RunLifecycleO
     _controller: vscode.NotebookController
   ): Promise<void> {
     for (const cell of cells) {
+      // BSP-005 M1 — Markup / markdown cells (atoms/concepts/cell-kinds.md
+      // `markdown` row) are operator prose; they carry no agent and no
+      // execution. VS Code's notebook UI normally never dispatches Markup
+      // cells through executeHandler, but the controller registers
+      // `markdown` as a supportedLanguage (line 149) so a defensive guard
+      // here is the right place to short-circuit. We log at info level so
+      // an operator inspecting the channel sees that the skip happened by
+      // design — no executeCell call is issued, no envelope is posted, and
+      // no NotebookCellExecution is even created (an empty execution would
+      // strip the cell's text-rendered markdown body for the duration).
+      if (cell.kind === vscode.NotebookCellKind.Markup) {
+        this.logger.info(
+          `[controller] skipping Markup cell ${cell.document.uri.toString()} (BSP-005 M1: markdown cells have no agent)`
+        );
+        continue;
+      }
       await this.runOne(cell);
     }
   }
