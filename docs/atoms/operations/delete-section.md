@@ -43,6 +43,7 @@ This is a deliberate K-class error, not a soft warning. The operator's options:
 ### Other preconditions
 - `section_id` MUST exist; otherwise K90 with `reason: "unknown_section"`.
 - The section MUST NOT be the root section (the root has no `id` in V1; this is implicit).
+- **Section-status gate** (per [decisions/v1-section-status-interruptibility](../decisions/v1-section-status-interruptibility.md)): the section MUST have `status ∈ {open, complete}`. `in_progress` or `frozen` → **K95** (`overlay_section_status_blocks`). For `frozen`, the operator must [set-section-status](set-section-status.md) to `open` first; for `in_progress`, all member runs must complete first (or the operator manually flips to `open`).
 
 ## What it produces
 

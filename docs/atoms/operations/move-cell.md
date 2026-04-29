@@ -41,6 +41,14 @@ Both `target_section_id` AND `position_index` MUST be specified. **No auto-tail.
 - The cell MUST NOT be currently executing (KB-target §22.7).
 - The move MUST NOT split a turn from its required tool-call children (mirrored from [split-cell](split-cell.md) preconditions / [discipline/tool-calls-atomic](../discipline/tool-calls-atomic.md)).
 
+### Section-status gate (per [decisions/v1-section-status-interruptibility](../decisions/v1-section-status-interruptibility.md))
+
+Both the source and target sections MUST have `status ∈ {open, complete}`:
+
+- Either side `in_progress` or `frozen` → **K95** (`overlay_section_status_blocks` with `section_id`, `current_status`, `side: "source" | "target"`).
+- Either side `complete` → soft block; commit requires `operator_confirmed: true` on the intent envelope.
+- Use [set-section-status](set-section-status.md) to unfreeze before the move.
+
 ## What it produces
 
 - The cell's `metadata.rts.cells[<id>].section_id` is updated to `target_section_id`.

@@ -34,6 +34,7 @@ This split exists because:
 - `title` MUST be a non-empty string. Empty / null titles are rejected.
 - The section MUST NOT be currently being mutated by another in-flight commit (CAS protection per BSP-003's snapshot-version mechanism).
 - No cell movements occur. `cell_range[]` is unchanged. `parent_section_id`, `summary`, `status`, `collapsed`, `flow_policy` are unchanged.
+- **Status changes are NOT in scope here.** Use [set-section-status](set-section-status.md) for `status` transitions; rename is title-only. Rename is permitted regardless of section `status` (even on `frozen` sections — the title is presentational and never gates structural ops).
 
 ## What it produces
 
@@ -43,8 +44,8 @@ This split exists because:
 
 ## V1 vs V2+
 
-- **V1**: title only.
-- **V2+**: bulk-rename across patterns; rename with redirect-link in history; per-section status enum expansion (decision **D1** lift — V1 ships `collapsed: bool` + `summary?: string` only, no status enum yet).
+- **V1**: title only. The `status` enum ships in V1 too, but transitions go through [set-section-status](set-section-status.md), not here. (PLAN §4 D1 originally said "drop the status enum in V1" — superseded by [decisions/v1-section-status-interruptibility](../decisions/v1-section-status-interruptibility.md).)
+- **V2+**: bulk-rename across patterns; rename with redirect-link in history.
 
 ## See also
 

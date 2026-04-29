@@ -42,6 +42,13 @@ Resulting state: `cell_id` keeps the prefix; a new cell `cell_id_b` is inserted 
 - **Cell must not be currently executing.** No split during execution; stop the run first.
 - **No pin/exclude/checkpoint boundary may lie at the split point** without an explicit flag-handling decision by the operator.
 
+### Section-status precondition (per [decisions/v1-section-status-interruptibility](../decisions/v1-section-status-interruptibility.md))
+
+- The cell's enclosing [section](../concepts/section.md) MUST have `status ∈ {open, complete}`.
+  - `in_progress`: hard block. **K95**.
+  - `frozen`: hard block. **K95**. Operator must [set-section-status](set-section-status.md) to `open` first.
+  - `complete`: soft block. Commit succeeds only if the intent envelope carries `operator_confirmed: true`.
+
 ### What the split produces (decisions S3, S4, S6)
 
 - **Sub-turn renumbering**: reset to flat. Both halves drop sub-index numbering. The underlying turn DAG is unchanged; the split is overlay-only. (Decision S3.)

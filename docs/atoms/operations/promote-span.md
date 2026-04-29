@@ -44,6 +44,7 @@ If the operator passes an explicit `cell_kind` that conflicts with the inference
 - The new cell has empty `turns[]` and a non-null `bound_span_id`. Its `bound_agent_id` is `null` (the cell does not dispatch).
 - Position default: end of `section_id` (matches **decision SD3** for [create-section](create-section.md)).
 - For `cell_kind: "checkpoint"`, the same rules as the [pin-exclude-scratch-checkpoint](pin-exclude-scratch-checkpoint.md) checkpoint flag apply (decisions **CK1**, **CK2**).
+- **Section-status gate** (per [decisions/v1-section-status-interruptibility](../decisions/v1-section-status-interruptibility.md)): the target [section](../concepts/section.md) MUST have `status ∈ {open, complete}`. `in_progress` or `frozen` → **K95**; `complete` requires `operator_confirmed: true`.
 
 ## What it produces
 

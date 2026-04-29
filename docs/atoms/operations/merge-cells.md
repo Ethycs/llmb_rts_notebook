@@ -33,8 +33,9 @@ Merge is allowed only if **all** the following hold:
 - **Neither cell is currently executing** (KB-target §22.7; decision F1's adjacent rule).
 - **Append preserves turn ordering**: `c_a`'s last turn must be the parent of `c_b`'s first turn, or they share the same parent and `c_b` is the chronologically later sibling.
 - **Bindings remain unambiguous** — no two turns in the merged cell may bind the same artifact span ambiguously.
+- **Section-status gate** (per [decisions/v1-section-status-interruptibility](../decisions/v1-section-status-interruptibility.md)): the shared section MUST have `status ∈ {open, complete}`. `in_progress` or `frozen` → **K95**. `complete` requires `operator_confirmed: true` on the intent envelope.
 
-If any precondition fails → **K93** (`overlay_merge_rejected` with `cell_a`, `cell_b`, `reason`).
+If any precondition fails → **K93** (`overlay_merge_rejected` with `cell_a`, `cell_b`, `reason`); section-status failures specifically surface as **K95** (`overlay_section_status_blocks`).
 
 ### Forbidden across hard provenance boundaries (BSP-007 §6.3)
 

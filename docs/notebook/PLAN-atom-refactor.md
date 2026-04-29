@@ -118,7 +118,7 @@ These came out of the 2026-04-28 deconfliction pass and need atom homes. Each ro
 
 | # | Decision | Recommendation pinned during session |
 |---|---|---|
-| D1 | Section status enum values | Drop the enum in V1; ship `collapsed: bool` + `summary?: string` only. Add status enum in V2. |
+| D1 | Section status enum values | **SUPERSEDED 2026-04-29**: status enum ships in V1 as the section-level interruptibility lock (`open / in_progress / complete / frozen`). See [decisions/v1-section-status-interruptibility](../atoms/decisions/v1-section-status-interruptibility.md). Original guidance was to drop the enum; the reframe gives it real V1 consumers (every structural op gains a section-status precondition). |
 | D2 | `tool` vs `tool_cell` naming | Bare `tool` matches enum convention. Update KB-target prose to match. |
 | D3 | Section nesting depth | **CONFIRMED flat in V1.** `parent_section_id` field exists but rejected if non-null. V1.5+ unlocks. |
 | D4 | Checkpoint cell schema | `{summary_text, covers_cell_ids[], created_at}` + `bound_agent_id: null` (operator-authored only in V1). AI-summarized → V2. |
