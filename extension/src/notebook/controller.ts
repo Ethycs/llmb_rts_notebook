@@ -57,25 +57,70 @@ export interface KernelExecuteRequest {
   directive?: CellDirective | null;
 }
 
-/** V1 cell-directive grammar.
+/** Cell-directive grammar.
  *
- *  Two recognized verbs in V1 (BSP-002 §3 / atoms/operations/{spawn-agent,
- *  continue-turn}.md):
+ *  BSP-005 S5.0 ([PLAN-S5.0-cell-magic-vocabulary.md]) lands the
+ *  IPython-style two-tier ``@`` / ``@@`` magic vocabulary; V1 legacy
+ *  ``/spawn`` and ``@<id>:`` forms remain recognized aliases.
  *
- *  * `/spawn <agent_id> [provider:<name>] task:"<initial task>"` —
- *    creates a new agent in the zone (BSP-005 S2 path).
- *  * `@<agent_id>: <message>` — multi-turn continuation against an
- *    already-spawned agent (BSP-005 S3 path). The kernel routes this
- *    to ``AgentSupervisor.send_user_turn``; if the target is idle/exited
- *    the supervisor resumes via the S2 ``--resume`` plumbing first.
+ *  Recognized forms (in priority order):
  *
- *  ``/branch``, ``/revert``, and ``/stop`` are spec'd in BSP-002 §3 but
- *  reserved for S5; this parser does not recognize them yet.
+ *  * ``@@spawn <agent_id> [endpoint:<name>] task:"<task>"`` — spawn (canonical)
+ *  * ``@@agent <agent_id>`` (with body) — continuation (canonical)
+ *  * ``@@<cell_magic>`` — kind-only declaration (markdown, scratch,
+ *    checkpoint, endpoint, …); maps to a ``set_cell_metadata`` envelope
+ *    carrying the parsed kind + named args.
+ *  * ``@<line_magic>`` (column-0; e.g. ``@pin``, ``@exclude``,
+ *    ``@affinity primary,cheap``) — flag mutation; maps to
+ *    ``set_cell_metadata`` with the flag toggled.
+ *  * ``/spawn <agent_id> task:"<task>"`` — legacy spawn alias.
+ *  * ``@<agent_id>: <message>`` — legacy continuation alias.
+ *
+ *  ``@@break`` is consumed by the file-level splitter; it MUST NOT
+ *  reach this parser. If it does, we return null (no-op).
+ *
+ *  PLAN-S5.0 §3.6: this parser is the front-end; the kernel-side
+ *  ``magic_registry`` is the source of truth for K30/K31/K32/K34 — the
+ *  extension makes a best-effort recognition pass and lets the kernel
+ *  reject invalid forms with a structured error span.
  */
 export type CellDirective =
-  | { kind: 'spawn'; agent_id: string; task: string }
+  | { kind: 'spawn'; agent_id: string; task: string; endpoint?: string }
   | { kind: 'continue'; agent_id: string; text: string }
+  | { kind: 'cell_magic'; magic: string; args: string; cell_kind: string }
+  | { kind: 'line_magic'; magic: string; args: string; flags: { set?: string[]; unset?: string[] } }
   ;
+
+/** PLAN-S5.0 §3.4 — line magics that toggle cell-metadata flags.
+ *  The parser maps these to a ``set_cell_metadata`` envelope (set or
+ *  unset the corresponding flag); other line magics (``@affinity``,
+ *  ``@handoff``, ``@status``, ``@revert``, ``@stop``, ``@branch``)
+ *  also dispatch as ``line_magic`` directives but the receiving handler
+ *  is slice-pending. */
+const FLAG_LINE_MAGICS: Record<string, { set?: string; unset?: string }> = {
+  pin: { set: 'pinned' },
+  unpin: { unset: 'pinned' },
+  exclude: { set: 'excluded' },
+  include: { unset: 'excluded' }
+};
+
+/** PLAN-S5.0 §3.4 — the union of recognized line-magic names. Only
+ *  column-0 ``@<name>`` lines whose name is in this set dispatch as
+ *  line magics; everything else (``@user`` mentions, email, etc.) is
+ *  body text. */
+const LINE_MAGIC_NAMES: ReadonlySet<string> = new Set([
+  ...Object.keys(FLAG_LINE_MAGICS),
+  'mark', 'affinity', 'handoff', 'status',
+  'revert', 'stop', 'branch'
+]);
+
+/** PLAN-S5.0 §3.3 — the union of recognized cell-magic names (excludes
+ *  ``break`` which is consumed by the splitter). */
+const CELL_MAGIC_NAMES: ReadonlySet<string> = new Set([
+  'agent', 'spawn', 'markdown', 'scratch', 'checkpoint',
+  'endpoint', 'compare', 'section',
+  'tool', 'artifact', 'native'
+]);
 
 /** Parse a cell's text content for V1 directives. Returns null when the
  *  cell does not begin with a recognized directive.
@@ -97,17 +142,119 @@ export type CellDirective =
  *  the same agent.
  */
 export function parseCellDirective(text: string): CellDirective | null {
-  // Match: /spawn <agent_id> task:"<task>"
-  // <agent_id> is a non-whitespace token; task value is double-quoted.
-  // Multi-line tasks are not supported in V1; embedded escaped quotes either.
-  const trimmed = text.trim();
+  // PLAN-S5.0 §3.6 dispatcher. The cell text is examined LINE-BY-LINE
+  // from the top — the first non-blank line determines whether the
+  // cell carries a directive. Subsequent lines are *body* (consumed by
+  // the cell-magic / continuation handler).
+  if (text == null || text.length === 0) {
+    return null;
+  }
+  const lines = text.split(/\r?\n/);
+  // Find the first non-blank line.
+  let idx = 0;
+  while (idx < lines.length && lines[idx].trim().length === 0) {
+    idx += 1;
+  }
+  if (idx >= lines.length) {
+    return null;
+  }
+  const head = lines[idx];
+  const restLines = lines.slice(idx + 1);
+
+  // ``@@break`` is consumed by the splitter; defensive null when seen.
+  if (head.trim() === '@@break') {
+    return null;
+  }
+
+  // --- Canonical S5.0 cell-magic forms -----------------------------
+
+  // ``@@<cell_magic> [args...]`` at column 0. The regex captures the
+  // magic name + the arg-string remainder. Body text is the remaining
+  // lines, joined verbatim.
+  const cellMagicMatch = head.match(/^@@([A-Za-z_][\w]*)\s*(.*)$/);
+  if (cellMagicMatch && CELL_MAGIC_NAMES.has(cellMagicMatch[1])) {
+    const magic = cellMagicMatch[1];
+    const argsStr = cellMagicMatch[2].trim();
+    // ``@@spawn`` short-circuits to the structured spawn directive
+    // (so the kernel sees ``action_type=agent_spawn`` exactly as the
+    // legacy /spawn path does).
+    if (magic === 'spawn') {
+      const positional = argsStr.match(/^(\S+)/);
+      const taskMatch = argsStr.match(/task:"([^"]*)"/);
+      const endpointMatch = argsStr.match(/endpoint:(\S+)/);
+      if (positional && taskMatch) {
+        const result: CellDirective = {
+          kind: 'spawn',
+          agent_id: positional[1],
+          task: taskMatch[1]
+        };
+        if (endpointMatch) {
+          result.endpoint = endpointMatch[1];
+        }
+        return result;
+      }
+      return null;
+    }
+    // ``@@agent <id>`` short-circuits to the structured continue
+    // directive when there's a body.
+    if (magic === 'agent') {
+      const idMatch = argsStr.match(/^(\S+)/);
+      const body = restLines.join('\n').trim();
+      if (idMatch && body.length > 0) {
+        return { kind: 'continue', agent_id: idMatch[1], text: body };
+      }
+      return null;
+    }
+    // Any other recognized cell magic: ship as a generic cell_magic
+    // directive — the kernel-side dispatcher routes by ``magic`` name.
+    return {
+      kind: 'cell_magic',
+      magic,
+      args: argsStr,
+      cell_kind: magic
+    };
+  }
+
+  // --- Canonical S5.0 line-magic forms -----------------------------
+
+  // ``@<line_magic> [args...]`` at column 0. Distinguish from the
+  // legacy ``@<id>: <message>`` continuation by requiring (a) the
+  // magic name to be in the registry AND (b) no colon-separator after
+  // the name (the colon would mean it's a legacy continuation against
+  // an agent that happens to share a magic-name spelling, which K32
+  // forbids — but we still want to parse the form rather than mis-
+  // classifying body).
+  const lineMagicMatch = head.match(/^@([A-Za-z_][\w]*)(?:\s+([\s\S]*))?$/);
+  if (
+    lineMagicMatch &&
+    LINE_MAGIC_NAMES.has(lineMagicMatch[1]) &&
+    !head.includes(':')
+  ) {
+    const magic = lineMagicMatch[1];
+    const args = (lineMagicMatch[2] ?? '').trim();
+    const flagSpec = FLAG_LINE_MAGICS[magic];
+    const flags: { set?: string[]; unset?: string[] } = {};
+    if (flagSpec?.set) {
+      flags.set = [flagSpec.set];
+    }
+    if (flagSpec?.unset) {
+      flags.unset = [flagSpec.unset];
+    }
+    return { kind: 'line_magic', magic, args, flags };
+  }
+
+  // --- Legacy V1 forms (PLAN-S5.0 §3.9) ----------------------------
+
+  // ``/spawn <agent_id> task:"<task>"`` — only the head line is
+  // considered (the legacy form is single-line).
+  const trimmed = head.trim();
   const spawnMatch = trimmed.match(/^\/spawn\s+(\S+)\s+task:"([^"]*)"\s*$/);
   if (spawnMatch) {
     return { kind: 'spawn', agent_id: spawnMatch[1], task: spawnMatch[2] };
   }
-  // BSP-005 S3 — `@<agent_id>: <message>`. The message body may contain
-  // additional colons; we capture only the FIRST colon as the
-  // separator. The agent_id excludes whitespace and colons.
+  // ``@<agent_id>: <message>`` — first colon is the separator. Note
+  // we already excluded the column-0 line-magic case above so a
+  // ``@pin`` (no colon) won't reach this match.
   const continueMatch = trimmed.match(/^@([^\s:]+)\s*:\s*([\s\S]+)$/);
   if (continueMatch) {
     const agent_id = continueMatch[1];

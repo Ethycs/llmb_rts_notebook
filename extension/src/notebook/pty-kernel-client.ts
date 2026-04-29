@@ -479,6 +479,64 @@ export class PtyKernelClient implements KernelClient {
           originating_cell_id: input.cellUri
         }
       };
+    } else if (input.directive && input.directive.kind === 'line_magic') {
+      // BSP-005 S5.0 — line-magic flag mutation (PLAN §3.6). Maps to
+      // ``set_cell_metadata``: the parser already converted the magic
+      // (``@pin``, ``@exclude``) into a ``flags.{set, unset}`` payload
+      // the kernel-side metadata writer can apply. Non-flag line magics
+      // (``@affinity``, ``@handoff``, …) ship the same envelope shape
+      // with ``flags`` empty plus the raw ``args`` for downstream
+      // handlers; pending-slice magics return K42 server-side.
+      const params: Record<string, unknown> = {
+        cell_id: input.cellUri,
+        magic: input.directive.magic,
+        args: input.directive.args
+      };
+      const setFlags = input.directive.flags.set ?? [];
+      const unsetFlags = input.directive.flags.unset ?? [];
+      for (const flag of setFlags) {
+        params[flag] = true;
+      }
+      for (const flag of unsetFlags) {
+        params[flag] = false;
+      }
+      envelope = {
+        type: 'operator.action',
+        payload: {
+          action_type: 'set_cell_metadata',
+          intent_kind: 'set_cell_metadata',
+          parameters: params,
+          originating_cell_id: input.cellUri
+        }
+      };
+      // Line-magic effects are synchronous metadata mutations — no
+      // terminal span is expected, so resolve immediately after the
+      // write.
+      this.writeFrame(envelope);
+      return;
+    } else if (input.directive && input.directive.kind === 'cell_magic') {
+      // BSP-005 S5.0 — generic cell-magic dispatch for kinds that don't
+      // map to ``agent_spawn`` / ``agent_continue`` (markdown, scratch,
+      // checkpoint, endpoint, compare, section, …). Maps to
+      // ``set_cell_metadata`` carrying the kind + structured args; the
+      // kernel-side handler decides whether the magic is active or
+      // pending (V1.5/S5/S5.5/V2+ slices return K42).
+      envelope = {
+        type: 'operator.action',
+        payload: {
+          action_type: 'set_cell_metadata',
+          intent_kind: 'set_cell_metadata',
+          parameters: {
+            cell_id: input.cellUri,
+            kind: input.directive.cell_kind,
+            magic: input.directive.magic,
+            args: input.directive.args
+          },
+          originating_cell_id: input.cellUri
+        }
+      };
+      this.writeFrame(envelope);
+      return;
     } else {
       // No directive recognized: ship the cell edit notification (logged
       // kernel-side per K-MCP). Resolve immediately — no span will arrive.
