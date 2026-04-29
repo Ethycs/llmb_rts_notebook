@@ -1,6 +1,6 @@
 # Cell
 
-**Status**: V1 shipped
+**Status**: V1 shipped (cell-as-agent-identity invariant rendered on the X-EXT side, S1 / commit `26ac581`)
 **Source specs**: [BSP-002 §2.1](../../notebook/BSP-002-conversation-graph.md#21-turn) (turn schema), [BSP-002 §6](../../notebook/BSP-002-conversation-graph.md#6-cell--turn-binding-and-cell-as-agent-identity) (binding rule), [KB-notebook-target.md §4](../../notebook/KB-notebook-target.md#4-what-a-cell-is) (philosophical frame), [KB-notebook-target.md §0.4](../../notebook/KB-notebook-target.md#04-cell-kinds-typed-in-v1) (typed kind)
 **Related atoms**: [cell-kinds](cell-kinds.md), [turn](turn.md), [section](section.md), [sub-turn](sub-turn.md)
 

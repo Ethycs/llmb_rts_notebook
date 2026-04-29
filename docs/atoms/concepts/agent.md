@@ -1,6 +1,6 @@
 # Agent
 
-**Status**: V1 shipped (the `claude-code` provider; persistent lifecycle; `/spawn`, `@<agent>:`, `/stop` directives — `/branch` and `/revert` are V1 spec'd, may slip to V2)
+**Status**: V1 shipped (the `claude-code` provider; persistent lifecycle; `/spawn`, `@<agent>:`, `/stop` directives; cell-decoration rendering of agent identity is live on the X-EXT side, S1 / commit `26ac581` — `/branch` and `/revert` are V1 spec'd, may slip to V2)
 **Source specs**: [BSP-002 §2.2](../../notebook/BSP-002-conversation-graph.md#22-agent), [BSP-002 §4](../../notebook/BSP-002-conversation-graph.md#4-persistent-agent-lifecycle), [BSP-002 §6](../../notebook/BSP-002-conversation-graph.md#6-cell--turn-binding-and-cell-as-agent-identity) (cell-as-agent-identity), [KB-notebook-target.md §10](../../notebook/KB-notebook-target.md#10-agents-as-executors)
 **Related atoms**: [turn](turn.md), [zone](zone.md), [cell](cell.md), [run-frame](run-frame.md)
 
@@ -30,6 +30,10 @@ An **agent** is a named, mutable ref pointing into the [turn](turn.md) DAG, plus
 - `alive` — process running, accepting turns over stdin.
 - `idle` — process exited gracefully; resumable via `claude --resume <claude_session_id>`.
 - `exited` — process exited and cannot be resumed; the conversation rebuilds from turn replay if re-engaged.
+
+**Registry-miss defaults** (pre-S2 hydrate path / agent metadata not yet in the registry):
+- `runtime_status` defaults to `"idle"` — the operator-recognisable "ran here, currently quiet" state. Until the S2 hydrate path lands the agent metadata, this is what the cell-decoration badge renders.
+- `provider` defaults to `"claude-code"` — V1's only-provider rule (BSP-002 §10 Q5); the badge therefore always names a valid provider even before the registry is populated.
 
 ## Invariants
 

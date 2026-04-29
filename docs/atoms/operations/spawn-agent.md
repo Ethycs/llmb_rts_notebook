@@ -1,6 +1,6 @@
 # Operation: spawn-agent
 
-**Status**: V1 shipped (BSP-002 K-AS slice)
+**Status**: V1 shipped (BSP-002 K-AS slice; resume path wired via S2 / submodule commit `7e65d9b`)
 **Source specs**: [BSP-002 §3](../../notebook/BSP-002-conversation-graph.md#3-cell-directive-grammar) (directive grammar), [BSP-002 §4.1](../../notebook/BSP-002-conversation-graph.md#41-spawn) (spawn lifecycle), [BSP-002 §2.2](../../notebook/BSP-002-conversation-graph.md#22-agent) (agent ref schema)
 **Related atoms**: [agent](../concepts/agent.md), [turn](../concepts/turn.md), [zone](../concepts/zone.md), [continue-turn](continue-turn.md), [stop-agent](stop-agent.md)
 

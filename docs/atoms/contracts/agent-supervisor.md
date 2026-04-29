@@ -1,6 +1,6 @@
 # Contract: AgentSupervisor
 
-**Status**: `contract` (V1 shipped — `spawn`, `respawn_from_config`, `terminate_all` present in code; `send_user_turn`, `fork`, restart-window are V1 spec'd / partially implemented)
+**Status**: `contract` (V1 shipped — `spawn`, `respawn_from_config`, `terminate_all`, `send_user_turn` (S3 / submodule commit `3d43efb`) present in code; resume path wired via S2 / submodule commit `7e65d9b`; `fork`, restart-window are V1 spec'd / partially implemented)
 **Module**: `vendor/LLMKernel/llm_kernel/agent_supervisor.py` — `class AgentSupervisor` and `class AgentHandle`
 **Source specs**: [BSP-002 §4](../../notebook/BSP-002-conversation-graph.md#4-persistent-agent-lifecycle), [BSP-002 §9](../../notebook/BSP-002-conversation-graph.md#9-implementation-slices) (K-AS slice), [RFC-002 §"Process lifecycle"](../../rfcs/RFC-002-claude-code-provisioning.md), [RFC-006 §8](../../rfcs/RFC-006-kernel-extension-wire-format.md#8--family-f-notebook-metadata-bidirectional-in-v202) (post-hydrate respawn)
 **Related atoms**: [agent](../concepts/agent.md), [operations/spawn-agent](../operations/spawn-agent.md), [contracts/metadata-writer](metadata-writer.md), [protocols/family-d-event-log](../protocols/family-d-event-log.md)
@@ -42,10 +42,15 @@ class AgentSupervisor:
     def terminate_all(self, grace_seconds: float = 10.0) -> None: ...
 ```
 
-Spec'd but not yet present (BSP-002 §9 K-AS / V2 work):
+Shipped in S3 (submodule commit `3d43efb`):
 
 ```python
     def send_user_turn(self, agent_id: str, message: str) -> AgentHandle: ...        # BSP-002 §4.2
+```
+
+Spec'd but not yet present (BSP-002 §9 K-AS / V2 work):
+
+```python
     def fork(self, source_agent: str, at_turn_id: Optional[str], new_agent_id: str) -> AgentHandle: ...   # §4.4
     def stop(self, agent_id: str) -> None: ...                                       # §4.3 explicit stop
 ```
@@ -86,7 +91,7 @@ Spec'd but not yet present (BSP-002 §9 K-AS / V2 work):
 
 ## Code drift vs spec
 
-- **`spawn(...)` does not yet accept the operator's `task` per cell.** It accepts the initial task; mid-turn continuations (`@<agent>: <message>`) are not yet implemented as `send_user_turn` (BSP-002 §4.2 spec'd but missing). The K-AS slice in BSP-002 §9 ratifies the data model now and notes the V1.0/V1.1 boundary.
+- **`spawn(...)` accepts only the initial task per cell.** Mid-turn continuations (`@<agent>: <message>`) ship via `send_user_turn` (BSP-002 §4.2 — landed in S3 / submodule commit `3d43efb`). The K-AS slice in BSP-002 §9 ratified the data model; the V1.0/V1.1 boundary is now closed.
 - **`fork(at_turn_id, ...)` and explicit `stop(agent_id)` are not present.** BSP-002 §4.4 / §4.3 are spec'd; the K-AS slice flagged them as may-slip-to-V2. Today an idle agent only resumes via the silence watchdog → exit → `--resume` path on the next cell.
 - **`respawn_from_config` requires a synthetic `task` key inside each entry** (RFC-005's recoverable schema does not carry `task`). The spec acknowledges this as an open issue queued for RFC-005 v2.
 

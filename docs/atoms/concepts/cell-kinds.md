@@ -1,6 +1,6 @@
 # Cell kinds
 
-**Status**: V1 shipped (4 kinds active, 4 reserved)
+**Status**: V1 shipped (4 kinds active, 4 reserved; markdown=no-badge and promoted-suffix render rules now enforced on the X-EXT side, S1 / commit `26ac581`)
 **Source specs**: [BSP-002 §13.2](../../notebook/BSP-002-conversation-graph.md#132-cell-kinds-typed-enum-kb-target-04), [KB-notebook-target.md §0.4](../../notebook/KB-notebook-target.md#04-cell-kinds-typed-in-v1), [KB-notebook-target.md §13.1](../../notebook/KB-notebook-target.md) (the eight-kind taxonomy)
 **Related atoms**: [cell](cell.md), [tool-call](tool-call.md), [artifact-ref](artifact-ref.md)
 

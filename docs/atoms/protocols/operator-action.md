@@ -29,7 +29,7 @@ The `operator.action` envelope is the **outer wire shape** every operator-origin
 | `action_type`             | `parameters` shape                                      | Source spec |
 |---|---|---|
 | `agent_spawn`             | `{agent_id, task, cell_id, provider?, model?}`          | BSP-002 §3, RFC-006 v2.0.3 |
-| `agent_continue`          | `{agent_id, message, cell_id}`                          | BSP-002 §3 |
+| `agent_continue`          | `{agent_id, text, cell_id}` (with inner `intent_kind: "send_user_turn"`; S3 / commit `ac2bb4d`) | BSP-002 §3 |
 | `agent_branch`            | `{source_agent, at_turn_id?, new_agent_id, cell_id}`    | BSP-002 §3 (V2 ship; data-model V1) |
 | `agent_revert`            | `{agent_id, to_turn_id, cell_id}`                       | BSP-002 §3 (V2 ship; data-model V1) |
 | `agent_stop`              | `{agent_id, cell_id}`                                   | BSP-002 §3 |

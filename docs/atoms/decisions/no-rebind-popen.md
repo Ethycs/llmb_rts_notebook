@@ -24,6 +24,10 @@ PIDs are volatile across kernel restarts. Sessions are durable.
 
 4. **K24 covers the resume-failed case.** Per [BSP-002 §7](../../notebook/BSP-002-conversation-graph.md#7-failure-modes-k-class-numbering-continued-from-bsp-001-k11k13): `--resume <session_id>` may fail if claude's local cache expired the session. The kernel then falls back to full transcript replay (Case B mechanics from §4.4). Operator action is none — the fallback is automatic.
 
+   **Probe timeout**: K24 detection uses a synchronous `claude --resume` probe with a `0.5 s` timeout (S2 lock-in). Short enough to keep hydrate latency low; long enough that a healthy `claude --resume` succeeds before the timer fires.
+
+   **Fallback marker stage name**: `supervisor_resume_failed_k24`. Emitted on the run-tracker when the probe times out or returns non-zero, so the K24 fallback path is observable in trace data without re-deriving it from log strings.
+
 5. **Per [Engineering Guide §6 recoverable vs volatile](../../../Engineering_Guide.md#6-recoverable-vs-volatile-state)**: PID is the canonical example of volatile state. RFC-005 §"`metadata.rts.config`" structurally splits `config.recoverable.agents[]` (durable session info) from `config.volatile.agents[]` (PIDs, current statuses). `respawn_from_config` reads the recoverable side ONLY.
 
 ## Operational consequences
