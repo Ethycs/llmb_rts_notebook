@@ -2,9 +2,10 @@
 
 ## Status
 
-Draft. Date: 2026-04-28. Version: 2.0.4. Supersedes [RFC-003](RFC-003-custom-message-format.md) v1.0.0.
+Draft. Date: 2026-04-29. Version: 2.1.0. Supersedes [RFC-003](RFC-003-custom-message-format.md) v1.0.0.
 
 **Changelog**:
+- v2.1.0 (additive, PLAN-S5.0.3d, 2026-04-29): adds §"Transports" registering the V1.5 transport catalogue (PTY / Unix / TCP) and the `kernel.handshake` envelope as the first frame on every transport. The wire-format itself is unchanged — Family A/B/C/F/G envelopes are transport-invariant per the existing two-carrier architecture. The TCP transport binds bearer-token auth at the handshake layer; token comparison is constant-time (`hmac.compare_digest`); default bind is `127.0.0.1` (loopback). Mismatched `WIRE_MAJOR` or auth failure closes the transport with an `error` field on the handshake response. V1 kernels accept one connection at a time; second client receives `kernel_busy`. See [PLAN-S5.0.3 §4.3](../notebook/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#43-handshake-envelope-new--first-envelope-on-any-connection) and [PLAN-S5.0.3 §5](../notebook/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#5-external-transport-tcp--token). Definitions live in [docs/atoms/protocols/wire-handshake.md](../atoms/protocols/wire-handshake.md) and [docs/atoms/concepts/transport-mode.md](../atoms/concepts/transport-mode.md).
 - v2.0.4 (additive, atom-refactor Phase 4 Op-4, 2026-04-28): §1 "Mandatory attributes per run" gains two new **optional / situational** Family A span attributes: `llmnb.section_id` (operator-side section the cell was issued from; see [section atom](../atoms/concepts/section.md)) and `llmnb.output.kind` (12-value typed-output enum; see [output-kind atom](../atoms/concepts/output-kind.md)). Both are situational — V1 producers SHOULD emit when known; V1 consumers MUST tolerate absence (treat as untyped / no-section). Per [BSP-002 §13.5.2](../notebook/BSP-002-conversation-graph.md) and [KB-notebook-target.md §0.8](../notebook/KB-notebook-target.md#08-typed-outputs--v1-ships-the-tag-v2-ships-lenses). Definitions now live in `docs/atoms/`. No behavioral or wire-format breaking changes.
 - v2.0.3 (additive): §6 `operator.action` `action_type` enum gains `agent_spawn` — extension's parsed `/spawn <agent_id> task:"..."` cell directive arrives as this action_type with parameters `{agent_id, task, cell_id}`. Kernel handler delegates to `AgentSupervisor.spawn(...)`. Required by V1 hero-loop "type /spawn in a cell → agent runs → notify renders."
 - v2.0.2 (additive): §7 Family E heartbeat is now asymmetric for V1 — `heartbeat.kernel` MUST be emitted by the kernel every 5s (drives the operator-facing kernel-state indicator and detects "kernel alive but stuck" cases that PTY-EOF cannot catch); `heartbeat.extension` is `SHOULD` in V1 (`MUST` in V1.5+). §8 Family F `notebook.metadata` becomes bidirectional with new `mode: "hydrate"` (extension→kernel) for `.llmnb` load path.
@@ -382,6 +383,88 @@ If no extension is attached when the kernel would otherwise emit `notebook.metad
 #### Schema governance split
 
 This RFC governs the *transport* of `metadata.rts` (the envelope and Family F semantics). RFC-005 governs the *content* (the schema of `metadata.rts` itself). A V1 reader MUST validate the envelope per this RFC, then validate the inner snapshot per RFC-005's `schema_version`. Mismatched majors between the wire and the snapshot are a kernel bug; receivers MUST log and discard.
+
+## Transports (v2.1.0)
+
+The wire-format is **transport-invariant**: the Family A/B/C/F/G envelope shapes specified above flow identically over PTY (V1), Unix sockets, and TCP (V1.5). The transport boundary is responsible for framing (newline-delimited JSON in V1) and authentication; envelope dispatch never knows which transport it is running over. See [docs/atoms/concepts/transport-mode.md](../atoms/concepts/transport-mode.md) for the canonical statement.
+
+### §T1 — `kernel.handshake` envelope (first envelope on every transport)
+
+Before any Family A/B/C/F/G frame flows, the driver MUST send a `kernel.handshake` envelope and the kernel MUST respond. The handshake negotiates `wire_version`, declares the driver's capabilities, and (for TCP) carries bearer-token auth. On `WIRE_MAJOR` mismatch or auth failure, the kernel sends an error response and closes the transport.
+
+#### Driver → kernel (request)
+
+```jsonc
+{
+  "type": "kernel.handshake",
+  "payload": {
+    "client_name":     "llmnb-cli | vscode-extension | <custom>",
+    "client_version":  "<semver>",
+    "wire_version":    "1.0.0",
+    "transport":       "pty | unix | tcp",
+    "auth": {                                   // present iff transport == "tcp"
+      "scheme": "bearer",
+      "token":  "<token>"
+    },
+    "capabilities": ["family_a", "family_b", "family_c", "family_f", "family_g"]
+  }
+}
+```
+
+#### Kernel → driver (success response)
+
+```jsonc
+{
+  "type": "kernel.handshake",
+  "payload": {
+    "kernel_version":         "<semver>",
+    "wire_version":           "1.0.0",
+    "session_id":             "<uuid>",
+    "accepted_capabilities":  ["family_a", "family_b", "family_c", "family_f", "family_g"],
+    "warnings":               ["minor_version_skew"]   // optional
+  }
+}
+```
+
+#### Kernel → driver (error response)
+
+```jsonc
+{
+  "type": "kernel.handshake",
+  "payload": {
+    "wire_version": "1.0.0",
+    "kernel_version": "<semver>",
+    "error": "version_mismatch_major | auth_failed | kernel_busy | wire-failure"
+  }
+}
+```
+
+After an error response the kernel closes the transport. The driver gets one chance per connection.
+
+### §T2 — Transport catalogue
+
+| Transport | Status | Bind / advertisement | Auth | Default deployment |
+|---|---|---|---|---|
+| **PTY** | V1 (RFC-008) | Parent spawns child; no advertisement | Implicit parent-child trust | Local (extension hosts kernel) |
+| **Unix socket** | V1.5 | `~/.llmnb/runtime/<pid>.sock` (mode 0600); token in `<pid>.token` (mode 0600) | Filesystem perms + bearer token | Local same-user IPC |
+| **TCP** | V1.5 (PLAN-S5.0.3d) | Explicit `--bind HOST:PORT` (default `127.0.0.1:7474`) | Bearer token via `LLMNB_AUTH_TOKEN` env | Trusted networks (CI, devcontainers, single-tenant cloud) |
+
+The TCP transport MUST default-bind to `127.0.0.1`; binding to `0.0.0.0` is an explicit operator decision documented in `llmnb serve --help`. There is no mTLS in V1.5 — TCP is for **trusted networks only**. mTLS / cert-pinning is a V2+ amendment (see PLAN-S5.0.3 §10 risk #3).
+
+### §T3 — Auth model (TCP)
+
+- **Token comparison MUST be constant-time** (`hmac.compare_digest`). Plain `==` is forbidden.
+- **Token MUST NOT appear on argv.** It would leak via `ps`. The kernel reads `os.environ[<name>]` where `<name>` is supplied via `--auth-token-env` (default `LLMNB_AUTH_TOKEN`). The driver loads the same name on its side.
+- **Token absence or mismatch** → handshake response with `error: "auth_failed"` then `transport.close()`. No retry.
+- **Wire-version mismatch (major)** → `error: "version_mismatch_major"` then `transport.close()`. No graceful degradation.
+
+### §T4 — Single-client invariant (V1.5)
+
+V1.5 kernels accept one connection at a time. A second simultaneous client receives a handshake response with `error: "kernel_busy"` and the connection closes. Multi-client is V2+ work; the handshake's `session_id` is forward-compatible (V2+ kernels MAY issue distinct session ids per concurrent client without a wire-version bump).
+
+### §T5 — JSON-Schema export
+
+Handshake schemas are emitted to `vendor/LLMKernel/llm_kernel/wire/schemas/handshake.{request,response}.json` by `python -m llm_kernel.wire.export`. Non-Python drivers consume those JSON files directly; they are part of the published wire surface alongside the family schemas.
 
 ### §9 — Cross-family invariants
 
