@@ -2,7 +2,10 @@
 
 ## Status
 
-Draft. Date: 2026-04-26. Version: 1.0.0.
+Draft. Date: 2026-04-29. Version: 1.0.1.
+
+**Changelog**:
+- v1.0.1 (additive, PLAN-S5.0.3d, 2026-04-29): adds §"Other transports" noting that TCP is supported behind the same envelope contract specified in [RFC-006](RFC-006-kernel-extension-wire-format.md) v2.1.0. PTY remains the V1 default for local extension-kernel integration; TCP (PLAN-S5.0.3d) is the V1.5 transport for headless / external-driver deployments. Both transports open with the `kernel.handshake` envelope and dispatch identical Family A/B/C/F/G payloads after handshake success. No PTY-side behavior changes.
 
 This RFC is the layer-3/4 (transport binding) normative specification for how the VS Code extension hosts and communicates with LLMKernel. It is the V1 substitute for any "Jupyter Server" assumption inherited from `vscode-jupyter`'s legacy code: the extension launches LLMKernel as a subprocess directly, with no Jupyter Server, no kernelspec discovery, and no `@jupyterlab/services` dependency.
 
@@ -388,6 +391,19 @@ The frame parser buffers incoming socket bytes, splits on `\n`, parses each line
 Once `PtyKernelClient` is in place, `@jupyterlab/services` is no longer used. The dependency MUST be removed from `extension/package.json`. Removal is observable: extension bundle size drops by ~3–5 MB.
 
 The `JupyterKernelClient` file is deleted (or kept temporarily as `// deprecated` for one minor version). The `KernelClient` interface stays — only the implementation rotates.
+
+## Other transports (v1.0.1)
+
+The PTY+socket two-channel arrangement specified above is the V1 default for **local extension-kernel** integration. PLAN-S5.0.3d adds a sibling transport — TCP — for **headless** and **external-driver** deployments (CI runners, containers, Rust/Go orchestrators, the `llmnb execute` CLI talking to a remote kernel). The TCP transport is specified normatively in [RFC-006 §"Transports"](RFC-006-kernel-extension-wire-format.md) v2.1.0; this section anchors the cross-reference.
+
+**Invariant carried over:** every transport opens with the [`kernel.handshake`](../atoms/protocols/wire-handshake.md) envelope and then carries identical Family A/B/C/F/G payloads. PTY remains the local default. The Comm-target name (`llmnb.rts.v2`) is the layer-1 major-version identifier on PTY; the handshake envelope's `wire_version` field is the source of truth on TCP (and unifies version negotiation across all transports going forward).
+
+**What's new in v1.0.1:**
+- A new entry-point `python -m llm_kernel serve --transport tcp --bind HOST:PORT --auth-token-env LLMNB_AUTH_TOKEN` (PLAN-S5.0.3 §5.2). Default bind is `127.0.0.1` (loopback). Token comparison is constant-time. Token never on argv.
+- The kernel-side serve loop accepts one connection at a time in V1.5; second client receives `kernel_busy` and is closed. Multi-client is V2+.
+- The PTY transport is unchanged; this RFC's §1–§9 continue to specify the load-bearing local transport.
+
+**Trusted-network model:** TCP is for trusted networks only. There is no mTLS in V1.5 (PLAN-S5.0.3 §10 risk #3). Operators binding to `0.0.0.0` MUST do so explicitly and only inside an authorized perimeter.
 
 ## Backward-compatibility analysis
 
