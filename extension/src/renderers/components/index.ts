@@ -35,4 +35,18 @@ export type {
   ContaminationLogEntry,
   ContaminationBadgeProps
 } from './contamination-badge.js';
+export {
+  renderProvenanceChip,
+  bindProvenanceChipHandlers,
+  formatProvenanceChipText,
+  formatProvenanceChipTooltip,
+  firstNonBlankLine,
+  PROVENANCE_CHIP_CLASS,
+  PROVENANCE_CHIP_BUTTON_CLASS,
+  PROVENANCE_CHIP_PREFIX,
+  REVEAL_DATA_ATTR,
+  GENERATOR_TEXT_MAX_CHARS,
+  SHORT_ID_LEN
+} from './provenance-chip.js';
+export type { ProvenanceChipProps } from './provenance-chip.js';
 export { escapeHtml, escapeAttr } from './escape.js';
