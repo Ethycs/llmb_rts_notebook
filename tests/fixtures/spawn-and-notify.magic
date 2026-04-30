@@ -1,0 +1,4 @@
+@@spawn alpha task:"hello world"
+@@break
+@@scratch
+print('hello from stub')
