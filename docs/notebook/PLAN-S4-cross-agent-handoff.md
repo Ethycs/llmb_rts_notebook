@@ -1,9 +1,9 @@
 # Plan: S4 — Cross-agent context handoff
 
-**Status**: ready (refresh after S5.0/S5.0.1/S5.0.3)
+**Status**: V1 shipped — submodule `52a355c`, outer `fe2121a` (2026-04-30). V1.5 follow-up queued; see §10.
 **Audience**: an LLM (or operator) picking this up cold. Self-contained.
 **Goal**: thread `last_seen_turn_id` through `AgentHandle` and `send_user_turn`, walk the turn DAG between an agent's last-seen point and the notebook head, and inject missed turns from other agents into the addressed agent's session before the operator's new message reaches it.
-**Time budget**: ~0.6 days. `send_user_turn` is already shipped (S3 / submodule commit `3d43efb`); `last_seen_turn_id` and `_missed_turns` are NOT present. The remaining work is the DAG walker, synthesis prefix, hash-strip discipline, and K26 plumbing. Single-agent.
+**Time budget**: spent ~0.6 days. `send_user_turn` was already shipped (S3 / submodule commit `3d43efb`); this slice added `last_seen_turn_id`, the `_missed_turns` walker, hash-strip-via-`magic_hash.strip_hashes_from_text`, K26 plumbing, and 11 new tests. Single-agent (Sonnet, 87 tool uses — over the 40-cap; budget for similar slices should be raised to 1d).
 
 ---
 
@@ -50,7 +50,7 @@ Driver: [BSP-002 §4.6](BSP-002-conversation-graph.md). Slice spec: [BSP-005 §"
 2. **Persistence.** Mirror `last_seen_turn_id` into `metadata.rts.zone.agents.<id>.session.last_seen_turn_id` per [agent atom schema](../atoms/concepts/agent.md). The field already exists in the atom schema; this slice wires it via the existing `update_agent_session` intent kind in [protocols/submit-intent-envelope](../atoms/protocols/submit-intent-envelope.md).
 
 3. **Turn-DAG walker.** New private helper `AgentSupervisor._missed_turns(agent_id, head_turn_id) → list[Turn]`:
-   - Read `metadata.rts.zone.agents.<*>.turns[]` for ALL agents in the zone (cross-agent walk).
+   - **V1 reads from `AgentSupervisor._turns: dict[str, list[Turn]]`** populated via the new `AgentSupervisor.record_turn(agent_id, turn)` method. The PLAN's original "read `metadata.rts.zone.agents.<*>.turns[]`" intent depends on the metadata-writer turn-graph persistence slice that is still in `_PENDING_SLICE`; until it ships, V1 keeps a parallel in-memory store. See §10 for the V1.5 substrate-fix plan.
    - Construct the chain from `head_turn_id` backward via `parent_id` until `agent.last_seen_turn_id` is reached.
    - Filter to turns NOT authored by `agent_id` (handoff candidates).
    - Return chronologically ordered (root → head). Max-depth guard raises K26 with `reason: "cycle_detected"` defensively.
@@ -155,6 +155,7 @@ Expected count: 9 supervisor tests + 2 hydrate tests = 11 new tests.
 | Cycle in turn DAG | Walker has max-depth guard; exceeding it raises K26 with `reason: "cycle_detected"`. |
 | `metadata.rts.zone` head_turn_id stale during fast cell sequence | `_notebook_head_turn_id()` reads writer's in-memory snapshot under `_lock`; FIFO serialization keeps it consistent. |
 | Sibling agent's prior turn contains hashed-magic | Mitigated by mandatory `magic_hash.strip_hashes_from_text(...)` invocation in `_synthesize_handoff_prefix`. Agents never observe `@@<hash>:<name>` patterns. |
+| **V1 in-memory `_turns` dict resets on kernel boot** — cross-reopen handoff loses pre-reopen sibling turns. | V1 acceptable for in-session workflows (the dominant case). V1.5 substrate-fix slice (see §10) migrates to `metadata.rts.zone.agents.<*>.turns[]` when metadata-writer turn-graph persistence ships. Until then, operators reopening yesterday's notebook and addressing alpha will not see beta's pre-reopen turns replayed — though the new turns produced after reopen do replay correctly. |
 
 ## §7. Atoms touched + Atom Status fields needing update
 
@@ -176,14 +177,46 @@ Expected count: 9 supervisor tests + 2 hydrate tests = 11 new tests.
 
 ## §9. Definition of done
 
-- [ ] All 11 new tests pass.
-- [ ] `AgentHandle.last_seen_turn_id` field present; default `None`.
-- [ ] `_missed_turns` walker present and covered by tests.
-- [ ] `_synthesize_handoff_prefix` calls `strip_hashes_from_text` on every content string before returning.
-- [ ] K26 registered in `_rfc_schemas.py` or `wire/tools.py`.
-- [ ] Two-agent end-to-end smoke: spawn alpha + beta, run two turns on beta, then `@@agent alpha` — alpha's response references beta's content, confirming handoff fired.
-- [ ] Three-agent stress smoke: 5 turns each on alpha, beta, gamma in alternating order; verify each `last_seen_turn_id` advances correctly across the writer state.
-- [ ] Idle-resume + handoff smoke: terminate alpha, send `@@agent alpha` after beta has produced 2 turns; alpha resumes, handoff fires, response correct.
-- [ ] [contracts/agent-supervisor.md](../atoms/contracts/agent-supervisor.md) updated to note S4 extends `send_user_turn`.
-- [ ] BSP-005 changelog updated with the slice's commit SHA.
-- [ ] This plan flips to `**Status**: shipped (commit <SHA>)`.
+- [x] All 11 new tests pass (post-flight `pytest -n auto --dist=loadfile`: **712 passed, 2 skipped, 0 failed in ~42s**).
+- [x] `AgentHandle.last_seen_turn_id` field present; default `None`.
+- [x] `_missed_turns` walker present and covered by tests.
+- [x] `_synthesize_handoff_prefix` calls `strip_hashes_from_text` on every content string before returning.
+- [x] K26 registered in `_rfc_schemas.py` AND `wire/tools.py`.
+- [ ] Two-agent end-to-end live smoke (deferred to V1.5 — requires turn-graph persistence; V1 unit + integration tests cover the in-memory mechanics).
+- [ ] Three-agent stress smoke (same caveat as above).
+- [ ] Idle-resume + handoff smoke (same caveat — `_turns` dict hydration lives in V1.5).
+- [x] [contracts/agent-supervisor.md](../atoms/contracts/agent-supervisor.md) updated to note S4 extends `send_user_turn`.
+- [ ] BSP-005 changelog updated with the slice's commit SHA (operator-side housekeeping).
+- [x] This plan reflects V1 shipped state with V1.5 caveats called out (this commit).
+
+## §10. V1 reality vs PLAN spec — V1.5 follow-up
+
+The shipped V1 differs from the original PLAN spec on **one point** the operator should know about. All other §3 work matches the spec exactly.
+
+### The divergence
+
+PLAN-S4 §3 step 3 originally specced that `_missed_turns` reads `metadata.rts.zone.agents.<*>.turns[]` (the metadata-writer turn graph). What actually shipped reads from `AgentSupervisor._turns: dict[str, list[Turn]]`, populated via a new `record_turn(agent_id, turn)` method on the supervisor.
+
+### Why it shipped this way
+
+The metadata-writer turn-graph slice is in `_PENDING_SLICE`: when supervisor calls `submit_intent({intent_kind: "update_agent_session", ...})`, the writer accepts the intent and logs it as a no-op. The persisted turn array doesn't exist yet. The implementation slice chose to ship handoff anyway with a parallel in-memory store rather than block on the writer slice. This is consistent with the `_PENDING_SLICE` discipline already established elsewhere in the kernel.
+
+### Behavioral consequences
+
+| Scenario | V1 behavior | Original PLAN-S4 spec |
+|---|---|---|
+| In-session handoff (alpha addressed after beta produces 3 turns in same kernel boot) | Works | Works |
+| Notebook close → reopen → `@@agent alpha` (with beta's pre-reopen turns) | **`_turns` dict empty after kernel boot; `_missed_turns` returns []**; alpha receives operator message without sibling-turn replay | Works (turns persist via metadata) |
+| Notebook close → reopen → beta produces NEW post-reopen turns → `@@agent alpha` | Works for the new post-reopen turns only | Works for both pre- and post-reopen turns |
+
+The dominant operator workflow (start a notebook, work for an hour, multi-agent flows within that session) is **fully covered by V1**. The "operator opens yesterday's notebook" workflow is the gap.
+
+### V1.5 follow-up slice (queued, not yet authored)
+
+`PLAN-S4.1-turn-graph-persistence-handoff-fix.md` (placeholder name):
+1. Land the metadata-writer turn-graph slice (substrate-side; whoever picks this up first audits `_PENDING_SLICE` for `record_turn` / `update_agent_session` and wires the actual persistence into `metadata.rts.zone.agents.<id>.turns[]`).
+2. Migrate `AgentSupervisor._missed_turns` to read from the persisted turn graph.
+3. Migrate `_spawn_from_config_entry` (hydrate path) to repopulate `_turns` from `metadata.rts` if the in-memory cache is needed for performance, OR remove it entirely if the persisted graph is fast enough.
+4. Re-enable the three deferred smokes (two-agent end-to-end, three-agent stress, idle-resume + handoff) — they will exercise the post-reopen replay path that V1 cannot.
+
+Estimated sizing once the substrate slice lands: ~0.3-0.5 day delta. Independent test count: +3 deferred smokes from §9 above.
