@@ -1,0 +1,26 @@
+{
+  "kind": "spawn",
+  "text": "@@spawn alpha task:\"hello world\"",
+  "agent_id": "alpha",
+  "response": {
+    "type": "operator.action",
+    "payload": {
+      "kind": "run.complete",
+      "status": "ok",
+      "agent_id": "alpha",
+      "outputs": [
+        {
+          "output_type": "display_data",
+          "data": {
+            "application/vnd.rts.run+json": {
+              "spanId": "stub-spawn-alpha",
+              "name": "agent.spawn",
+              "status": "ok"
+            }
+          },
+          "metadata": {}
+        }
+      ]
+    }
+  }
+}

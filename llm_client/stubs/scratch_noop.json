@@ -1,0 +1,19 @@
+{
+  "kind": "scratch",
+  "text": "@@scratch\nprint('hello from stub')",
+  "agent_id": null,
+  "response": {
+    "type": "operator.action",
+    "payload": {
+      "kind": "run.complete",
+      "status": "ok",
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": "hello from stub\n"
+        }
+      ]
+    }
+  }
+}
