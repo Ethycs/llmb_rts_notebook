@@ -1,6 +1,7 @@
 # Magic code generator
 
 **Status**: V2+ reserved (concept locked; slice queued as `PLAN-S5.0.2-magic-code-generators.md`, not yet authored)
+**Implementation note**: Kernel side shipped in S5.0.2 (submodule branch `wip/s5-0-2-magic-generators`); extension provenance chip ships with parallel slice. Status flip awaits operator ratification once both halves merge.
 **Source specs**: [PLAN-S5.0.1 §3.10–§3.11](../../notebook/PLAN-S5.0.1-cell-magic-injection-defense.md) (the emission-ban context this concept resolves), [PLAN-S5.0 §3](../../notebook/PLAN-S5.0-cell-magic-vocabulary.md) (cell-magic registry this extends), [discipline/zachtronics](../discipline/zachtronics.md) (visible-tile constraint), [discipline/magic-injection-defense](../discipline/magic-injection-defense.md) *(forthcoming with S5.0.1)*
 **Related atoms**: [magic](magic.md), [cell](cell.md), [cell-kinds](cell-kinds.md), [protocols/operator-action](../protocols/operator-action.md), [discipline/text-as-canonical](../discipline/text-as-canonical.md), [discipline/certified-magic-emitter](../discipline/certified-magic-emitter.md)
 
