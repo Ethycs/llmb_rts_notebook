@@ -42,11 +42,13 @@ class AgentSupervisor:
     def terminate_all(self, grace_seconds: float = 10.0) -> None: ...
 ```
 
-Shipped in S3 (submodule commit `3d43efb`):
+Shipped in S3 (submodule commit `3d43efb`); extended in S4 (PLAN-S4 cross-agent handoff):
 
 ```python
     def send_user_turn(self, agent_id: str, message: str) -> AgentHandle: ...        # BSP-002 §4.2
 ```
+
+S4 note: `send_user_turn` now walks the turn DAG between `agent.last_seen_turn_id` and the notebook head, synthesizes prefix messages for missed sibling turns (hash-stripped via `magic_hash.strip_hashes_from_text`), and injects them before the operator message. After a successful write, `handle.last_seen_turn_id` advances to the head and `update_agent_session` is submitted to the metadata writer. Raises K26 (`cross_agent_handoff_failed`) on cycle detection or stdin write failure during prefix injection. The public signature is unchanged; the return dict gains `handoff_prefix_count`.
 
 Shipped in S9-kernel / K-AS-A (submodule commit `87cb127`):
 
