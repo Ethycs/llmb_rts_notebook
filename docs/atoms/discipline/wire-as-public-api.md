@@ -69,3 +69,5 @@ The wire-as-public-API discipline is the **runtime** layer counterpart to [text-
 - [protocols/wire-handshake](../protocols/wire-handshake.md) — runtime enforcement of version semantics.
 - [concepts/transport-mode](../concepts/transport-mode.md) — same wire across PTY / Unix / TCP.
 - [protocols/operator-action](../protocols/operator-action.md) — concrete envelope this rule governs.
+
+<!-- S5.0.3a ship note: llm_kernel.wire package created; _rfc_schemas aliased; JSON schemas exported. Source commit: <TBD-after-commit>. Status NOT flipped — awaiting S5.0.3b/c/d/e. -->
