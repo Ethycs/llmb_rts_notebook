@@ -35,7 +35,7 @@ Driver: [BSP-002 §4.6](BSP-002-conversation-graph.md). Slice spec: [BSP-005 §"
 
 ## §2.5. V1 vs V2+ — explicit handoff
 
-**V1 ships only automatic-on-`@msg` handoff.** When the operator addresses an agent with `@@agent <id>` (or the `@msg <id>: <message>` line-magic shorthand per [S5.0](PLAN-S5.0-cell-magic-vocabulary.md) §3.4), the kernel performs the handoff automatically if that agent has missed sibling turns. No operator-authored explicit directive is required or supported.
+**V1 ships only automatic-on-`@@agent` handoff.** When the operator addresses an agent with `@@agent <id>` (canonical cell-magic per [PLAN-S5.0](PLAN-S5.0-cell-magic-vocabulary.md), with the cell body as the message) — or with the legacy `@<id>: <body>` column-0 directive (preserved indefinitely; rewrites internally to `@@agent <id>\n<body>` per S5.0 line 176) — the kernel performs the handoff automatically if that agent has missed sibling turns. No operator-authored explicit directive is required or supported.
 
 **V2+ feature: `@handoff <to_id>` line-magic.** When appended to a cell, the kernel records "after this cell completes, the operator's next un-targeted message routes to `<to_id>`." Stack-style: nested `@handoff` builds a degrade-stack; `@handoff` with no arg pops one frame. This is a control-flow side-effect that persists between cells — visible only in the emitting cell's text, not in the destination cell.
 
@@ -45,7 +45,7 @@ Driver: [BSP-002 §4.6](BSP-002-conversation-graph.md). Slice spec: [BSP-005 §"
 
 ## §3. Concrete work
 
-1. **Schema extension on `AgentHandle`.** Add `last_seen_turn_id: Optional[str]` to the dataclass in `vendor/LLMKernel/llm_kernel/agent_supervisor.py`. Default `None` for fresh spawns; populated to the spawn's first response turn id after S2's resume completes. (`claude_session_id` and resume logic already present; this is an additive field.)
+1. **Schema extension on `AgentHandle`.** Add `last_seen_turn_id: Optional[str]` to the dataclass in `vendor/LLMKernel/llm_kernel/agent_supervisor.py`. Default `None` for fresh spawns; populated to the spawn's first response turn id. (`claude_session_id` and resume logic already shipped — `--resume` exists; this slice only adds the additive `last_seen_turn_id` field plus the walker that consumes it.)
 
 2. **Persistence.** Mirror `last_seen_turn_id` into `metadata.rts.zone.agents.<id>.session.last_seen_turn_id` per [agent atom schema](../atoms/concepts/agent.md). The field already exists in the atom schema; this slice wires it via the existing `update_agent_session` intent kind in [protocols/submit-intent-envelope](../atoms/protocols/submit-intent-envelope.md).
 
