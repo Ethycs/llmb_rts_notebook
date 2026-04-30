@@ -53,6 +53,7 @@ python-dotenv = ">=1.0.0"
 mitmproxy = ">=11.0.0"
 llm-kernel = { path = "vendor/LLMKernel", editable = true }
 llmb-rts-notebook = { path = ".", editable = true }
+build = ">=1.2.0"
 
 [tool.pixi.feature.kernel.tasks]
 kernel-dev = "python -m llmkernel"
@@ -60,6 +61,7 @@ kernel-test = "pytest vendor/LLMKernel/tests/ -v"
 driver-test = "pytest tests/ -q"
 extension-build = { cmd = "npm run build", cwd = "extension" }
 extension-test = { cmd = "npm test", cwd = "extension" }
+check-builds = "python -m build --no-isolation --wheel ."
 
 [tool.pixi.environments]
 default = { features = [], solve-group = "default" }
