@@ -45,7 +45,7 @@ The wire shape itself is unchanged from BSP-002 §9 / RFC-006 §6 — magics map
 | `agent_spawn`             | `{agent_id, task, cell_id, provider?, model?}`          | BSP-002 §3, RFC-006 v2.0.3 |
 | `agent_continue`          | `{agent_id, text, cell_id}` (with inner `intent_kind: "send_user_turn"`; S3 / commit `ac2bb4d`) | BSP-002 §3 |
 | `agent_branch`            | `{source_agent, at_turn_id?, new_agent_id, cell_id}`    | BSP-002 §3 (V2 ship; data-model V1) |
-| `agent_revert`            | `{agent_id, to_turn_id, cell_id}`                       | BSP-002 §3 (V2 ship; data-model V1) |
+| `agent_revert`            | `{agent_id, target_turn_id, cell_id}`                   | BSP-002 §3 (V2 ship; data-model V1) |
 | `agent_stop`              | `{agent_id, cell_id}`                                   | BSP-002 §3 |
 | `cell_edit`               | `{cell_id, text}`                                       | RFC-006 §6 v2.0.0 |
 | `branch_switch`           | `{branch_ref, cell_id?}`                                | RFC-006 §6 v2.0.0 |

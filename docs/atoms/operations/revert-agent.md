@@ -36,8 +36,8 @@ Kernel envelope:
 - `target_turn_id` MUST be in `agent`'s ancestry (reachable by walking `parent_id` from current head); else **K22** (`cell_directive_invalid_revert_target`). If the target is in another lineage, the operator wants [branch-agent](branch-agent.md), not revert.
 - Revert sends SIGTERM to the agent's claude process (if alive); `runtime_status` becomes `idle`. The previous `claude_session_id` is preserved on the now-historical turns; **a new `claude_session_id` is assigned at the next continue-turn** when Case B replay (per [branch-agent](branch-agent.md)) synthesizes a new session.
 - Records a `agent_ref_move` event in `metadata.rts.event_log` with `reason: "operator_revert"` (BSP-002 §8.5).
-- The cell that issues `/revert` produces no turn (ref-move cell per BSP-002 §6 binding table).
-- **Non-destructive at the turn level**: turns between `target_turn_id` and the prior head remain in `metadata.rts.zone.agents.<id>.turns[]`. They are no longer reachable from `head_turn_id` but ARE reachable via `/branch <agent> at <orphaned_turn>`.
+- The cell that issues `@revert` produces no turn (ref-move cell per BSP-002 §6 binding table).
+- **Non-destructive at the turn level**: turns between `target_turn_id` and the prior head remain in `metadata.rts.zone.agents.<id>.turns[]`. They are no longer reachable from `head_turn_id` but ARE reachable via `@branch <agent> at <orphaned_turn>`.
 
 ### Why each turn carries `claude_session_id`
 

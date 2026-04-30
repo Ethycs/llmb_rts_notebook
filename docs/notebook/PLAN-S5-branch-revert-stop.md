@@ -53,7 +53,7 @@ Hard dependencies (all shipped):
 - `@branch alpha at t_3 as beta` produces a new ref; both Case A and Case B mechanics.
 - `@revert alpha to t_2` moves HEAD; replay synthesizes a fresh session on next continue.
 - `@stop alpha` clean SIGTERM with grace.
-- Legacy column-0 `/branch`, `/revert`, `/stop` slash directives are **not** in the documented S5.0 alias set (§3.9 of PLAN-S5.0 lists only `/spawn` and `@<id>:`). Treat slash forms as **NOT preserved** unless explicitly re-added by a follow-up; flagged as an open question for operator review (see §6).
+- Legacy column-0 `/branch`, `/revert`, `/stop` slash directives are **retired**. Per operator decision (commit pending), only `/spawn` and `@<id>:` continue parsing as legacy aliases per PLAN-S5.0 §3.9; the three slash forms used in pre-S5.0 design docs do not survive the magic-vocabulary cutover. Operators use `@branch`/`@revert`/`@stop` line-magics exclusively from S5 onward.
 
 **V2+ deferred:**
 - **Reflog**: a per-agent history of HEAD movements that survives revert. V1 records `agent_ref_move` event-log entries (per [revert-agent](../atoms/operations/revert-agent.md)); a navigable reflog UI is V2+.
@@ -112,7 +112,7 @@ Wire envelopes (already catalogued in [protocols/operator-action](../atoms/proto
 
 ```jsonc
 { "action_type": "agent_branch",  "parameters": { "source_agent_id": "...", "at_turn_id": "...", "new_agent_id": "...", "cell_id": "..." } }
-{ "action_type": "agent_revert",  "parameters": { "agent_id": "...", "target_turn_id": "...", "cell_id": "..." } }   // [revert-agent] uses `target_turn_id`; protocol catalogue line 48 uses `to_turn_id` — drift flagged in §6
+{ "action_type": "agent_revert",  "parameters": { "agent_id": "...", "target_turn_id": "...", "cell_id": "..." } }
 { "action_type": "agent_stop",    "parameters": { "agent_id": "...", "cell_id": "..." } }
 ```
 
@@ -164,8 +164,8 @@ Expected count: 10 supervisor + 3 writer + 3 magic-registry + 2 cell-manager = 1
 
 | Risk | Mitigation |
 |---|---|
-| Slash-form back-compat — original PLAN-S5 + KB cite `/branch`, `/revert`, `/stop`, but PLAN-S5.0 §3.9 only enumerates `/spawn` and `@<id>:` as preserved aliases | **Open ambiguity**: do operators retain slash forms for these three? If yes, add to S5.0's column-0 alias rewriter. If no, document the migration. Flagged for operator review before code lands. |
-| Wire-payload field naming drift — `revert-agent.md` says `target_turn_id`; `protocols/operator-action.md` line 48 says `to_turn_id` | Pick one (recommend `target_turn_id` to match the atom that other atoms cross-reference) and update the other; verify `_rfc_schemas.py` matches. Flagged. |
+| Slash-form `/branch`, `/revert`, `/stop` originally specced; resolved by operator decision to **retire**. No back-compat alias. | Documented migration: pre-S5.0 cells using slash forms parse as plain text from S5 onward (no surprise dispatch). Operator notebook surfaces a one-time advisory on first migration. |
+| Wire-payload field naming previously drifted — operator decision **`target_turn_id`** (matches `revert-agent.md` and BSP-002 §6 overlay schema). | `operator-action.md` line 48 normalized to `target_turn_id` (commit pending — same as this plan's normalization). Verify `_rfc_schemas.py` and `wire/tools.py` match when the action_type ships its real handler. |
 | Case B replay diverges from Case A by claude version drift | Both invocations pin to the same claude binary version per [contracts/agent-supervisor §"Pre-spawn validation"](../atoms/contracts/agent-supervisor.md). |
 | SIGTERM race during revert (turns mid-stream) | Watchdog handles `process_died_mid_turn` (K23); revert reuses that exit path. |
 | `at_turn_id` ancestry walk slow for long agents | Acceptable for V1; ancestry chains rarely exceed 100 turns. V2 may add an index. |
@@ -176,8 +176,8 @@ Expected count: 10 supervisor + 3 writer + 3 magic-registry + 2 cell-manager = 1
 ## §7. Atoms touched + Atom Status fields needing update
 
 - [contracts/agent-supervisor.md](../atoms/contracts/agent-supervisor.md) — `fork`, `revert`, `stop` move from "Spec'd but not yet present" to public methods; update Status / "Code drift vs spec".
-- [operations/branch-agent.md](../atoms/operations/branch-agent.md) — Status flips to `V1 shipped (data + mechanics; branch-switching UX V2+)`. Operation signature line replaces `/branch <…>` with `@branch <…>`; legacy slash form noted as "not preserved as alias in V1" pending §6 resolution.
-- [operations/revert-agent.md](../atoms/operations/revert-agent.md) — Status `V1 shipped`. Same signature swap. Resolve `target_turn_id` vs `to_turn_id` drift.
+- [operations/branch-agent.md](../atoms/operations/branch-agent.md) — Status flips to `V1 shipped (data + mechanics; branch-switching UX V2+)`. Operation signature line replaces `/branch <…>` with `@branch <…>`; legacy slash form **retired** per §6 resolution.
+- [operations/revert-agent.md](../atoms/operations/revert-agent.md) — Status `V1 shipped`. Same signature swap. `target_turn_id` is canonical (already correct in this atom).
 - [operations/stop-agent.md](../atoms/operations/stop-agent.md) — Status remains `V1 shipped`; signature line updates from `/stop <agent_id>` to `@stop <agent_id>`. The idle-timeout path was already shipped; this slice adds the explicit operator-issued path.
 - [concepts/magic.md](../atoms/concepts/magic.md) — line-magic registry table: `revert / stop / branch` row flips from `stub (S5)` to `active`.
 - [concepts/agent.md](../atoms/concepts/agent.md) — verify `runtime_status` enum values reflect the explicit `idle` path on `stop`.
@@ -208,6 +208,6 @@ Expected count: 10 supervisor + 3 writer + 3 magic-registry + 2 cell-manager = 1
 - [ ] Cell Manager gate smoke: `@revert` issued in a running cell → K3C; in a contaminated cell → K3E.
 - [ ] Driver invariance smoke: same `agent_branch` / `agent_revert` / `agent_stop` envelope shape consumed by `llm_client.driver` and the VS Code extension; no driver-side branch logic.
 - [ ] Atom Status fields updated per §7.
-- [ ] §6 ambiguities resolved before merge: (a) slash-form aliasing decision; (b) `target_turn_id` vs `to_turn_id` field-name normalization.
+- [x] §6 ambiguities resolved (slash forms retired; `target_turn_id` canonical) — operator decisions landed in commits TBD.
 - [ ] BSP-005 changelog updated with slice commit SHA.
 - [ ] This plan flips to `**Status**: shipped (commit <SHA>)`.
