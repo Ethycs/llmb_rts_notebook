@@ -16,6 +16,13 @@ requires = ["hatchling"]
 [tool.hatch.build.targets.wheel]
 packages = ["llm_client"]
 
+[tool.pytest.ini_options]
+# Custom markers used in tests/. Registering here silences the
+# ``PytestUnknownMarkWarning`` and gates slow tests behind ``-m integration``.
+markers = [
+    "integration: end-to-end tests that spawn the kernel as a subprocess",
+]
+
 [tool.pixi.workspace]
 channels = ["conda-forge"]
 platforms = ["win-64"]

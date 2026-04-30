@@ -71,11 +71,18 @@ def test_auth_init_custom_token_name(
     assert "LLMNB_AUTH_TOKEN" not in text
 
 
-def test_serve_subcommand_returns_1(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+def test_serve_subcommand_errors_when_token_unset(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Serve is a stub for S5.0.3d; returns 1 with a clear deferral msg."""
-    rc = main(["serve"])
-    assert rc == 1
+    """Serve refuses to launch when the token env var is unset (rc=2).
+
+    Implemented in S5.0.3d. The CLI checks the env var BEFORE spawning
+    the kernel subprocess so operators get a local error message.
+    """
+    monkeypatch.delenv("LLMNB_AUTH_TOKEN", raising=False)
+    rc = main(["serve", "--auth-token-env", "LLMNB_AUTH_TOKEN_DEFINITELY_UNSET"])
+    assert rc == 2
     captured = capsys.readouterr()
-    assert "S5.0.3d" in captured.err
+    assert "LLMNB_AUTH_TOKEN_DEFINITELY_UNSET" in captured.err

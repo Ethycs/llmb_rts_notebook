@@ -83,9 +83,17 @@ def test_boot_different_session_ids() -> None:
         conn2.close()
 
 
-def test_boot_tcp_raises_not_implemented() -> None:
-    """Requesting TCP transport raises NotImplementedError (S5.0.3d work)."""
+def test_boot_tcp_requires_bind_and_token() -> None:
+    """Requesting TCP transport without bind/token raises ValueError (S5.0.3d).
+
+    S5.0.3d wired transport='tcp' to llm_client.transport.tcp.connect.
+    The wrapper enforces that ``bind`` and ``auth_token`` are supplied
+    BEFORE attempting the connect (so operators get a clear local error
+    rather than ``ConnectionRefusedError``).
+    """
     from llm_client import boot_minimal_kernel
 
-    with pytest.raises(NotImplementedError, match="S5.0.3d"):
+    with pytest.raises(ValueError, match="bind"):
         boot_minimal_kernel(transport="tcp")
+    with pytest.raises(ValueError, match="auth_token"):
+        boot_minimal_kernel(transport="tcp", bind="127.0.0.1:65535")
