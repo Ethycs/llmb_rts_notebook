@@ -1,6 +1,6 @@
 # Discipline: Wire as public API
 
-**Status**: V1.5 reserved (concept locked; slice queued as PLAN-S5.0.3, not yet dispatched)
+**Status**: V1.5 shipped (PLAN-S5.0.3e landed 2026-04-29; outer commit pin TBD-after-commit; submodule pin TBD-after-commit)
 **Source specs**: [PLAN-S5.0.3 §4](../../notebook/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#4-wire-interface-contract) (public surface + version constants + handshake), [PLAN-S5.0.3 §3.2](../../notebook/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#32-what-moves-where) (`_rfc_schemas` → `wire/tools.py`), [PLAN-S5.0.3 §7.1](../../notebook/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#71-round-0-operator-30min) (RFC-006 amendment), [RFC-006 §"Backward-compatibility analysis"](../../rfcs/RFC-006-kernel-extension-wire-format.md)
 **Related atoms**: [text-as-canonical](text-as-canonical.md), [concepts/driver](../concepts/driver.md), [protocols/wire-handshake](../protocols/wire-handshake.md), [concepts/transport-mode](../concepts/transport-mode.md)
 
@@ -71,3 +71,5 @@ The wire-as-public-API discipline is the **runtime** layer counterpart to [text-
 - [protocols/operator-action](../protocols/operator-action.md) — concrete envelope this rule governs.
 
 <!-- S5.0.3a ship note: llm_kernel.wire package created; _rfc_schemas aliased; JSON schemas exported. Source commit: <TBD-after-commit>. Status NOT flipped — awaiting S5.0.3b/c/d/e. -->
+
+<!-- S5.0.3e ship note (campaign endpoint): lint boundary intact (driver→wire only); smoke aliases migrated to _test_helpers.smokes shim keeping wire discipline clean; all driver tests passing (87+1 skipped pre; 92+1 skipped post). Status flipped to V1.5 shipped. Source commit: TBD-after-commit. After this campaign: V2 two-PyPI-distribution split (llmnb-kernel + llmnb); mTLS over TCP; WebSocket transport for browser drivers. -->
