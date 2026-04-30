@@ -38,6 +38,7 @@ import {
   renderAsk, renderClarify, renderPresent, renderEscalate,
   renderReadFile, renderWriteFile, renderRunCommand,
   renderAgentEmit,
+  renderProvenanceChip,
   escapeHtml
 } from './components/index.js';
 
@@ -79,7 +80,17 @@ export const activate: ActivationFunction = (ctx: RendererContext<unknown>) => {
     renderOutputItem(item: OutputItem, element: HTMLElement): void {
       try {
         const payload = item.json() as RunMimePayload;
-        element.innerHTML = renderRunMime(payload, ctx);
+        // PLAN-S5.0.2 §3.2 — provenance chip prepended above the run output
+        // when the cell carries `generated_by`. Renderers don't see cell
+        // metadata directly; the kernel mirrors the schema fields onto the
+        // span attributes (`llmnb.generated_by`, `llmnb.generated_at`,
+        // optional `llmnb.generator_text`) and/or the OutputItem metadata
+        // so the chip can render in the webview.
+        const provenance = extractProvenanceFromOutputItem(item, payload);
+        const chipHtml = provenance
+          ? renderProvenanceChip(provenance)
+          : '';
+        element.innerHTML = chipHtml + renderRunMime(payload, ctx);
         installDelegatedHandlers(element, ctx);
       } catch (err) {
         element.textContent = `[run-renderer] failed to render: ${String(err)}`;
@@ -87,6 +98,71 @@ export const activate: ActivationFunction = (ctx: RendererContext<unknown>) => {
     }
   };
 };
+
+/** Extract provenance fields for the chip from the run-MIME payload's span
+ *  attributes, falling back to the OutputItem's per-output metadata. The
+ *  kernel handler may surface the fields on either side; we accept both
+ *  for forward compatibility. Returns `undefined` when neither path
+ *  carries a `generated_by`. */
+function extractProvenanceFromOutputItem(
+  item: OutputItem,
+  payload: RunMimePayload
+): {
+  cellId: string;
+  generatedBy: string;
+  generatedAt: string | null;
+  generatorMagicText: string | null;
+} | undefined {
+  // 1) Span attributes (preferred — flows through the same MIME payload as
+  //    the run record itself, no separate metadata channel needed).
+  let generatedBy = '';
+  let generatedAt: string | null = null;
+  let generatorText: string | null = null;
+  let cellId = '';
+  if (payload && typeof payload === 'object' && 'attributes' in payload) {
+    const attrs = (payload as { attributes?: OtlpAttribute[] }).attributes;
+    generatedBy = getStringAttr(attrs, 'llmnb.generated_by', '') ?? '';
+    const at = getStringAttr(attrs, 'llmnb.generated_at', '');
+    generatedAt = typeof at === 'string' && at.length > 0 ? at : null;
+    const gt = getStringAttr(attrs, 'llmnb.generator_text', '');
+    generatorText = typeof gt === 'string' && gt.length > 0 ? gt : null;
+    cellId = getStringAttr(attrs, 'llmnb.cell_id', '') ?? '';
+  }
+  // 2) OutputItem metadata fallback. The kernel may instead attach the
+  //    fields to `cell.outputs[*].metadata.rts` so the renderer picks
+  //    them up without polluting the OTLP attribute namespace.
+  if (!generatedBy) {
+    const meta = item.metadata as { rts?: Record<string, unknown> } | undefined;
+    const rts = meta?.rts;
+    if (rts && typeof rts === 'object') {
+      const gb = (rts as { generated_by?: unknown }).generated_by;
+      const ga = (rts as { generated_at?: unknown }).generated_at;
+      const gt = (rts as { generator_text?: unknown }).generator_text;
+      const cid = (rts as { cell_id?: unknown }).cell_id;
+      if (typeof gb === 'string' && gb.length > 0) {
+        generatedBy = gb;
+      }
+      if (typeof ga === 'string' && ga.length > 0) {
+        generatedAt = ga;
+      }
+      if (typeof gt === 'string' && gt.length > 0) {
+        generatorText = gt;
+      }
+      if (typeof cid === 'string' && cid.length > 0) {
+        cellId = cid;
+      }
+    }
+  }
+  if (generatedBy.length === 0) {
+    return undefined;
+  }
+  return {
+    cellId,
+    generatedBy,
+    generatedAt,
+    generatorMagicText: generatorText
+  };
+}
 
 /** Inject the renderer stylesheet once per webview. */
 function ensureStylesInjected(): void {
@@ -214,6 +290,21 @@ function installDelegatedHandlers(
   element.addEventListener('click', (ev: MouseEvent) => {
     const t = ev.target;
     if (!(t instanceof HTMLElement)) return;
+    // PLAN-S5.0.2 §3.2 — provenance chip click → llmnb.revealCell. Resolved
+    // BEFORE the toggle/action dispatch below so the chip can short-circuit
+    // (it has no toggle/action attributes; the early return is purely a
+    // dispatch-ordering nicety).
+    const owningReveal = t.closest('[data-rts-reveal-cell]') as HTMLElement | null;
+    if (owningReveal) {
+      const cellId = owningReveal.getAttribute('data-rts-reveal-cell');
+      if (cellId && cellId.length > 0 && typeof ctx.postMessage === 'function') {
+        ctx.postMessage({
+          type: 'command.invoke',
+          payload: { command: 'llmnb.revealCell', args: { cellId } }
+        });
+      }
+      return;
+    }
     // The agent_emit toggle uses both data-rts-action and data-rts-toggle so
     // either click path fires the body show/hide. Resolve the toggle first.
     const owningToggle = t.closest('[data-rts-toggle]') as HTMLElement | null;

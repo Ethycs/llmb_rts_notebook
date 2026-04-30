@@ -82,6 +82,7 @@ import {
   registerPinStatusHeaderCommand
 } from './notebook/pin-status-header.js';
 import { registerResetContaminationCommand } from './notebook/commands/reset-contamination.js';
+import { registerRevealCellCommand } from './notebook/commands/reveal-cell.js';
 
 const NOTEBOOK_TYPE = 'llmnb';
 
@@ -446,6 +447,37 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
   // Single dedicated entry point that flips the contamination flag false;
   // K3F refuses every other code path that tries to clear it.
   context.subscriptions.push(registerResetContaminationCommand(router));
+
+  // PLAN-S5.0.2 §3.2 — `llmnb.revealCell` jump-to-source command. Driven by
+  // the provenance chip click in the run-renderer; resolves the target
+  // cellId against the active llmnb notebook editor and scrolls + flashes.
+  context.subscriptions.push(registerRevealCellCommand(NOTEBOOK_TYPE));
+
+  // PLAN-S5.0.2 §3.2 — bridge renderer `command.invoke` postMessages into
+  // VS Code commands. The provenance chip's click handler emits
+  //   {type: "command.invoke", payload: {command, args}}
+  // which lands here; we forward to vscode.commands.executeCommand. Other
+  // command names land in the same path so future renderer-driven
+  // commands don't need a separate registration.
+  const rendererMessaging = vscode.notebooks.createRendererMessaging('llmnb-run-renderer');
+  context.subscriptions.push(
+    rendererMessaging.onDidReceiveMessage((event: { message: unknown }) => {
+      const msg = event.message as
+        | { type?: string; payload?: { command?: string; args?: unknown } }
+        | undefined;
+      if (!msg || msg.type !== 'command.invoke' || !msg.payload) return;
+      const cmd = msg.payload.command;
+      if (typeof cmd !== 'string' || cmd.length === 0) return;
+      // Allow-list — only renderer-safe commands. Add to this list as more
+      // chip-style click handlers are introduced.
+      const ALLOWED = new Set(['llmnb.revealCell']);
+      if (!ALLOWED.has(cmd)) {
+        logger.warn(`[llmnb] renderer requested disallowed command: ${cmd}`);
+        return;
+      }
+      void vscode.commands.executeCommand(cmd, msg.payload.args);
+    })
+  );
 
   // PLAN-S5.0.1 §3.8 — pin-status header. See pin-status-header.ts for the
   // mount-choice rationale (status-bar item scoped to the active llmnb
