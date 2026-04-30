@@ -164,11 +164,21 @@ def boot_minimal_kernel(
     from llm_kernel.run_tracker import RunTracker
 
     if transport == "tcp":
-        from llm_client.transport.tcp import connect as _tcp_connect  # noqa: F401
-        raise NotImplementedError(
-            "TCP transport ships in S5.0.3d. "
-            "Use transport='pty' for in-process mode."
-        )
+        # Out-of-process external-driver path: boot_minimal_kernel
+        # delegates to llm_client.transport.tcp.connect, which performs
+        # the handshake against an already-running ``llm_kernel serve``
+        # process. boot_minimal_kernel's ``proxy``/``work_dir``/MagicMock
+        # scaffolding is irrelevant on this branch -- the kernel runs
+        # remotely and supplies its own internals.
+        if not bind:
+            raise ValueError("transport='tcp' requires bind=HOST:PORT")
+        if not auth_token:
+            raise ValueError(
+                "transport='tcp' requires auth_token "
+                "(typically os.environ['LLMNB_AUTH_TOKEN'])"
+            )
+        from llm_client.transport.tcp import connect as _tcp_connect
+        return _tcp_connect(bind=bind, token=auth_token)
 
     session_id = str(_uuid.uuid4())
     kernel = make_mock_kernel()
@@ -219,3 +229,71 @@ def boot_minimal_kernel(
         tracker=tracker,
         server=server,
     )
+
+
+# ---------------------------------------------------------------------------
+# Clean external-driver entry point (PLAN-S5.0.3d).
+#
+# ``connect_to_kernel`` is the public path drivers running in a separate
+# process from the kernel use. It does NOT use the in-process MagicMock
+# scaffolding; it just opens the transport, performs handshake, and
+# returns a KernelConnection backed by a real socket.
+#
+# Use this from:
+#   - ``llmnb execute`` against a kernel started via ``llmnb serve``
+#   - external Rust/Go orchestrators (via the JSON envelope contract)
+#   - integration tests that boot a kernel as a subprocess
+#
+# Use ``boot_minimal_kernel`` instead from:
+#   - in-process smokes (``agent-supervisor-smoke``, etc.)
+#   - tests that need to introspect run_tracker / dispatcher state
+# ---------------------------------------------------------------------------
+
+
+def connect_to_kernel(
+    bind: str,
+    *,
+    token: str,
+    transport: Literal["tcp"] = "tcp",
+    timeout: float = 30.0,
+) -> KernelConnection:
+    """Connect to a remote kernel over a transport. Clean external entry.
+
+    Unlike :func:`boot_minimal_kernel`, this does NOT scaffold a
+    MagicMock kernel or start a proxy server in-process. The kernel is
+    expected to be already running (``python -m llm_kernel serve ...``).
+    The driver opens the transport, performs the handshake, and returns
+    a connection ready for ``ship_envelope``.
+
+    Parameters
+    ----------
+    bind:
+        Address. ``HOST:PORT`` or ``tcp://HOST:PORT`` for TCP.
+    token:
+        Bearer token (TCP). Source from ``os.environ[LLMNB_AUTH_TOKEN]``
+        or ``.env`` -- never argv (leaks via ``ps``).
+    transport:
+        Currently only ``"tcp"``. Unix-socket support is queued.
+    timeout:
+        Connect + handshake budget in seconds.
+
+    Returns
+    -------
+    KernelConnection
+        Real socket-backed handle. Caller MUST call ``.close()``.
+
+    Raises
+    ------
+    TcpHandshakeError (and subclasses):
+        Handshake-level failure -- token wrong, version mismatch, busy.
+    ConnectionRefusedError:
+        Kernel not listening at ``bind``.
+
+    See Also
+    --------
+    boot_minimal_kernel : in-process boot for smokes and tests.
+    """
+    if transport == "tcp":
+        from llm_client.transport.tcp import connect as _tcp_connect
+        return _tcp_connect(bind=bind, token=token, timeout=timeout)
+    raise ValueError(f"unsupported transport for connect_to_kernel: {transport!r}")

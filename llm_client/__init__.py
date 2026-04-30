@@ -21,7 +21,7 @@ Lint contract (PLAN-S5.0.3 §3.3 + S5.0.3c amendment):
     in-process kernel internals are imported. Isolated here intentionally.
 """
 
-from .boot import boot_minimal_kernel, KernelConnection
+from .boot import boot_minimal_kernel, connect_to_kernel, KernelConnection
 from .driver import ship_envelope, collect_snapshots
 from .executor import run_notebook, ExecutionResult
 from .notebook import (
@@ -33,6 +33,7 @@ from .notebook import (
 
 __all__ = [
     "boot_minimal_kernel",
+    "connect_to_kernel",
     "KernelConnection",
     "ship_envelope",
     "collect_snapshots",
