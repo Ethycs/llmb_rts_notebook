@@ -195,7 +195,12 @@ export type OperatorActionType =
   | 'approval_response'
   | 'dismiss_notification'
   | 'drift_acknowledged'
-  | 'agent_interrupt';
+  | 'agent_interrupt'
+  // PLAN-S5.0.1 §3.10/§3.11 — operator-only intents added by S5.0.1d.
+  // `reset_contamination` is the explicit clear path for the per-cell
+  // contamination flag (the only path that flips it false; see §3.10
+  // "Contaminated-cell freeze" and the K3F refusal contract).
+  | 'reset_contamination';
 
 export interface OperatorActionPayload {
   action_type: OperatorActionType;
