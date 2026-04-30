@@ -1,6 +1,6 @@
 # Magic
 
-**Status**: V1 shipped (cell-magic vocabulary, S5.0 commit `336a6c7` / submodule `e6620db`)
+**Status**: V1.5 shipped (cell-magic vocabulary S5.0 + injection defense S5.0.1, submodule `aaab372` / outer `13eda07`)
 **Source specs**: [BSP-005 §S5.0](../../notebook/BSP-005-cell-roadmap.md), [PLAN-S5.0-cell-magic-vocabulary.md §3](../../notebook/PLAN-S5.0-cell-magic-vocabulary.md#3-concrete-work), [PLAN-S5.0-cell-magic-vocabulary.md §4](../../notebook/PLAN-S5.0-cell-magic-vocabulary.md#4-interface-contracts), [KB-notebook-target.md §13](../../notebook/KB-notebook-target.md#13-cell-discipline-zachtronics-not-general-asm) (the design doctrine this operationalizes)
 **Related atoms**: [cell](cell.md), [cell-kinds](cell-kinds.md), [operations/parse-cell](../operations/parse-cell.md), [operations/split-at-breaks](../operations/split-at-breaks.md), [protocols/operator-action](../protocols/operator-action.md), [discipline/text-as-canonical](../discipline/text-as-canonical.md), [discipline/zachtronics](../discipline/zachtronics.md), [discipline/certified-magic-emitter](../discipline/certified-magic-emitter.md)
 

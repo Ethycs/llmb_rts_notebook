@@ -194,7 +194,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/a9/5b/9b92f54c784c26e2a422e55a8d2607ab15b7ea3349e28359282f84f01d43/yarl-1.23.0-cp314-cp314-win_amd64.whl
       - pypi: https://files.pythonhosted.org/packages/08/8a/0861bec20485572fbddf3dfba2910e38fe249796cb73ecdeb74e07eeb8d3/zipp-3.23.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/3a/43/241f9615bcf8ba8903b3f0432da069e857fc4fd1783bd26183db53c4804b/zstandard-0.25.0-cp314-cp314-win_amd64.whl
-      - pypi: C:/Users/Qeyto/Documents/GitHub/llmb_rts_notebook/vendor/LLMKernel
+      - pypi: ./vendor/LLMKernel
 packages:
 - pypi: https://files.pythonhosted.org/packages/0f/15/5bf3b99495fb160b63f95972b81750f18f7f4e02ad051373b669d17d44f2/aiohappyeyeballs-2.6.1-py3-none-any.whl
   name: aiohappyeyeballs
@@ -1372,10 +1372,10 @@ packages:
   - aurelio-sdk==0.0.19 ; python_full_version < '3.14' and extra == 'semantic-router'
   - numpydoc==1.8.0 ; extra == 'utils'
   requires_python: '>=3.10,<3.14'
-- pypi: C:/Users/Qeyto/Documents/GitHub/llmb_rts_notebook/vendor/LLMKernel
+- pypi: ./vendor/LLMKernel
   name: llm-kernel
   version: 0.1.0
-  sha256: a92a7805826f23ce2e00bc576fd8e44579181978cbab57e3fb4550477ea53184
+  sha256: 56f4ca58a524a4fe986e706fd5eef75a5515e2210058062d59423e33ad92e079
   requires_dist:
   - ipykernel>=6.0.0
   - ipython>=7.0.0
