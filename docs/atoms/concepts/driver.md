@@ -67,6 +67,36 @@ Pre-S5.0.3, every smoke and one-off automation imported kernel internals because
      Live mode V1: boots kernel + ships hydrate then raises NotImplementedError
      citing S5.0.3d. Source commit: <TBD-after-commit>. Status NOT flipped. -->
 
+<!-- S5.0.3d ship note: TCP transport + handshake envelope shipped.
+     Files added: vendor/LLMKernel/llm_kernel/serve_mode.py (kernel-side
+     `serve` subcommand with TCP bind + bearer-token auth, constant-time
+     compare via hmac.compare_digest, one-connection-at-a-time,
+     handshake validation in _validate_handshake); families.py
+     HandshakeRequest/Response shapes filled in (replacing the S5.0.3a
+     stubs); wire/schemas/handshake.{request,response}.json regenerated.
+     Outer: llm_client/transport/tcp.py implemented (handshake client +
+     TcpHandshakeError taxonomy: TcpAuthFailedError, TcpVersionMismatchError,
+     TcpKernelBusyError); llm_client/boot.py grew connect_to_kernel(...)
+     as the clean external-driver entry point (no MagicMock scaffolding;
+     opens the transport, performs handshake, returns KernelConnection);
+     llm_client/cli/serve.py launches `python -m llm_kernel serve` as a
+     subprocess (subprocess path keeps cli/serve.py inside the lint
+     boundary -- it does NOT import llm_kernel.serve_mode);
+     llm_client/cli/auth.py grew `verify` subcommand (presence + sha256[:8]
+     hash, never the raw token). RFC-006 bumped to v2.1.0 with new
+     "Transports" section + handshake spec; RFC-008 bumped to v1.0.1
+     with "Other transports" cross-reference. New tests:
+     test_handshake_envelope.py (12 cases, kernel-side validator),
+     test_tcp_transport.py (subprocess kernel boot, marked
+     @pytest.mark.integration), test_one_connection_at_a_time.py
+     (kernel_busy + reconnect-after-disconnect), test_auth_token_storage.py
+     (init/verify/refuse-tracked/custom-name/env-precedence), and
+     vendor/LLMKernel/tests/test_serve_subcommand.py (argv parsing).
+     Source commit: <TBD-after-commit>. Status: this slice flips
+     wire-handshake + transport-mode atoms to V1.5 shipped. -->
+
+`connect_to_kernel(bind, token=..., transport="tcp")` is the **clean external-driver entry point** that ships with this slice. Unlike `boot_minimal_kernel` (which uses MagicMock scaffolding for in-process smokes), `connect_to_kernel` opens a real socket, performs the handshake, and returns a `KernelConnection` backed by the transport. Drivers running in a separate process from the kernel (the headless `llmnb execute` against a remote kernel; future Rust/Go orchestrators reading the JSON wire schemas) use this path. See [protocols/wire-handshake](../protocols/wire-handshake.md) for the envelope shape.
+
 ## See also
 
 - [discipline/wire-as-public-api](../discipline/wire-as-public-api.md) — the contract surface drivers consume.

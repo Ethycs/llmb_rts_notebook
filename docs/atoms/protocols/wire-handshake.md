@@ -1,6 +1,6 @@
 # Protocol: kernel.handshake envelope
 
-**Status**: V1.5 reserved (concept locked; slice queued as PLAN-S5.0.3, not yet dispatched)
+**Status**: V1.5 shipped (PLAN-S5.0.3d landed 2026-04-29; outer commit pin TBD-after-commit; submodule pin TBD-after-commit)
 **Family**: `kernel.handshake` — pre-family transport bring-up (precedes A/B/C/F/G framing)
 **Direction**: bidirectional, request-response — driver → kernel, then kernel → driver
 **Source specs**: [PLAN-S5.0.3 §4.3](../../notebook/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#43-handshake-envelope-new--first-envelope-on-any-connection), [PLAN-S5.0.3 §5.2](../../notebook/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#52-tcp-server) (TCP auth model), [PLAN-S5.0.3 §7.1](../../notebook/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#71-round-0-operator-30min) (RFC-006 v2.1.0 amendment), [RFC-006](../../rfcs/RFC-006-kernel-extension-wire-format.md), [RFC-008](../../rfcs/RFC-008-pty-transport.md)

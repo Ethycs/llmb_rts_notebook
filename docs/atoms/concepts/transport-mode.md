@@ -1,6 +1,6 @@
 # Transport mode
 
-**Status**: V1.5 reserved (PTY shipped; Unix socket V1.5; TCP queued in PLAN-S5.0.3d, not yet dispatched)
+**Status**: V1.5 shipped (PTY shipped in V1; TCP shipped in PLAN-S5.0.3d 2026-04-29; outer commit pin TBD-after-commit; submodule pin TBD-after-commit; Unix socket remains V1.5 partial — handshake/contract complete, transport adapter in V1)
 **Source specs**: [PLAN-S5.0.3 §5](../../notebook/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#5-external-transport-tcp--token), [PLAN-S5.0.3 §7.1](../../notebook/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#71-round-0-operator-30min) (RFC-008 v1.0.1 amendment noting TCP), [RFC-008 §"Transport boundary"](../../rfcs/RFC-008-pty-transport.md), [RFC-006](../../rfcs/RFC-006-kernel-extension-wire-format.md) (envelope contract is transport-invariant)
 **Related atoms**: [protocols/wire-handshake](../protocols/wire-handshake.md), [discipline/wire-as-public-api](../discipline/wire-as-public-api.md), [concepts/driver](../concepts/driver.md), [contracts/kernel-client](../contracts/kernel-client.md)
 
@@ -14,7 +14,7 @@ A **transport mode** is the connection mechanism between a [driver](driver.md) a
 |---|---|---|---|---|
 | **PTY** | Kernel spawned by extension/CLI as a child process | Implicit parent-child trust | V1 shipped (RFC-008) | `python -m llm_kernel pty-mode` |
 | **Unix socket** | Local same-user IPC; advertised at `~/.llmnb/runtime/<pid>.sock` (mode 0600); token in `<pid>.token` (mode 0600) | Filesystem perms + bearer token | V1.5 (PLAN-S5.0.3b/c) | `llmnb execute notebook.llmnb --connect unix:///tmp/llmnb-1234.sock` |
-| **TCP** | Remote or container-to-container | Bearer token via `LLMNB_AUTH_TOKEN` env (never argv) | V1.5 (PLAN-S5.0.3d, queued) | `llmnb execute … --connect tcp://kernel.host:7474 --token-env LLMNB_AUTH_TOKEN` |
+| **TCP** | Remote or container-to-container | Bearer token via `LLMNB_AUTH_TOKEN` env (never argv); constant-time compare (`hmac.compare_digest`); default-bind `127.0.0.1`; one-connection-at-a-time | V1.5 shipped (PLAN-S5.0.3d) | `python -m llm_kernel serve --transport tcp --bind 127.0.0.1:7474 --auth-token-env LLMNB_AUTH_TOKEN` |
 
 ## What's transport-specific vs envelope-invariant
 
