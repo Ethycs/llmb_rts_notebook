@@ -57,6 +57,27 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
             "notebook contains escalate-bearing cells."
         ),
     )
+    parser.add_argument(
+        "--cell-timeout",
+        type=float,
+        default=60.0,
+        help="Per-cell hard timeout in seconds (live mode). Default: 60.",
+    )
+    parser.add_argument(
+        "--quiescence-window",
+        type=float,
+        default=2.0,
+        help=(
+            "Seconds of empty kernel recv before considering a cell "
+            "complete in live mode. Default: 2.0."
+        ),
+    )
+    parser.add_argument(
+        "--total-timeout",
+        type=float,
+        default=600.0,
+        help="Overall live-run timeout in seconds. Default: 600.",
+    )
 
 
 def run(args: argparse.Namespace) -> int:
@@ -68,6 +89,9 @@ def run(args: argparse.Namespace) -> int:
             replay_recording=args.replay,
             record_to=args.record,
             unattended=args.unattended,
+            cell_timeout=args.cell_timeout,
+            quiescence_window=args.quiescence_window,
+            total_timeout=args.total_timeout,
         )
     except EscalationRequiresOperatorError as e:
         print(f"error: {e}", file=sys.stderr)

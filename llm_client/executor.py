@@ -340,30 +340,125 @@ def _run_replay_mode(
 # ---------------------------------------------------------------------------
 
 
+def _derive_cell_envelope(
+    cell_id: str,
+    record: dict[str, Any],
+    *,
+    session_id: str,
+    ordinal: int,
+) -> Optional[dict[str, Any]]:
+    """Derive a wire envelope for a cell, or ``None`` for no-op cell-kinds.
+
+    PLAN-S5.0.3.1 §3.B — per-cell envelope mapping (LOCKED).
+
+    Returns ``None`` for ``markdown`` / ``scratch`` / ``native`` / unknown
+    cell kinds (no envelope shipped; the cell is recorded as a structural
+    no-op success). Returns a Family A ``operator.action`` envelope for
+    ``agent`` / ``spawn`` cells per ``protocols/operator-action.md``.
+    """
+    kind = (record.get("kind") or "").lower()
+    text = record.get("text", "") or ""
+    agent_id = record.get("bound_agent_id")
+    request_id = f"{session_id}:{ordinal}"
+
+    if kind == "spawn":
+        # ``@@spawn <id>`` cell — body may carry task description.
+        # Extract a coarse ``task`` from the body (first non-empty line),
+        # mirroring the extension's cell-magic dispatcher behavior.
+        task = ""
+        for line in text.splitlines():
+            stripped = line.strip()
+            if stripped and not stripped.startswith("@@"):
+                task = stripped
+                break
+        return {
+            "type": "operator.action",
+            "request_id": request_id,
+            "payload": {
+                "action_type": "agent_spawn",
+                "parameters": {
+                    "agent_id": agent_id,
+                    "task": task,
+                    "cell_id": cell_id,
+                },
+                "originating_cell_id": cell_id,
+            },
+        }
+
+    if kind == "agent" and agent_id:
+        # Strip the leading ``@@agent <id>`` directive line, if present.
+        body_lines = text.splitlines()
+        if body_lines and body_lines[0].strip().startswith("@@agent"):
+            body_lines = body_lines[1:]
+        body = "\n".join(body_lines).strip() or text.strip()
+        return {
+            "type": "operator.action",
+            "request_id": request_id,
+            "payload": {
+                "action_type": "agent_continue",
+                "intent_kind": "send_user_turn",
+                "parameters": {
+                    "agent_id": agent_id,
+                    "text": body,
+                    "cell_id": cell_id,
+                },
+                "originating_cell_id": cell_id,
+            },
+        }
+
+    # markdown, scratch, native, or unknown -> no envelope (W4 tolerant).
+    return None
+
+
 def _run_live_mode(
     notebook: dict,
     path: Path,
     *,
     record_to: Optional[Path],
     unattended: bool,
+    cell_timeout: float = 60.0,
+    quiescence_window: float = 2.0,
+    total_timeout: float = 600.0,
+    connection: Optional[Any] = None,
 ) -> tuple[dict, list[dict], list[dict]]:
-    """V1 live-mode driver — boots a real kernel + ships hydrate envelope.
+    """V1 live-mode driver — per-cell ship-then-drain with quiescence.
 
-    Full operator-action drive (spawn, message, snapshot collection)
-    awaits the async recv path in S5.0.3d. V1 raises NotImplementedError
-    so a misconfigured CI doesn't silently no-op.
+    PLAN-S5.0.3.1 §3 (LOCKED). Boots a kernel via TCP-on-loopback by
+    default (Ambiguity 2 resolution: in-process recv has no event queue;
+    TCP loopback is the minimum-LoC path that keeps the lint boundary
+    intact). Tests inject a pre-built ``connection`` to bypass the boot.
+
+    Completion criterion (Ambiguity 1 resolution): the kernel does NOT
+    currently emit ``runtime_status: idle`` in Family F snapshots
+    (verified against ``vendor/LLMKernel/llm_kernel/agent_supervisor.py``
+    and ``metadata_writer.py`` — the only ``runtime_status`` references
+    are read-only resume gates). Live-mode therefore uses **quiescence-
+    only** completion: a cell is done when either a correlated
+    ``run.complete`` arrives, OR ``quiescence_window`` of empty recv
+    ticks elapses, OR ``cell_timeout`` is exceeded.
     """
-    # Booting the kernel still validates that the operator's environment
-    # is set up correctly (LiteLLM proxy starts, ANTHROPIC_API_KEY
-    # present), so we still attempt the boot before raising.
-    from llm_client import boot_minimal_kernel
-    conn = boot_minimal_kernel(proxy="litellm")
+    # Lazy import to keep the lint surface narrow for unit tests that
+    # never reach the boot path.
+    if connection is None:
+        # TCP-on-loopback path. Spin up `python -m llm_kernel serve`
+        # as a subprocess with `--proxy none` and connect via the
+        # already-shipped TCP transport. This keeps the driver/kernel
+        # lint boundary intact (no llm_kernel internals imported) and
+        # mirrors tests/test_tcp_transport.py.
+        conn = _boot_tcp_loopback_kernel()
+        owns_connection = True
+    else:
+        conn = connection
+        owns_connection = False
+
+    sent_received: list[dict] = []
+    succeeded: list[dict] = []
+    failed: list[dict] = []
+    interrupted = False
+
     try:
-        # Ship the hydrate envelope (Family F mode=hydrate). The
-        # dispatcher applies it to the writer; in V1 in-process mode
-        # there's no async response queue so we can't observe further
-        # snapshots from this driver-end.
-        rts = notebook.get("metadata", {}).get("rts", {})
+        # Initial Family F hydrate — same as V1's prior shape.
+        rts = notebook.get("metadata", {}).get("rts", {}) or {}
         hydrate_env = {
             "type": "notebook.metadata",
             "payload": {
@@ -372,14 +467,376 @@ def _run_live_mode(
                 "trigger": "executor.live",
             },
         }
-        conn.send(hydrate_env)
-    finally:
-        conn.close()
+        try:
+            conn.send(hydrate_env)
+        except Exception as exc:  # noqa: BLE001 — surface as transport-lost
+            return _live_transport_lost(
+                notebook, sent_received, str(exc), record_to,
+            )
 
-    raise NotImplementedError(
-        "Live-mode end-to-end ships in S5.0.3d (TCP transport with "
-        "async recv path). Use mode='stub' or mode='replay' for V1."
+        cells = rts.get("cells", {}) or {}
+        layout = rts.get("layout", {}) or {}
+        from llm_client.notebook import _layout_walk_ids
+        ordered_ids = _layout_walk_ids(layout.get("tree"))
+        for cid in cells:
+            if cid not in ordered_ids:
+                ordered_ids.append(cid)
+
+        working_rts: dict[str, Any] = rts
+        session_id = getattr(conn, "session_id", "live") or "live"
+        run_deadline = time.monotonic() + total_timeout
+
+        for ordinal, cid in enumerate(ordered_ids):
+            if time.monotonic() > run_deadline:
+                # Total run timeout exceeded — fail-fast remaining cells.
+                failed.append(_synthetic_k_envelope(
+                    cid, "K_CELL_TIMEOUT",
+                    f"total run timeout ({total_timeout}s) exceeded",
+                ))
+                continue
+
+            record = cells.get(cid)
+            if not isinstance(record, dict):
+                continue
+
+            envelope = _derive_cell_envelope(
+                cid, record, session_id=session_id, ordinal=ordinal,
+            )
+            if envelope is None:
+                # No-op cell-kind (markdown / scratch / native / unknown).
+                # Counted as succeeded with empty outputs to match stub-
+                # mode's degrade-to-noop behavior.
+                synth = {
+                    "type": "operator.action",
+                    "payload": {
+                        "kind": "run.complete",
+                        "status": "ok",
+                        "cell_id": cid,
+                        "ordinal": ordinal,
+                        "outputs": [],
+                    },
+                }
+                succeeded.append(synth)
+                if record_to is not None:
+                    sent_received.append({"sent": None, "received": synth})
+                continue
+
+            # Ship the envelope.
+            try:
+                conn.send(envelope)
+            except Exception as exc:  # noqa: BLE001
+                failed.append(_synthetic_k_envelope(
+                    cid, "K_TRANSPORT_LOST", str(exc),
+                ))
+                if record_to is not None:
+                    sent_received.append({
+                        "sent": envelope,
+                        "received": failed[-1],
+                    })
+                # Fail-fast remaining cells with the same code.
+                for remaining in ordered_ids[ordinal + 1:]:
+                    failed.append(_synthetic_k_envelope(
+                        remaining, "K_TRANSPORT_LOST", "connection closed",
+                    ))
+                break
+
+            # Per-cell ship-then-drain loop.
+            cell_deadline = time.monotonic() + cell_timeout
+            quiescence_start: Optional[float] = None
+            cell_completed = False
+            received_for_cell: Optional[dict] = None
+
+            while time.monotonic() < cell_deadline:
+                try:
+                    reply = conn.recv(timeout=0.1)
+                except KeyboardInterrupt:
+                    interrupted = True
+                    break
+                except Exception as exc:  # noqa: BLE001
+                    failed.append(_synthetic_k_envelope(
+                        cid, "K_TRANSPORT_LOST", str(exc),
+                    ))
+                    cell_completed = True
+                    break
+
+                if not reply:
+                    if quiescence_start is None:
+                        quiescence_start = time.monotonic()
+                    elif time.monotonic() - quiescence_start >= quiescence_window:
+                        # Quiescence-only completion (Ambiguity 1).
+                        cell_completed = True
+                        break
+                    continue
+
+                # Got an envelope — reset quiescence.
+                quiescence_start = None
+
+                msg_type = (
+                    reply.get("message_type")
+                    or reply.get("type", "")
+                )
+                payload = reply.get("payload") or {}
+
+                if msg_type == "notebook.metadata":
+                    snap = payload.get("snapshot")
+                    if isinstance(snap, dict):
+                        # PLAN §3.C: replace working state, no patch mode.
+                        working_rts = snap
+
+                # Correlate by request_id for clean per-cell completion.
+                reply_corr = (
+                    reply.get("correlation_id")
+                    or reply.get("request_id")
+                    or payload.get("correlation_id")
+                    or payload.get("request_id")
+                )
+                if reply_corr == envelope["request_id"]:
+                    received_for_cell = reply
+                    if payload.get("k_code"):
+                        failed.append(reply)
+                    else:
+                        succeeded.append(reply)
+                    cell_completed = True
+                    break
+
+                # K-class envelope keyed on cell_id (no correlation_id).
+                if (
+                    payload.get("k_code")
+                    and payload.get("cell_id") == cid
+                ):
+                    received_for_cell = reply
+                    failed.append(reply)
+                    cell_completed = True
+                    break
+
+            if interrupted:
+                if record_to is not None:
+                    sent_received.append({
+                        "sent": envelope,
+                        "received": received_for_cell,
+                    })
+                break
+
+            if not cell_completed:
+                # Cell-timeout exceeded.
+                fail_env = _synthetic_k_envelope(
+                    cid, "K_CELL_TIMEOUT",
+                    f"cell exceeded {cell_timeout}s budget",
+                )
+                failed.append(fail_env)
+                received_for_cell = fail_env
+            elif received_for_cell is None:
+                # Quiescence path — synthesize a success record so
+                # record_to has something to log; uses working_rts
+                # outputs for the cell if present.
+                cell_outputs: list[Any] = []
+                cell_record = working_rts.get("cells", {}).get(cid)
+                if isinstance(cell_record, dict):
+                    co = cell_record.get("outputs") or []
+                    if isinstance(co, list):
+                        cell_outputs = co
+                received_for_cell = {
+                    "type": "operator.action",
+                    "payload": {
+                        "kind": "run.complete",
+                        "status": "ok",
+                        "cell_id": cid,
+                        "ordinal": ordinal,
+                        "outputs": cell_outputs,
+                    },
+                }
+                succeeded.append(received_for_cell)
+
+            if record_to is not None:
+                sent_received.append({
+                    "sent": envelope,
+                    "received": received_for_cell,
+                })
+
+        # Trailing drain for `end_of_run` snapshot.
+        if not interrupted:
+            tail_deadline = time.monotonic() + quiescence_window
+            while time.monotonic() < tail_deadline:
+                try:
+                    reply = conn.recv(timeout=0.1)
+                except Exception:  # noqa: BLE001
+                    break
+                if not reply:
+                    continue
+                msg_type = (
+                    reply.get("message_type")
+                    or reply.get("type", "")
+                )
+                if msg_type == "notebook.metadata":
+                    snap = (reply.get("payload") or {}).get("snapshot")
+                    if isinstance(snap, dict):
+                        working_rts = snap
+
+        # Mirror per-cell outputs from working_rts back into the notebook.
+        nb_cells = notebook.get("metadata", {}).get("rts", {}).get("cells", {})
+        if isinstance(nb_cells, dict):
+            for cid, working_record in (working_rts.get("cells") or {}).items():
+                if not isinstance(working_record, dict):
+                    continue
+                nb_record = nb_cells.get(cid)
+                if not isinstance(nb_record, dict):
+                    continue
+                outputs = working_record.get("outputs")
+                if isinstance(outputs, list):
+                    nb_record["outputs"] = outputs
+
+        # Update the notebook's metadata.rts to the final working state
+        # (mirrors stub mode's behavior of treating the result as the
+        # source of truth for the on-disk file).
+        notebook.setdefault("metadata", {})["rts"] = working_rts
+
+    finally:
+        if owns_connection:
+            try:
+                conn.close()
+            except Exception:  # noqa: BLE001
+                pass
+
+    if record_to is not None:
+        record_to.parent.mkdir(parents=True, exist_ok=True)
+        with record_to.open("w", encoding="utf-8") as f:
+            for entry in sent_received:
+                f.write(json.dumps(entry, ensure_ascii=False, default=str) + "\n")
+
+    if interrupted:
+        raise KeyboardInterrupt()
+
+    return notebook, succeeded, failed
+
+
+def _synthetic_k_envelope(
+    cell_id: str, k_code: str, message: str,
+) -> dict[str, Any]:
+    """Build a synthetic K-class failure envelope for the given cell."""
+    return {
+        "type": "operator.action",
+        "payload": {
+            "kind": "run.complete",
+            "status": "error",
+            "cell_id": cell_id,
+            "k_code": k_code,
+            "message": message,
+            "outputs": [],
+        },
+    }
+
+
+def _live_transport_lost(
+    notebook: dict,
+    sent_received: list[dict],
+    message: str,
+    record_to: Optional[Path],
+) -> tuple[dict, list[dict], list[dict]]:
+    """Bail-out path: the initial hydrate ship failed."""
+    failed = [_synthetic_k_envelope("<hydrate>", "K_TRANSPORT_LOST", message)]
+    if record_to is not None:
+        record_to.parent.mkdir(parents=True, exist_ok=True)
+        with record_to.open("w", encoding="utf-8") as f:
+            for entry in sent_received:
+                f.write(json.dumps(entry, ensure_ascii=False, default=str) + "\n")
+    return notebook, [], failed
+
+
+def _boot_tcp_loopback_kernel():  # noqa: ANN202 — returns a duck-typed conn
+    """Spawn ``python -m llm_kernel serve`` on 127.0.0.1:0 and connect.
+
+    Returns a wrapper around the TCP ``KernelConnection`` that also
+    cleans up the kernel subprocess on ``.close()``.
+
+    Reuses the pattern from tests/test_tcp_transport.py — kernel-stderr
+    is drained by a daemon thread so the pipe never back-pressures the
+    serve loop. Auth token is randomly minted (never logged).
+    """
+    import os
+    import re
+    import secrets
+    import subprocess
+    import sys
+    import threading
+    import queue as _queue
+
+    from llm_client.transport.tcp import connect as tcp_connect
+
+    token = secrets.token_urlsafe(16)
+    env = dict(os.environ)
+    env["LLMNB_AUTH_TOKEN"] = token
+    env.setdefault("PYTHONPATH", os.pathsep.join(sys.path))
+
+    cmd = [
+        sys.executable, "-u", "-m", "llm_kernel", "serve",
+        "--transport", "tcp",
+        "--bind", "127.0.0.1:0",
+        "--auth-token-env", "LLMNB_AUTH_TOKEN",
+        "--proxy", os.environ.get("LLMNB_LIVE_PROXY", "litellm"),
+    ]
+    proc = subprocess.Popen(
+        cmd,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=env,
     )
+
+    listen_q: _queue.Queue[tuple[str, int]] = _queue.Queue(maxsize=1)
+    seen_listen = threading.Event()
+    listen_re = re.compile(r"listening on ([\d.]+):(\d+)")
+
+    def _drain_stderr() -> None:
+        try:
+            while True:
+                if proc.stderr is None:
+                    return
+                line = proc.stderr.readline()
+                if not line:
+                    return
+                if not seen_listen.is_set():
+                    match = listen_re.search(
+                        line.decode("utf-8", errors="replace"),
+                    )
+                    if match:
+                        listen_q.put((match.group(1), int(match.group(2))))
+                        seen_listen.set()
+        except Exception:
+            return
+
+    threading.Thread(target=_drain_stderr, daemon=True).start()
+
+    try:
+        host, port = listen_q.get(timeout=30.0)
+    except _queue.Empty:
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+        raise RuntimeError(
+            "kernel never reported a listening port within 30s"
+        ) from None
+
+    conn = tcp_connect(bind=f"{host}:{port}", token=token, timeout=10.0)
+
+    # Wrap close() so we also tear down the subprocess.
+    original_close = conn.close
+
+    def _wrapped_close() -> None:
+        try:
+            original_close()
+        finally:
+            try:
+                proc.terminate()
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+            except Exception:  # noqa: BLE001
+                pass
+
+    conn.close = _wrapped_close  # type: ignore[method-assign]
+    return conn
 
 
 # ---------------------------------------------------------------------------
@@ -395,6 +852,10 @@ def run_notebook(
     replay_recording: Optional[Path] = None,
     record_to: Optional[Path] = None,
     unattended: bool = False,
+    cell_timeout: float = 60.0,
+    quiescence_window: float = 2.0,
+    total_timeout: float = 600.0,
+    connection: Optional[Any] = None,
 ) -> ExecutionResult:
     """Boot a kernel, drive every cell, write outputs back. PLAN-S5.0.3 §9.
 
@@ -429,8 +890,6 @@ def run_notebook(
         Notebook has an escalate cell and ``unattended=False``.
     FileNotFoundError
         ``mode="replay"`` and the recording is missing.
-    NotImplementedError
-        ``mode="live"`` (V1 — full drive ships in S5.0.3d).
     """
     path = Path(path)
     notebook = _load_notebook(path)
@@ -460,7 +919,13 @@ def run_notebook(
         )
     elif mode == "live":
         notebook, succeeded, failed = _run_live_mode(
-            notebook, path, record_to=record_to, unattended=unattended,
+            notebook, path,
+            record_to=record_to,
+            unattended=unattended,
+            cell_timeout=cell_timeout,
+            quiescence_window=quiescence_window,
+            total_timeout=total_timeout,
+            connection=connection,
         )
     else:
         raise ValueError(f"unknown mode: {mode!r}")

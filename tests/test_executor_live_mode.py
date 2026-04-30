@@ -1,42 +1,83 @@
-"""
-tests/test_executor_live_mode.py — live-mode executor smoke (gated).
+"""tests/test_executor_live_mode.py — live-mode executor unit tests (S5.0.3.1).
 
-Live mode requires ANTHROPIC_API_KEY for the LiteLLM proxy boot. V1
-implementation raises NotImplementedError after booting (full drive
-ships in S5.0.3d). This test covers the boot path and the deferral
-message; it does NOT make real API calls.
+Per PLAN-S5.0.3.1 §5: 4 unit tests covering the per-cell envelope
+derivation. The integration test lives in
+``tests/test_executor_live_integration.py``.
 
-Skipped automatically when ANTHROPIC_API_KEY is missing.
+These tests target ``_derive_cell_envelope`` directly. They do NOT spin
+up a kernel; the per-cell envelope helper is a pure function.
 """
 
 from __future__ import annotations
 
-import os
-import shutil
-from pathlib import Path
-
-import pytest
+from llm_client.executor import _derive_cell_envelope
 
 
-FIXTURES = Path(__file__).parent / "fixtures"
-SPAWN_AND_NOTIFY = FIXTURES / "spawn-and-notify.magic"
+def test_derive_envelope_for_spawn_cell() -> None:
+    """`@@spawn` cells produce an `agent_spawn` operator-action."""
+    record = {
+        "kind": "spawn",
+        "text": "@@spawn alpha\nhello world\n",
+        "bound_agent_id": "alpha",
+    }
+    env = _derive_cell_envelope(
+        "cell-1", record, session_id="sess", ordinal=0,
+    )
+    assert env is not None
+    assert env["type"] == "operator.action"
+    assert env["request_id"] == "sess:0"
+    payload = env["payload"]
+    assert payload["action_type"] == "agent_spawn"
+    assert payload["parameters"]["agent_id"] == "alpha"
+    assert payload["parameters"]["cell_id"] == "cell-1"
+    # task is the first non-magic line.
+    assert payload["parameters"]["task"] == "hello world"
+    assert payload["originating_cell_id"] == "cell-1"
 
 
-@pytest.mark.skipif(
-    not os.environ.get("ANTHROPIC_API_KEY"),
-    reason="ANTHROPIC_API_KEY not set; live-mode boot test is gated.",
-)
-def test_live_mode_boot_then_defers(tmp_path: Path) -> None:
-    """Live mode boots the kernel + ships hydrate, then raises (V1 deferral).
+def test_derive_envelope_for_agent_cell() -> None:
+    """`@@agent` cells produce an `agent_continue` operator-action."""
+    record = {
+        "kind": "agent",
+        "text": "@@agent alpha\nWhat is 2+2?\n",
+        "bound_agent_id": "alpha",
+    }
+    env = _derive_cell_envelope(
+        "cell-2", record, session_id="sess", ordinal=3,
+    )
+    assert env is not None
+    assert env["request_id"] == "sess:3"
+    payload = env["payload"]
+    assert payload["action_type"] == "agent_continue"
+    assert payload["intent_kind"] == "send_user_turn"
+    assert payload["parameters"]["agent_id"] == "alpha"
+    assert payload["parameters"]["cell_id"] == "cell-2"
+    # The leading @@agent directive is stripped from the body.
+    assert payload["parameters"]["text"] == "What is 2+2?"
 
-    The deferral is the explicit S5.0.3d hand-off: until the async recv
-    path lands, live-mode end-to-end can't complete from the driver
-    side. The boot and hydrate-ship still happen so a misconfigured
-    API key surfaces immediately.
-    """
-    from llm_client import run_notebook
 
-    src = tmp_path / "in.magic"
-    shutil.copy(SPAWN_AND_NOTIFY, src)
-    with pytest.raises(NotImplementedError, match="S5.0.3d"):
-        run_notebook(src, output=tmp_path / "out.llmnb", mode="live")
+def test_derive_envelope_for_scratch_and_markdown_returns_none() -> None:
+    """`scratch` / `markdown` / `native` cells ship no envelope (no-op)."""
+    for kind in ("scratch", "markdown", "native"):
+        record = {"kind": kind, "text": "anything", "bound_agent_id": None}
+        env = _derive_cell_envelope(
+            "c", record, session_id="s", ordinal=0,
+        )
+        assert env is None, f"{kind!r} should be a no-op cell"
+
+
+def test_derive_envelope_for_unknown_kind_returns_none() -> None:
+    """Unknown / agent-without-binding cells ship no envelope (W4 tolerant)."""
+    # Unknown kind.
+    env = _derive_cell_envelope(
+        "c1", {"kind": "synthetic", "text": "x", "bound_agent_id": None},
+        session_id="s", ordinal=0,
+    )
+    assert env is None
+
+    # agent kind without a bound agent_id (defensive).
+    env2 = _derive_cell_envelope(
+        "c2", {"kind": "agent", "text": "x", "bound_agent_id": None},
+        session_id="s", ordinal=0,
+    )
+    assert env2 is None
