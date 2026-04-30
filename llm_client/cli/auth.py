@@ -10,6 +10,7 @@ provisions it.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import os
 import secrets
 import subprocess
@@ -36,6 +37,22 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
         "--force",
         action="store_true",
         help="Overwrite an existing entry without prompting.",
+    )
+
+    verify = sub.add_parser(
+        "verify",
+        help="Check that LLMNB_AUTH_TOKEN is present (does not echo the token).",
+    )
+    verify.add_argument(
+        "--token-name",
+        default="LLMNB_AUTH_TOKEN",
+        help="Environment variable name (default LLMNB_AUTH_TOKEN).",
+    )
+    verify.add_argument(
+        "--env-file",
+        type=Path,
+        default=Path(".env"),
+        help="Target .env file (default ./.env).",
     )
 
 
@@ -123,8 +140,48 @@ def _do_init(args: argparse.Namespace) -> int:
     return 0
 
 
+def _read_token_from_env_file(env_path: Path, name: str) -> str | None:
+    """Best-effort read of ``NAME=...`` from a dotenv-style file."""
+    if not env_path.exists():
+        return None
+    for line in env_path.read_text(encoding="utf-8", errors="replace").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith(f"{name}="):
+            return line.split("=", 1)[1].strip().strip('"').strip("'")
+    return None
+
+
+def _do_verify(args: argparse.Namespace) -> int:
+    """Print whether the token is reachable, without echoing the value.
+
+    Resolution order: process env first (so a CI override is honoured),
+    then ``--env-file``. Outputs an 8-char hex prefix of sha256(token)
+    so operators can tell whether two environments hold the same token
+    without ever exposing the secret itself.
+    """
+    name: str = args.token_name
+    env_path: Path = args.env_file
+
+    token = os.environ.get(name)
+    source = "environment"
+    if not token:
+        token = _read_token_from_env_file(env_path, name)
+        source = str(env_path) if token else "(missing)"
+    if not token:
+        print(f"{name}: missing (looked in environment and {env_path})")
+        return 2
+
+    digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    print(f"{name}: present (source={source}, sha256[:8]={digest[:8]})")
+    return 0
+
+
 def run(args: argparse.Namespace) -> int:
     if args.auth_action == "init":
         return _do_init(args)
+    if args.auth_action == "verify":
+        return _do_verify(args)
     print(f"error: unknown auth action {args.auth_action!r}", file=sys.stderr)
     return 2
