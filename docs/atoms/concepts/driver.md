@@ -51,6 +51,22 @@ Pre-S5.0.3, every smoke and one-off automation imported kernel internals because
 
 <!-- S5.0.3b ship note: llm_client/ package created; boot_minimal_kernel + KernelConnection in llm_client/boot.py; ship_envelope + collect_snapshots in llm_client/driver.py; transport stubs in llm_client/transport/; _run_agent_supervisor_smoke refactored to consume boot_minimal_kernel; lint boundary enforced by tests/test_lint_boundary.py. Source commit: <TBD-after-commit>. Status NOT flipped — awaiting S5.0.3c/d/e. -->
 
+<!-- S5.0.3c ship note: executor + format converters + CLI subcommands shipped.
+     Files added: llm_client/executor.py (run_notebook + ExecutionResult,
+     EscalationRequiresOperatorError, ReplayMismatchError); llm_client/notebook.py
+     (detect_format / llmnb_to_magic / magic_to_llmnb / ipynb_to_llmnb);
+     llm_client/stubs/__init__.py + canned spawn_alpha.json/scratch_noop.json;
+     llm_client/cli/__main__.py dispatcher with execute/convert/validate/
+     smoke/auth/serve subcommands. Lint boundary widened to allow
+     llm_kernel.cell_text imports (parse_cell + split_at_breaks are pure
+     stdlib-only public symbols; duplicating ~530 LoC was the rejected
+     alternative). PLAN §10 risk #7 unattended flag is required-explicit
+     (default False raises EscalationRequiresOperatorError on escalate
+     cells; True auto-rejects). Stub mode is deterministic (10x byte-
+     identical); replay mode records verbatim and matches by ordinal+cell_id.
+     Live mode V1: boots kernel + ships hydrate then raises NotImplementedError
+     citing S5.0.3d. Source commit: <TBD-after-commit>. Status NOT flipped. -->
+
 ## See also
 
 - [discipline/wire-as-public-api](../discipline/wire-as-public-api.md) — the contract surface drivers consume.

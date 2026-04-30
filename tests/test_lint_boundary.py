@@ -32,8 +32,18 @@ EXEMPT_PATTERNS: list[str] = [
     "boot.py",         # designated in-process crossing-point (V1)
 ]
 
-# Regex: matches any llm_kernel import that is NOT llm_kernel.wire[...].
-_FORBIDDEN = re.compile(r"llm_kernel\.(?!wire(\.|$))")
+# Allow-list of llm_kernel public submodules importable by llm_client/.
+# Per PLAN-S5.0.3 §3.3 the canonical public surface is `llm_kernel.wire`.
+# `llm_kernel.cell_text` is added (S5.0.3c) because it is a pure
+# stdlib-only parser (BSP-005 §S5.0) whose `parse_cell` and
+# `split_at_breaks` are explicitly the public splitter+parser; reusing
+# them in `llm_client.notebook` avoids duplicating ~530 LoC and the
+# silent-drift hazard that duplication would create. Adding new
+# allow-list entries requires an explicit decision here.
+_ALLOWED_KERNEL_PUBLIC: tuple[str, ...] = ("wire", "cell_text")
+_alt = "|".join(_ALLOWED_KERNEL_PUBLIC)
+# Regex: matches any llm_kernel import not in the allow-list.
+_FORBIDDEN = re.compile(rf"llm_kernel\.(?!({_alt})(\.|$))")
 
 
 def _is_exempt(rel: Path) -> bool:
