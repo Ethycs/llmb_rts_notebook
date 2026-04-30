@@ -83,6 +83,16 @@
         "command": "llmnb.interruptCell",
         "title": "LLMNB: Interrupt agent for this cell",
         "category": "LLMNB"
+      },
+      {
+        "command": "llmnb.resetContamination",
+        "title": "LLMNB: Reset contamination on this cell",
+        "category": "LLMNB"
+      },
+      {
+        "command": "llmnb.pinStatusHeader.openMenu",
+        "title": "LLMNB: Pin status — open menu",
+        "category": "LLMNB"
       }
     ],
     "configuration": {

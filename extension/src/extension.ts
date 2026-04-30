@@ -72,6 +72,16 @@ import {
   postAgentInterrupt,
   type InterruptCommandArgs
 } from './notebook/interrupt-button.js';
+import {
+  ContaminationRegistry,
+  ContaminationBadgeStatusBarProvider
+} from './notebook/contamination-badge.js';
+import {
+  PinStatusRegistry,
+  PinStatusHeaderHost,
+  registerPinStatusHeaderCommand
+} from './notebook/pin-status-header.js';
+import { registerResetContaminationCommand } from './notebook/commands/reset-contamination.js';
 
 const NOTEBOOK_TYPE = 'llmnb';
 
@@ -89,6 +99,10 @@ let activeBadgeProvider: CellBadgeStatusBarProvider | undefined;
 let activeGutterManager: GutterColorManager | undefined;
 let activeInterruptProvider: InterruptButtonStatusBarProvider | undefined;
 let activeInterruptOverrides: LocalOverrideStore | undefined;
+let activeContaminationRegistry: ContaminationRegistry | undefined;
+let activeContaminationProvider: ContaminationBadgeStatusBarProvider | undefined;
+let activePinStatusRegistry: PinStatusRegistry | undefined;
+let activePinStatusHeader: PinStatusHeaderHost | undefined;
 
 // Diagnostic ring buffers — populated only when LLMNB_E2E_VERBOSE === '1'.
 // Tests subscribe via the ExtensionApi accessors; production builds zero
@@ -412,6 +426,40 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
     })
   );
 
+  // PLAN-S5.0.1 §3.8 — contamination badge + pin-status header (S5.0.1d).
+  // Both registries consume notebook.metadata snapshots (Family F) so chip
+  // visibility flips when the kernel mutates `cells[<id>].contaminated` or
+  // `config.magic_hash_enabled` / `config.magic_pin_fingerprint`.
+  const contaminationRegistry = new ContaminationRegistry();
+  activeContaminationRegistry = contaminationRegistry;
+  context.subscriptions.push({ dispose: () => contaminationRegistry.dispose() });
+  context.subscriptions.push(router.registerMetadataObserver(contaminationRegistry));
+
+  const contaminationProvider = new ContaminationBadgeStatusBarProvider(contaminationRegistry);
+  activeContaminationProvider = contaminationProvider;
+  context.subscriptions.push({ dispose: () => contaminationProvider.dispose() });
+  context.subscriptions.push(
+    vscode.notebooks.registerNotebookCellStatusBarItemProvider(NOTEBOOK_TYPE, contaminationProvider)
+  );
+
+  // PLAN-S5.0.1 §3.8 — `llmnb.resetContamination` operator-action command.
+  // Single dedicated entry point that flips the contamination flag false;
+  // K3F refuses every other code path that tries to clear it.
+  context.subscriptions.push(registerResetContaminationCommand(router));
+
+  // PLAN-S5.0.1 §3.8 — pin-status header. See pin-status-header.ts for the
+  // mount-choice rationale (status-bar item scoped to the active llmnb
+  // editor; VS Code v1.92 does not expose a notebook-toolbar slot).
+  const pinStatusRegistry = new PinStatusRegistry();
+  activePinStatusRegistry = pinStatusRegistry;
+  context.subscriptions.push({ dispose: () => pinStatusRegistry.dispose() });
+  context.subscriptions.push(router.registerMetadataObserver(pinStatusRegistry));
+
+  const pinStatusHeader = new PinStatusHeaderHost(NOTEBOOK_TYPE, pinStatusRegistry);
+  activePinStatusHeader = pinStatusHeader;
+  context.subscriptions.push({ dispose: () => pinStatusHeader.dispose() });
+  context.subscriptions.push(registerPinStatusHeaderCommand(pinStatusRegistry, NOTEBOOK_TYPE));
+
   // RFC-005 §"metadata.rts.blobs" — instantiate a per-session BlobResolver so
   // renderers can resolve `$blob:sha256:` sentinels in attribute values. The
   // table refreshes whenever a notebook.metadata snapshot lands; the loader
@@ -561,6 +609,10 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
     getGutterColorManager: () => activeGutterManager,
     getInterruptButtonProvider: () => activeInterruptProvider,
     getInterruptOverrideStore: () => activeInterruptOverrides,
+    getContaminationRegistry: () => activeContaminationRegistry,
+    getContaminationBadgeProvider: () => activeContaminationProvider,
+    getPinStatusRegistry: () => activePinStatusRegistry,
+    getPinStatusHeader: () => activePinStatusHeader,
     getRecentPtyBytes: () => ptyByteRing.join(''),
     getRecentLogRecords: () => [...logRecordRing],
     getRecentFrames: () => [...frameRing],
@@ -593,6 +645,10 @@ export function deactivate(): void {
   activeGutterManager = undefined;
   activeInterruptProvider = undefined;
   activeInterruptOverrides = undefined;
+  activeContaminationRegistry = undefined;
+  activeContaminationProvider = undefined;
+  activePinStatusRegistry = undefined;
+  activePinStatusHeader = undefined;
 }
 
 /** Load PtyKernelClient connection settings from VS Code configuration.
@@ -654,6 +710,14 @@ export interface ExtensionApi {
   getInterruptButtonProvider(): InterruptButtonStatusBarProvider | undefined;
   /** BSP-005 S9 — optimistic-override store powering the post-click hide. */
   getInterruptOverrideStore(): LocalOverrideStore | undefined;
+  /** PLAN-S5.0.1 §3.8 — per-cell contamination registry (Family F). */
+  getContaminationRegistry(): ContaminationRegistry | undefined;
+  /** PLAN-S5.0.1 §3.8 — contamination badge status-bar provider. */
+  getContaminationBadgeProvider(): ContaminationBadgeStatusBarProvider | undefined;
+  /** PLAN-S5.0.1 §3.8 — pin-status registry (Family F config slot). */
+  getPinStatusRegistry(): PinStatusRegistry | undefined;
+  /** PLAN-S5.0.1 §3.8 — pin-status header (status-bar item host). */
+  getPinStatusHeader(): PinStatusHeaderHost | undefined;
   // Diagnostic surfaces — populated only when LLMNB_E2E_VERBOSE === '1'.
   // Tests subscribe to introspect what the extension actually saw when
   // a Tier 4 e2e run fails. See Testing.md §6.
