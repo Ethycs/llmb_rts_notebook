@@ -78,7 +78,7 @@ Value forms in named args:
 | K33 | `unclosed_cell_at_file_end` — warning; serializer auto-closes |
 | K34 | `incompatible_kind_change` — `@mark <new_kind>` whose target is unknown / body-incompatible |
 
-K35 (plain magic in hash mode) is queued for [PLAN-S5.0.1](../../notebook/PLAN-S5.0.1-cell-magic-injection-defense.md); not yet shipped.
+K35 (plain magic in hash mode) is queued for [PLAN-S5.0.1](../../notebook/PLAN-S5.0.1-cell-magic-injection-defense.md); not yet shipped. Hash-mode primitives + emission ban land in S5.0.1a; see PLAN-S5.0.1 §3.1-3.4.
 
 ## Invariants
 
