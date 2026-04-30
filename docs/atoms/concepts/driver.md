@@ -49,6 +49,8 @@ V2+ candidates: a Rust orchestrator over TCP; a Jupyter ZMQ shim driver wrapping
 
 Pre-S5.0.3, every smoke and one-off automation imported kernel internals because there was no other path. Each new driver path multiplied the "almost-the-wire-but-not-quite" surface, and changes to internals silently broke smokes that were supposed to be exercising the wire. Naming "driver" as a category — and locking the lint boundary — makes the contract surface visible. Anything that wants to drive the kernel either uses the wire or it isn't a driver.
 
+<!-- S5.0.3b ship note: llm_client/ package created; boot_minimal_kernel + KernelConnection in llm_client/boot.py; ship_envelope + collect_snapshots in llm_client/driver.py; transport stubs in llm_client/transport/; _run_agent_supervisor_smoke refactored to consume boot_minimal_kernel; lint boundary enforced by tests/test_lint_boundary.py. Source commit: <TBD-after-commit>. Status NOT flipped — awaiting S5.0.3c/d/e. -->
+
 ## See also
 
 - [discipline/wire-as-public-api](../discipline/wire-as-public-api.md) — the contract surface drivers consume.

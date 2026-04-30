@@ -8,6 +8,9 @@ version = "0.1.0"
 build-backend = "hatchling.build"
 requires = ["hatchling"]
 
+[tool.hatch.build.targets.wheel]
+packages = ["llm_client"]
+
 [tool.pixi.workspace]
 channels = ["conda-forge"]
 platforms = ["win-64"]
@@ -37,10 +40,12 @@ anthropic = ">=0.40.0"
 python-dotenv = ">=1.0.0"
 mitmproxy = ">=11.0.0"
 llm-kernel = { path = "vendor/LLMKernel", editable = true }
+llmb-rts-notebook = { path = ".", editable = true }
 
 [tool.pixi.feature.kernel.tasks]
 kernel-dev = "python -m llmkernel"
 kernel-test = "pytest vendor/LLMKernel/tests/ -v"
+driver-test = "pytest tests/ -q"
 extension-build = { cmd = "npm run build", cwd = "extension" }
 extension-test = { cmd = "npm test", cwd = "extension" }
 
