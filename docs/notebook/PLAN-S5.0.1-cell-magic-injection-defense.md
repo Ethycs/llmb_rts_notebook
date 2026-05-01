@@ -1,6 +1,14 @@
 # Plan: S5.0.1 — Cell-magic injection defense (HMAC-hash pin + emission ban)
 
-**Status**: ready (follow-up to S5.0)
+**Status**: V1 shipped (§3.1–§3.11 all landed across multiple commits). Implementation history:
+- §3.1–§3.4 (HMAC primitive + contamination detector + sanitizer + bidirectional hash strip): `magic_hash.py` (272 LoC), submodule `360b658` (S5.0.1a foundation).
+- §3.5, §3.7 (pin-aware parser + auth lifecycle + cell-manager re-stamp): `auth_handlers.py` (406 LoC) + `cell_text.py` pin-aware parsing + `cell_manager.restamp` pass, submodule `94d1c39` / `798b8f0` (S5.0.1b). Outer bump `515790d`.
+- §3.6 (schema additions): `metadata_writer.py` `magic_hash_enabled` + `magic_pin_fingerprint` keys, submodule `1008dca` (S5.0.1b) and `dbad5ee` (injection_acceptance verbatim flag, S5.0.1c).
+- §3.8 (extension UI): `extension/src/notebook/contamination-badge.ts`, `pin-status-header.ts`, etc. (s5-0-1d-ext series + S5.0.1e contract tests).
+- §3.10 (Cell Manager precondition gates): K3C/K3D/K3E/K3F precondition predicates in `cell_manager.py`, submodule `ac25656` (S5.0.1c).
+- §3.11 (verbatim injection acceptance): `tests/test_injection_acceptance.py` + `metadata_writer` field, submodule `dbad5ee`.
+- All K-classes (K35, K36, K3C, K3D, K3E, K3F, K3G) registered in `wire/tools.py` `K_CLASS_REGISTRY` (§3.9).
+
 **Audience**: an LLM (or operator) picking this up cold.
 **Goal**: defend the cell-magic vocabulary against prompt-injection. Three layers: (1) detect when an agent emits `@@`/`@` magic-like syntax (always on); (2) opt-in **HMAC hash mode** where every legitimate magic line carries `@@<HMAC(pin, magic_name)>:<args>` and the kernel is **forbidden from emitting any valid hashed-magic pattern** through agent/tool output channels; (3) Cell Manager precondition gates that freeze running and contaminated cells against structural ops, plus a verbatim-string acceptance flag when the operator declines hash mode.
 **Time budget**: ~2.6 days. Single cross-layer agent. Depends on S5.0 (cell-magic parser + registry) being landed.

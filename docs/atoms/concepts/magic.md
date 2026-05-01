@@ -30,6 +30,9 @@ Per `vendor/LLMKernel/llm_kernel/magic_registry.py` `CELL_MAGICS`:
 | `scratch` | active | Scratch-kind cell; ContextPacker excludes |
 | `checkpoint` | active | Checkpoint-kind cell; body is summary text; `covers:[…]` |
 | `endpoint` | active | Declarative endpoint registration; writes `metadata.rts.config.endpoints[<name>]` |
+| `template` | active | Magic code generator — looks up `metadata.rts.config.templates[<name>]`, splits at `@@break`, inserts each fragment as a new cell with `generated_by` provenance (S5.0.2; `magic_registry.py:294`, `magic_generators._handle_template`) |
+| `expand` | active | Magic code generator — parses body verbatim through `cell_text.split_at_breaks`, emits each fragment as a new cell with provenance (S5.0.2; `magic_registry.py:295`, `magic_generators._handle_expand`) |
+| `import` | active | Magic code generator — reads another `.llmnb` from workspace and copies its cells with provenance (S5.0.2; `magic_registry.py:296`, `magic_generators._handle_import`) |
 | `compare` | stub (V1.5+) | Runs body across N endpoints; one output region per endpoint |
 | `section` | stub (S5.5) | Section boundary |
 | `tool` / `artifact` / `native` | stub (V2+) | Reserved kinds; round-trip identically; renderer falls through |
@@ -47,6 +50,7 @@ Per `LINE_MAGICS`:
 | `affinity <stack>` | active | Records to `cell.line_magics`; consumed by `send_user_turn` to pick endpoints |
 | `handoff <id>` | active | Records to `cell.line_magics`; on cell run, edits NEXT cell's `bound_agent_id` |
 | `status` | active | Inline kernel-status renderer chip |
+| `auth` | active | Pin lifecycle — subcommands `set` / `rotate` / `off` / `verify` / `status` for HMAC hash mode (S5.0.1b; `magic_registry.py:319`; runtime dispatch via `auth_handlers.apply_auth_command`, submodule `94d1c39`) |
 | `revert` | active | Moves `agent.head_turn_id` to `target_turn_id`; SIGTERMs live process; calls `AgentSupervisor.revert` (S5b / submodule commit `d85c3f4`) |
 | `stop` | active | Clean shutdown; SIGTERM + `runtime_status: idle`; preserves `claude_session_id` for resume. S5c, submodule commit `4461794`. |
 | `branch` | active | Forks an agent at head (Case A) or ancestor turn (Case B); calls `AgentSupervisor.fork` (S5a / submodule commit `da3aa2f`). Transcript replay for Case B happens lazily on first continue-turn. |
@@ -80,7 +84,7 @@ Value forms in named args:
 | K33 | `unclosed_cell_at_file_end` — warning; serializer auto-closes |
 | K34 | `incompatible_kind_change` — `@mark <new_kind>` whose target is unknown / body-incompatible |
 
-K35 (plain magic in hash mode) is queued for [PLAN-S5.0.1](../../notebook/PLAN-S5.0.1-cell-magic-injection-defense.md); not yet shipped. Hash-mode primitives + emission ban land in S5.0.1a; see PLAN-S5.0.1 §3.1-3.4.
+K35 (plain magic in hash mode) and K36 (cell contaminated by agent emission) are shipped — see [PLAN-S5.0.1](../../notebook/PLAN-S5.0.1-cell-magic-injection-defense.md) §3.9; hash-mode primitives + emission ban + auth lifecycle landed in S5.0.1a/b/c (submodule commits `360b658` / `94d1c39` / `ac25656`).
 
 ## Invariants
 

@@ -1,7 +1,7 @@
 # Magic code generator
 
-**Status**: V2+ reserved (concept locked; slice queued as `PLAN-S5.0.2-magic-code-generators.md`, not yet authored)
-**Implementation note**: Kernel side shipped in S5.0.2 (submodule branch `wip/s5-0-2-magic-generators`); extension provenance chip ships with parallel slice. Status flip awaits operator ratification once both halves merge.
+**Status**: V1 shipped (PLAN-S5.0.2; kernel side at submodule `33b5c50` — `vendor/LLMKernel/llm_kernel/magic_generators.py:1` 588 LoC, three handlers `_handle_template` / `_handle_expand` / `_handle_import`, `GeneratorContext` TypedDict; `magic_registry.GENERATORS` lazy dict at line 369; `cell_manager.insert_cells_with_provenance` at submodule `8581fab`; `metadata_writer` provenance schema at submodule `10d9046`)
+**Implementation note**: Kernel side shipped in S5.0.2; extension provenance chip ships in parallel slice (extension-side commits separately tracked).
 **Source specs**: [PLAN-S5.0.1 §3.10–§3.11](../../notebook/PLAN-S5.0.1-cell-magic-injection-defense.md) (the emission-ban context this concept resolves), [PLAN-S5.0 §3](../../notebook/PLAN-S5.0-cell-magic-vocabulary.md) (cell-magic registry this extends), [discipline/zachtronics](../discipline/zachtronics.md) (visible-tile constraint), [discipline/magic-injection-defense](../discipline/magic-injection-defense.md) *(forthcoming with S5.0.1)*
 **Related atoms**: [magic](magic.md), [cell](cell.md), [cell-kinds](cell-kinds.md), [protocols/operator-action](../protocols/operator-action.md), [discipline/text-as-canonical](../discipline/text-as-canonical.md), [discipline/certified-magic-emitter](../discipline/certified-magic-emitter.md)
 
@@ -85,7 +85,7 @@ What a generator is NOT: a "macro that runs hidden code with side effects beyond
 
 ## V1 vs V2+
 
-- **V1 (queued, PLAN-S5.0.2)**: three built-in generators (`@@template`, `@@expand`, `@@import`). Pure templating. No loops. No operator-registered custom handlers. Provenance schema lands. K3H / K3I / K3J registered.
+- **V1 (shipped, PLAN-S5.0.2 / submodule `33b5c50`)**: three built-in generators (`@@template`, `@@expand`, `@@import`). Pure templating. No loops. No operator-registered custom handlers. Provenance schema lands. K3H / K3I / K3J registered.
 - **V2+**: `@@for_each` / `@@if` / `@@compose` (control-flow generators). Operator-registered custom handlers via a registration intent. Generator chains with multi-step provenance.
 - **V3+**: cross-notebook generator pipelines, generator-output diffing for pre-execution review.
 
@@ -99,4 +99,4 @@ What a generator is NOT: a "macro that runs hidden code with side effects beyond
 - [discipline/cell-manager-owns-structure](../discipline/cell-manager-owns-structure.md) — generators write through Cell Manager, not via output stream
 - [protocols/operator-action](../protocols/operator-action.md) — generators dispatch via standard envelopes
 - [PLAN-S5.0.1](../../notebook/PLAN-S5.0.1-cell-magic-injection-defense.md) — the emission ban that motivates carving out generators
-- [PLAN-S5.0.2](../../notebook/PLAN-S5.0.2-magic-code-generators.md) — the queued slice (not yet authored)
+- [PLAN-S5.0.2](../../notebook/PLAN-S5.0.2-magic-code-generators.md) — the shipped slice (V1, submodule `33b5c50`)

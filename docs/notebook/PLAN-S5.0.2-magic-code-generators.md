@@ -1,6 +1,6 @@
 # Plan: S5.0.2 — Magic code generators (V1 built-ins)
 
-**Status**: ready
+**Status**: V1 shipped — `vendor/LLMKernel/llm_kernel/magic_generators.py` (588 LoC) carries `_handle_template`, `_handle_expand`, `_handle_import` with a `GeneratorContext` TypedDict; submodule commit `33b5c50` (S5.0.2 magic_generators module + dispatch). `magic_registry.GENERATORS` lazy-builds the dict at line 369; `cell_manager.insert_cells_with_provenance` is in submodule `8581fab`; `metadata_writer` schema (`config.magic_code_generators`, `config.templates`, cell `generated_by`/`generated_at`) in submodule `10d9046`.
 **Audience**: an LLM (or operator) picking this up cold. Self-contained.
 **Goal**: ship the three V1 built-in **magic code generators** (`@@template`, `@@expand`, `@@import`) — operator-designated cell-magics whose execution emits valid magic syntax that the parser dispatches as new cells. Generators are the legitimate exception to the S5.0.1 emission ban; they preserve the visible-tile discipline by placing generated cells in the notebook with `generated_by` provenance.
 **Time budget**: ~0.7-1 dispatcher-day. Single cross-layer agent (kernel handlers + cell-manager provenance + extension provenance chip), or 2-agent split (kernel + extension) on file-disjoint slices.

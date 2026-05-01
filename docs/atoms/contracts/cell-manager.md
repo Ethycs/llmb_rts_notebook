@@ -1,7 +1,7 @@
 # Contract: CellManager
 
-**Status**: `contract` (V1 spec'd — discipline ratified; module NOT yet present in `vendor/LLMKernel/llm_kernel/`)
-**Module**: target `vendor/LLMKernel/llm_kernel/cell_manager.py` (per BSP-005 / BSP-007 implementation slices)
+**Status**: `contract` (V1 shipped — module present at `vendor/LLMKernel/llm_kernel/cell_manager.py`, ~33 KB; K3C/K3D/K3E/K3F precondition predicates landed S5.0.1c submodule `ac25656`; `insert_cells_with_provenance` for generators landed S5.0.2 submodule `8581fab`)
+**Module**: `vendor/LLMKernel/llm_kernel/cell_manager.py` (per BSP-005 / BSP-007 implementation slices)
 **Source specs**: [discipline/cell-manager-owns-structure](../discipline/cell-manager-owns-structure.md), [BSP-007 §6](../../notebook/BSP-007-overlay-git-semantics.md#6-merge-correctness-rules-cell-merge), [BSP-002 §13.2.3](../../notebook/BSP-002-conversation-graph.md#1323-cell-kind-merge-invariants-kb-target-221-forward-reference) (merge invariants), [KB-notebook-target.md §22.1](../../notebook/KB-notebook-target.md) (split/merge invariants)
 **Related atoms**: [contracts/overlay-applier](overlay-applier.md), [operations/split-cell](../operations/split-cell.md), [operations/merge-cells](../operations/merge-cells.md), [operations/move-cell](../operations/move-cell.md), [operations/promote-span](../operations/promote-span.md)
 
