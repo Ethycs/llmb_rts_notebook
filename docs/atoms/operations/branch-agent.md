@@ -1,6 +1,6 @@
 # Operation: branch-agent
 
-**Status**: V1 spec'd (data model in BSP-002 §2; full UX V2+)
+**Status**: V1 shipped (data + mechanics; branch-switching UX V2+)
 **Source specs**: [BSP-002 §3](../../notebook/BSP-002-conversation-graph.md#3-cell-directive-grammar) (directive grammar), [BSP-002 §4.4](../../notebook/BSP-002-conversation-graph.md#44-branch) (branch lifecycle), [BSP-002 §5](../../notebook/BSP-002-conversation-graph.md#5-claude-session-id-strategy) (session-id strategy)
 **Related atoms**: [agent](../concepts/agent.md), [turn](../concepts/turn.md), [revert-agent](revert-agent.md), [spawn-agent](spawn-agent.md)
 
