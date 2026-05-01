@@ -2,7 +2,7 @@
 
 **Status**: V1 shipped (PLAN-S5.0.2; kernel side at submodule `33b5c50` — `vendor/LLMKernel/llm_kernel/magic_generators.py:1` 588 LoC, three handlers `_handle_template` / `_handle_expand` / `_handle_import`, `GeneratorContext` TypedDict; `magic_registry.GENERATORS` lazy dict at line 369; `cell_manager.insert_cells_with_provenance` at submodule `8581fab`; `metadata_writer` provenance schema at submodule `10d9046`)
 **Implementation note**: Kernel side shipped in S5.0.2; extension provenance chip ships in parallel slice (extension-side commits separately tracked).
-**Source specs**: [PLAN-S5.0.1 §3.10–§3.11](../../notebook/PLAN-S5.0.1-cell-magic-injection-defense.md) (the emission-ban context this concept resolves), [PLAN-S5.0 §3](../../notebook/PLAN-S5.0-cell-magic-vocabulary.md) (cell-magic registry this extends), [discipline/zachtronics](../discipline/zachtronics.md) (visible-tile constraint), [discipline/magic-injection-defense](../discipline/magic-injection-defense.md) *(forthcoming with S5.0.1)*
+**Source specs**: [PLAN-S5.0.1 §3.10–§3.11](../../notebook/PLAN-S5.0.1-cell-magic-injection-defense.md) (the emission-ban context this concept resolves), [PLAN-S5.0 §3](../../notebook/PLAN-S5.0-cell-magic-vocabulary.md) (cell-magic registry this extends), [discipline/zachtronics](../discipline/zachtronics.md) (visible-tile constraint), [discipline/magic-injection-defense](../discipline/magic-injection-defense.md)
 **Related atoms**: [magic](magic.md), [cell](cell.md), [cell-kinds](cell-kinds.md), [protocols/operator-action](../protocols/operator-action.md), [discipline/text-as-canonical](../discipline/text-as-canonical.md), [discipline/certified-magic-emitter](../discipline/certified-magic-emitter.md)
 
 ## Definition
