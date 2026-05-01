@@ -58,6 +58,7 @@ class KernelConnection:
         server,       # noqa: ANN001 — LiteLLMProxyServer | AnthropicPassthroughServer
         *,
         supervisor=None,  # noqa: ANN001
+        read_only: bool = False,
     ) -> None:
         self.session_id = session_id
         self.wire_version = WIRE_VERSION
@@ -65,7 +66,19 @@ class KernelConnection:
         self._tracker = tracker
         self._server = server
         self._supervisor = supervisor
+        self.read_only = read_only
         self._closed = False
+
+    @property
+    def supervisor(self):  # noqa: ANN201 — kernel-internal type
+        """Return the bound AgentSupervisor, or ``None`` under ``read_only=True``.
+
+        PLAN-S6.0 §3.D: under ``read_only`` the connection skips
+        AgentSupervisor instantiation so replay cannot spawn agent
+        processes.  Tests assert ``supervisor is None`` after a
+        ``boot_minimal_kernel(read_only=True)`` call.
+        """
+        return self._supervisor
 
     # ------------------------------------------------------------------
     # Transport stubs (PTY/in-process mode for V1)
@@ -115,6 +128,7 @@ def boot_minimal_kernel(
     transport: Literal["pty", "unix", "tcp"] = "pty",
     bind: str | None = None,
     auth_token: str | None = None,
+    read_only: bool = False,
 ) -> KernelConnection:
     """Boot a kernel + proxy + dispatcher + tracker. Return a connection.
 
@@ -137,6 +151,12 @@ def boot_minimal_kernel(
         Ignored unless ``transport="tcp"``.
     auth_token:
         Bearer token for TCP auth. Ignored unless ``transport="tcp"``.
+    read_only:
+        PLAN-S6.0 §3.D replay sandbox flag. When ``True`` the
+        dispatcher + run-tracker are wired but ``AgentSupervisor`` is
+        NOT instantiated -- the replayer drives the dispatcher
+        deterministically without spawning agent processes. Default
+        ``False`` preserves current behavior.
 
     Returns
     -------
@@ -223,11 +243,20 @@ def boot_minimal_kernel(
     if use_passthrough:
         server.run_tracker = tracker  # type: ignore[attr-defined]
 
+    # PLAN-S6.0 §3.D: under ``read_only`` the connection MUST NOT
+    # instantiate AgentSupervisor.  ``boot_minimal_kernel`` already
+    # leaves supervisor=None on this in-process path; the explicit
+    # gate here is documentation + a guard for future amendments that
+    # might want to attach one (any such code MUST honor ``read_only``).
+    supervisor = None  # in-process boot does not attach AgentSupervisor today
+
     return KernelConnection(
         session_id=session_id,
         dispatcher=dispatcher,
         tracker=tracker,
         server=server,
+        supervisor=supervisor if not read_only else None,
+        read_only=read_only,
     )
 
 
