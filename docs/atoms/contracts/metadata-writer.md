@@ -1,6 +1,6 @@
 # Contract: MetadataWriter
 
-**Status**: `contract` (V1 shipped — all listed methods present in code)
+**Status**: `contract` (V1 shipped — all listed methods present in code; PLAN-S4.1 turn-graph persistence active: `append_turn`, `fork_agent`, `move_agent_head` flipped from `_PENDING_SLICE` to live handlers, and `record_event` now dispatches on `parameters.kind` to route `agent_ref_move` events to `metadata.rts.zone.event_log[]` while the legacy `field_path`-shaped drift path is preserved for backward compatibility)
 **Module**: `vendor/LLMKernel/llm_kernel/metadata_writer.py` — `class MetadataWriter`
 **Source specs**: [BSP-003 §2](../../notebook/BSP-003-writer-registry.md#2-the-single-canonical-writer) (single canonical writer), [BSP-003 §6](../../notebook/BSP-003-writer-registry.md#6-apply-discipline) (apply discipline), [RFC-005 §"Persistence strategy"](../../rfcs/RFC-005-llmnb-file-format.md#persistence-strategy-who-writes-the-file), [RFC-006 §8](../../rfcs/RFC-006-kernel-extension-wire-format.md#8--family-f-notebook-metadata-bidirectional-in-v202)
 **Related atoms**: [protocols/submit-intent-envelope](../protocols/submit-intent-envelope.md), [protocols/family-f-notebook-metadata](../protocols/family-f-notebook-metadata.md), [contracts/intent-dispatcher](intent-dispatcher.md), [contracts/drift-detector](drift-detector.md)
