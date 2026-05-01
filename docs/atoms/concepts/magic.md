@@ -48,7 +48,8 @@ Per `LINE_MAGICS`:
 | `handoff <id>` | active | Records to `cell.line_magics`; on cell run, edits NEXT cell's `bound_agent_id` |
 | `status` | active | Inline kernel-status renderer chip |
 | `revert` | active | Moves `agent.head_turn_id` to `target_turn_id`; SIGTERMs live process; calls `AgentSupervisor.revert` (S5b / submodule commit `d85c3f4`) |
-| `stop` / `branch` | stub (S5a / S5c) | Name reserved; runtime effect deferred |
+| `stop` | active | Clean shutdown; SIGTERM + `runtime_status: idle`; preserves `claude_session_id` for resume. S5c, submodule commit `4461794`. |
+| `branch` | stub (S5a) | Name reserved; runtime effect deferred |
 
 ## Argument grammar
 
