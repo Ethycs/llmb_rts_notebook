@@ -1,17 +1,17 @@
 # Operation: revert-agent
 
-**Status**: V1 spec'd (data model ratified; lands with K-AS slice)
+**Status**: V1 shipped (submodule commit `d85c3f4`, 2026-04-30; `AgentSupervisor.revert` present; K22 registered; `@revert` line-magic active)
 **Source specs**: [BSP-002 §3](../../notebook/BSP-002-conversation-graph.md#3-cell-directive-grammar) (directive grammar), [BSP-002 §4.5](../../notebook/BSP-002-conversation-graph.md#45-revert) (revert lifecycle), [BSP-002 §5](../../notebook/BSP-002-conversation-graph.md#5-claude-session-id-strategy) (session-id strategy)
 **Related atoms**: [agent](../concepts/agent.md), [turn](../concepts/turn.md), [branch-agent](branch-agent.md), [continue-turn](continue-turn.md)
 
 ## Definition
 
-`/revert <agent_id> to <turn_id>` mutates `agent.head_turn_id = turn_id`, terminating the agent's currently-bound claude process if alive. Subsequent continue-turn ops on this agent build from `turn_id`; turns after `turn_id` remain in the DAG (still visible to [branch-agent](branch-agent.md)). HEAD moves backward; nothing is destroyed at the turn level.
+`@revert <agent_id> to <turn_id>` mutates `agent.head_turn_id = turn_id`, terminating the agent's currently-bound claude process if alive. Subsequent continue-turn ops on this agent build from `turn_id`; turns after `turn_id` remain in the DAG (still visible to [branch-agent](branch-agent.md)). HEAD moves backward; nothing is destroyed at the turn level.
 
 ## Operation signature
 
 ```
-/revert <agent_id> to <turn_id>
+@revert <agent_id> to <turn_id>
 ```
 
 Kernel envelope:

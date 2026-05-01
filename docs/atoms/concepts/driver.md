@@ -1,6 +1,6 @@
 # Driver
 
-**Status**: V1.5 shipped (PLAN-S5.0.3e landed 2026-04-29; outer commit pin TBD-after-commit; submodule pin TBD-after-commit)
+**Status**: V1.5 shipped (PLAN-S5.0.3e landed 2026-04-29; outer commit pin TBD-after-commit; submodule pin TBD-after-commit; live-mode functional as of PLAN-S5.0.3.1 / outer commit `27c0fcc`, 2026-04-30)
 **Source specs**: [PLAN-S5.0.3 §3](../../notebook/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#3-reorg-shape) (package layout), [PLAN-S5.0.3 §6](../../notebook/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#6-cli-surface) (executor CLI), [PLAN-S5.0.3 §9](../../notebook/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#9-interface-contracts-locked-before-dispatch) (driver interface contracts), [RFC-008 §"Transport boundary"](../../rfcs/RFC-008-pty-transport.md)
 **Related atoms**: [agent](agent.md), [transport-mode](transport-mode.md), [discipline/wire-as-public-api](../discipline/wire-as-public-api.md), [contracts/kernel-client](../contracts/kernel-client.md), [protocols/wire-handshake](../protocols/wire-handshake.md)
 
@@ -30,7 +30,7 @@ This is the formal version of a discipline the VS Code extension already follows
 | Driver | Lives in | Transport | Role |
 |---|---|---|---|
 | **VS Code extension** | `extension/` | PTY (V1) → Unix/TCP (V1.5) | Operator-facing notebook UI |
-| **`llmnb execute` CLI** | `llm_client/cli/` | PTY (default) or `--connect` over Unix/TCP | Headless run; tests-as-notebooks |
+| **`llmnb execute` CLI** | `llm_client/cli/` | PTY (default) or `--connect` over Unix/TCP | Headless run; tests-as-notebooks; live mode functional (outer commit `27c0fcc`) — first non-extension driver to consume `ship_envelope` + `collect_snapshots` in a real execution path |
 | **Smokes** (post-S5.0.3b) | `llm_client/cli/smoke.py` | PTY | Migration target for `python -m llm_kernel <name>-smoke` |
 
 V2+ candidates: a Rust orchestrator over TCP; a Jupyter ZMQ shim driver wrapping `llm_client.driver`.
@@ -52,6 +52,8 @@ Pre-S5.0.3, every smoke and one-off automation imported kernel internals because
 <!-- S5.0.3b ship note: llm_client/ package created; boot_minimal_kernel + KernelConnection in llm_client/boot.py; ship_envelope + collect_snapshots in llm_client/driver.py; transport stubs in llm_client/transport/; _run_agent_supervisor_smoke refactored to consume boot_minimal_kernel; lint boundary enforced by tests/test_lint_boundary.py. Source commit: <TBD-after-commit>. Status NOT flipped — awaiting S5.0.3c/d/e. -->
 
 <!-- S5.0.3e ship note (campaign endpoint): console-script entry point `llmnb` verified (pyproject.toml [project.scripts]); `llmnb smoke <name>` migrated to native via llm_client._test_helpers.smokes shim (option a — lint-exempted _test_helpers, no subprocess spawn); deprecation notices added to `python -m llm_kernel {paper-telephone,agent-supervisor,metadata-writer,pty-mode}-smoke` aliases (print to stderr, V2 hard-removes); pixi task `check-builds` added; campaign acceptance tests in tests/test_campaign_smoke.py; tests/test_console_script.py added. Status flipped to V1.5 shipped. Source commit: TBD-after-commit. After this campaign: V2 removes the old `python -m llm_kernel *-smoke` aliases; multi-client kernel; Rust/Go orchestrator driver over TCP. -->
+
+<!-- S5.0.3.1 ship note (live-mode): _run_live_mode no longer raises NotImplementedError. Executor now boots the kernel, ships a hydrate envelope via ship_envelope, and collects snapshots via collect_snapshots. This is the first non-extension, non-smoke driver to traverse the complete wire path in a real (non-stub, non-replay) execution. Source commit: outer 27c0fcc, 2026-04-30. -->
 
 <!-- S5.0.3c ship note: executor + format converters + CLI subcommands shipped.
      Files added: llm_client/executor.py (run_notebook + ExecutionResult,

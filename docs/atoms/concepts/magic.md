@@ -47,7 +47,8 @@ Per `LINE_MAGICS`:
 | `affinity <stack>` | active | Records to `cell.line_magics`; consumed by `send_user_turn` to pick endpoints |
 | `handoff <id>` | active | Records to `cell.line_magics`; on cell run, edits NEXT cell's `bound_agent_id` |
 | `status` | active | Inline kernel-status renderer chip |
-| `revert` / `stop` / `branch` | stub (S5) | Name reserved; runtime effect deferred |
+| `revert` | active | Moves `agent.head_turn_id` to `target_turn_id`; SIGTERMs live process; calls `AgentSupervisor.revert` (S5b / submodule commit `d85c3f4`) |
+| `stop` / `branch` | stub (S5a / S5c) | Name reserved; runtime effect deferred |
 
 ## Argument grammar
 
