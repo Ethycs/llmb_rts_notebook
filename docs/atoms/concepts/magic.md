@@ -49,7 +49,7 @@ Per `LINE_MAGICS`:
 | `status` | active | Inline kernel-status renderer chip |
 | `revert` | active | Moves `agent.head_turn_id` to `target_turn_id`; SIGTERMs live process; calls `AgentSupervisor.revert` (S5b / submodule commit `d85c3f4`) |
 | `stop` | active | Clean shutdown; SIGTERM + `runtime_status: idle`; preserves `claude_session_id` for resume. S5c, submodule commit `4461794`. |
-| `branch` | stub (S5a) | Name reserved; runtime effect deferred |
+| `branch` | active | Forks an agent at head (Case A) or ancestor turn (Case B); calls `AgentSupervisor.fork` (S5a / submodule commit `da3aa2f`). Transcript replay for Case B happens lazily on first continue-turn. |
 
 ## Argument grammar
 
