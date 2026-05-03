@@ -10,6 +10,23 @@ away. The dev guide states the design as fact (the endpoint of the
 conversation); the ADRs preserve the journey, including reversals
 and superseded commitments.
 
+## Two decision namespaces
+
+This directory holds the **formal MADR-lite ADRs** that came out of the
+original 1.1 MB design conversation. Each ADR has provenance back to
+specific source turns and represents a load-bearing architectural
+lock-in.
+
+The newer [`docs/atoms/decisions/`](../atoms/decisions/) directory holds
+**V1/V2 implementation decisions** that surfaced during execution
+(referenced as D1-D8 / S1-S6 / M1-M3 / SD1-SD3 / CK1-CK3 / F1 in
+[`docs/notebook/PLAN-atom-refactor.md §4`](../notebook/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms)). Distinct from the formal ADRs here — operational
+pins, not architectural lock-ins.
+
+Don't confuse the two. New formal ADRs (DR-0017+) get added here only
+when a new load-bearing architectural decision surfaces. Implementation
+choices go into the atom-layer decisions/ directory.
+
 ## Tags
 
 | Tag | Meaning |

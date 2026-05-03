@@ -20,7 +20,7 @@ The same concept (Cell, Section, Turn, Overlay commit, RunFrame, ArtifactRef) wa
 | [protocols/](protocols/) | Wire formats — direction, schema, error envelope, version handshake | `protocol` |
 | [contracts/](contracts/) | Code-internal interfaces — module location, signatures, invariants, K-class errors | `contract` |
 
-Roughly 70-80 atoms total. Each 30-120 lines. Total corpus ~4500 lines.
+~91 atoms across 7 subdirectories (as of 2026-05-02). Each 30-120 lines (avg ~74). Total corpus ~6,700 lines.
 
 ## Atom rules
 
