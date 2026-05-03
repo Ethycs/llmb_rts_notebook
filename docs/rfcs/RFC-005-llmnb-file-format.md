@@ -22,7 +22,7 @@ This RFC is the layer-1 (persistent storage) normative specification for the on-
 - [DR-0016 — RFC standards discipline](../decisions/0016-rfc-standards-discipline.md)
 - [RFC-001 — V1 MCP tool taxonomy](RFC-001-mcp-tool-taxonomy.md) — referenced by `config.kernel.rfc_001_version`
 - [RFC-002 — Claude Code provisioning procedure](RFC-002-claude-code-provisioning.md) — referenced by `config.agents[*].system_prompt_template_id`
-- [RFC-003 — Custom Jupyter message format](RFC-003-custom-message-format.md) — wire form; this RFC is the persistent form. RFC-003 v2 is expected to switch payloads to OTLP/JSON; this RFC anticipates that and specifies OTLP/JSON on disk regardless of RFC-003's version.
+- [RFC-006 — Kernel-extension wire format](RFC-006-kernel-extension-wire-format.md) — wire form; this RFC is the persistent form.
 
 ## Context
 
@@ -469,7 +469,7 @@ Pretty-printing inside the per-span line is not required (and reduces git delta 
 }
 ```
 
-The blob entry shape mirrors the [ArtifactRef atom](../atoms/concepts/artifact-ref.md). V1 stores `body` inline (never null); V2 permits `body: null` when the artifact is externalized — see [decisions/v1-artifact-shape](../atoms/decisions/v1-artifact-shape.md). Five top-level fields are normative in V1: `id`, `kind`, `size`, `content_hash`, `body`. The `meta` object preserves provenance (`mime`, `encoding`, `source`, `created_at`); receivers MUST round-trip unknown `meta` keys verbatim.
+The blob entry shape is the [ArtifactRef atom](../atoms/concepts/artifact-ref.md). This RFC owns the storage placement (`metadata.rts.blobs`) and the `$blob:` sentinel resolution rules; the atom owns the reusable field contract. V1 stores `body` inline (never null); V2 permits `body: null` when the artifact is externalized — see [decisions/v1-artifact-shape](../atoms/decisions/v1-artifact-shape.md).
 
 `id` and `content_hash` MUST be equal and MUST match the outer object key. Two writes of identical content collapse to one entry (content-addressed). The hash is the SHA-256 of `body`; the hash key validates the blob's integrity.
 
@@ -544,7 +544,7 @@ The line-oriented serialization (above) is what makes `git diff` on `.llmnb` pro
 - **Single physical writer:** the VS Code extension, via the `vscode.NotebookEdit` API and VS Code's normal serializer pipeline.
 - **Single logical writer of `metadata.rts`:** the kernel.
 
-The kernel ships `metadata.rts` snapshots to the extension over a custom message family (`notebook.metadata` — see RFC-003 v2 / future supersession), the extension applies the snapshot via `vscode.NotebookEdit.updateNotebookMetadata(...)`, and VS Code's save flow persists. There are NO direct kernel writes to disk under normal operation.
+The kernel ships `metadata.rts` snapshots to the extension over RFC-006 Family F (`notebook.metadata`), the extension applies the snapshot via `vscode.NotebookEdit.updateNotebookMetadata(...)`, and VS Code's save flow persists. There are NO direct kernel writes to disk under normal operation.
 
 #### When no extension is attached
 
@@ -835,7 +835,7 @@ If the operator has updated their kernel between sessions and `rfc_001_version` 
 
 ## Consumers
 
-- **LLMKernel `metadata_writer` module (new in V1):** the single logical writer of `metadata.rts`. Emits `notebook.metadata` snapshots over RFC-003 v2 envelopes; does not write to disk directly except in the queue-overflow fallback path.
+- **LLMKernel `metadata_writer` module (new in V1):** the single logical writer of `metadata.rts`. Emits `notebook.metadata` snapshots over RFC-006 Family F; does not write to disk directly except in the queue-overflow fallback path.
 - **VS Code extension `serializer.ts`:** the physical writer. Receives `metadata.rts` snapshots from the extension's message router and applies them via `vscode.NotebookEdit.updateNotebookMetadata`. Must preserve unknown keys verbatim on round-trip.
 - **VS Code extension `notebook/controller.ts`:** reads cell-level `metadata.rts` (`trace_id`, `target_agent`) on cell execution.
 - **Renderer `extension/src/renderers/run-renderer.ts`:** reads each cell-output OTLP span and dispatches on `attributes["llmnb.run_type"]` to the appropriate component.

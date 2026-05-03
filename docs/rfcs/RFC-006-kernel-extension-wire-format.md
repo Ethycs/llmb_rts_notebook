@@ -5,8 +5,8 @@
 Draft. Date: 2026-04-29. Version: 2.1.0. Supersedes [RFC-003](RFC-003-custom-message-format.md) v1.0.0.
 
 **Changelog**:
-- v2.1.0 (additive, PLAN-S5.0.3d, 2026-04-29): adds §"Transports" registering the V1.5 transport catalogue (PTY / Unix / TCP) and the `kernel.handshake` envelope as the first frame on every transport. The wire-format itself is unchanged — Family A/B/C/F/G envelopes are transport-invariant per the existing two-carrier architecture. The TCP transport binds bearer-token auth at the handshake layer; token comparison is constant-time (`hmac.compare_digest`); default bind is `127.0.0.1` (loopback). Mismatched `WIRE_MAJOR` or auth failure closes the transport with an `error` field on the handshake response. V1 kernels accept one connection at a time; second client receives `kernel_busy`. See [PLAN-S5.0.3 §4.3](../notebook/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#43-handshake-envelope-new--first-envelope-on-any-connection) and [PLAN-S5.0.3 §5](../notebook/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#5-external-transport-tcp--token). Definitions live in [docs/atoms/protocols/wire-handshake.md](../atoms/protocols/wire-handshake.md) and [docs/atoms/concepts/transport-mode.md](../atoms/concepts/transport-mode.md).
-- v2.0.4 (additive, atom-refactor Phase 4 Op-4, 2026-04-28): §1 "Mandatory attributes per run" gains two new **optional / situational** Family A span attributes: `llmnb.section_id` (operator-side section the cell was issued from; see [section atom](../atoms/concepts/section.md)) and `llmnb.output.kind` (12-value typed-output enum; see [output-kind atom](../atoms/concepts/output-kind.md)). Both are situational — V1 producers SHOULD emit when known; V1 consumers MUST tolerate absence (treat as untyped / no-section). Per [BSP-002 §13.5.2](../notebook/BSP-002-conversation-graph.md) and [KB-notebook-target.md §0.8](../notebook/KB-notebook-target.md#08-typed-outputs--v1-ships-the-tag-v2-ships-lenses). Definitions now live in `docs/atoms/`. No behavioral or wire-format breaking changes.
+- v2.1.0 (additive, PLAN-S5.0.3d, 2026-04-29): adds §"Transports" registering transport invariance and the `kernel.handshake` first-frame requirement. The transport catalogue and handshake shape live in [transport-mode](../atoms/concepts/transport-mode.md) and [wire-handshake](../atoms/protocols/wire-handshake.md).
+- v2.0.4 (additive, atom-refactor Phase 4 Op-4, 2026-04-28): §1 registers optional Family A span attributes `llmnb.section_id` and `llmnb.output.kind`. Definitions live in [section](../atoms/concepts/section.md) and [output-kind](../atoms/concepts/output-kind.md); this RFC keeps only the wire round-trip requirements.
 - v2.0.3 (additive): §6 `operator.action` `action_type` enum gains `agent_spawn` — extension's parsed `/spawn <agent_id> task:"..."` cell directive arrives as this action_type with parameters `{agent_id, task, cell_id}`. Kernel handler delegates to `AgentSupervisor.spawn(...)`. Required by V1 hero-loop "type /spawn in a cell → agent runs → notify renders."
 - v2.0.2 (additive): §7 Family E heartbeat is now asymmetric for V1 — `heartbeat.kernel` MUST be emitted by the kernel every 5s (drives the operator-facing kernel-state indicator and detects "kernel alive but stuck" cases that PTY-EOF cannot catch); `heartbeat.extension` is `SHOULD` in V1 (`MUST` in V1.5+). §8 Family F `notebook.metadata` becomes bidirectional with new `mode: "hydrate"` (extension→kernel) for `.llmnb` load path.
 - v2.0.1 (additive): added `kernel.shutdown_request` (§7.1) for RFC-008 graceful-shutdown signal compatibility.
@@ -76,13 +76,9 @@ Every Family A span MUST carry the attributes specified in [RFC-005 §"Mandatory
 
 #### Situational / optional attributes (additive in v2.0.4)
 
-The following situational attributes are **optional** on Family A spans. V1 producers SHOULD emit when the value is known; V1 consumers MUST tolerate absence (treat as untyped / no-section), MUST tolerate unknown enum values from forward-version producers, and MUST round-trip both attributes verbatim into [RFC-005](RFC-005-llmnb-file-format.md) `event_log.runs[]` storage.
+Family A spans MAY carry `llmnb.section_id` and `llmnb.output.kind`. Their definitions and value rules live in the [section](../atoms/concepts/section.md) and [output-kind](../atoms/concepts/output-kind.md) atoms, as ratified by [BSP-002 §13.5.2](../notebook/BSP-002-conversation-graph.md#1352-otlp-attribute-llmnboutputkind-kb-target-08--v1-tag-v2-lenses).
 
-- `llmnb.section_id` (string, optional) — operator-side [section](../atoms/concepts/section.md) the cell was issued from. The section is an overlay-graph narrative range over cells; this attribute lets receivers filter or group spans by section without re-walking the overlay. Distinct from `llmnb.zone_id` (kernel-side notebook session id; one per `.llmnb` file). Absence MUST be treated as "no section context"; producers MUST omit (not emit empty string) when no section is bound. Per [BSP-002 §13.5.2](../notebook/BSP-002-conversation-graph.md) and [KB-notebook-target.md §0.1](../notebook/KB-notebook-target.md#01-naming-reconciliation) (the zone→section rename).
-
-- `llmnb.output.kind` (string, optional) — output classification per the [output-kind atom](../atoms/concepts/output-kind.md). One of: `prose | code | diff | patch | decision | plan | artifact_ref | test_result | diagnostic | checkpoint | question | warning`. Absence MUST be treated as untyped output; producers SHOULD emit when the kind is known. Receivers seeing a forward-version value MUST treat the span as untyped rather than reject it (the 12-value list is V1-normative; the field accepts forward-compat values). The V2 lens UI ("show decisions only", "show failed tests") consumes this attribute; V1 ships only the tag, no lens. Per [BSP-002 §13.5.2](../notebook/BSP-002-conversation-graph.md) and [KB-notebook-target.md §0.8](../notebook/KB-notebook-target.md#08-typed-outputs--v1-ships-the-tag-v2-ships-lenses).
-
-Both attributes are additive on the wire — RFC-005's mandatory-attribute set is unchanged; old receivers ignore the new keys per the additive-evolution rules in §"Backward-compatibility analysis" below.
+Wire requirements stay here: V1 producers SHOULD emit either attribute when known; V1 consumers MUST tolerate absence, MUST treat forward-version `llmnb.output.kind` values as untyped, and MUST round-trip both attributes verbatim into [RFC-005](RFC-005-llmnb-file-format.md) `event_log.runs[]` storage. These attributes are additive; RFC-005's mandatory-attribute set is unchanged.
 
 #### `agent_emit` over Family A
 
@@ -228,7 +224,7 @@ Node and edge schemas are exactly the ones in [RFC-005 §`metadata.rts.agents`](
 
 ### §6 — Family D: Operator action
 
-One message, payload identical to RFC-003 v1 §Family D.
+One message, `operator.action`, whose reusable envelope and action-type catalogue live in [atoms/protocols/operator-action](../atoms/protocols/operator-action.md). This RFC owns the fact that Family D crosses the Comm boundary at `llmnb.rts.v2` and remains fire-and-forget.
 
 #### `operator.action`
 
@@ -246,7 +242,7 @@ One message, payload identical to RFC-003 v1 §Family D.
 }
 ```
 
-`action_type` adds **`drift_acknowledged`** in v2 (the operator confirmed a drift event from RFC-005's drift log). Other values are unchanged from RFC-003 v1 §Family D.
+`action_type` values are additive within RFC-006 v2.x. Unknown values are W4: log and discard. Downstream effects (Family A spans, Family F snapshots, or K-class errors) are the acknowledgment.
 
 ### §7 — Family E: Heartbeat / liveness
 
@@ -321,10 +317,7 @@ If the kernel does not receive `kernel.shutdown_request` before the data plane s
 
 ### §8 — Family F: Notebook metadata (bidirectional in v2.0.2)
 
-Family F is the persistence channel that [RFC-005 §"Persistence strategy"](RFC-005-llmnb-file-format.md#persistence-strategy-who-writes-the-file) requires. The kernel is the single *logical* writer of `metadata.rts`; the extension is the single *physical* reader/writer of `.llmnb` files. **Family F flows in both directions**:
-
-- **Kernel → extension** (`mode: "snapshot"` or `"patch"`): kernel ships its in-memory `metadata.rts` to the extension; extension applies via `vscode.NotebookEdit.updateNotebookMetadata` so VS Code's save flow persists. This is the runtime emission path (autosave, end-of-run, clean shutdown, periodic timer).
-- **Extension → kernel** (`mode: "hydrate"`, NEW in v2.0.2): on file-open, the extension parses the `.llmnb` (its existing serializer), extracts `metadata.rts`, and ships it to the kernel for state hydration. The kernel's read loop receives, calls `MetadataWriter.hydrate(snapshot)`, runs `DriftDetector.compare(persisted_volatile, current_volatile)` to populate `metadata.rts.drift_log`, and respawns agents from `config.recoverable.agents[]` via `AgentSupervisor.respawn_from_config(...)`. After the hydrate handler returns, the kernel emits a confirmation `notebook.metadata` `mode:"snapshot"` envelope back to the extension carrying the post-hydrate state (so the extension knows hydration completed and can update its UI).
+Family F is the persistence wire required by [RFC-005 §"Persistence strategy"](RFC-005-llmnb-file-format.md#persistence-strategy-who-writes-the-file): the kernel is the single logical writer of `metadata.rts`, and the extension is the single physical reader/writer of `.llmnb` files. The reusable envelope, mode catalogue, hydrate semantics, and cadence live in [atoms/protocols/family-f-notebook-metadata](../atoms/protocols/family-f-notebook-metadata.md).
 
 The bidirectionality is necessary because the architecture commits to "extension is the single physical reader/writer of `.llmnb`" (RFC-005 §"Persistence strategy"). The kernel cannot read the file directly; the extension is its sole source of persisted state on file-open.
 
@@ -349,32 +342,12 @@ The bidirectionality is necessary because the architecture commits to "extension
 }
 ```
 
-Field semantics:
+Boundary requirements:
 
-- `mode` (required) — `"snapshot"` (kernel→extension or hydrate confirmation), `"patch"` (V1.5+, either direction), `"hydrate"` (extension→kernel on open). V1 senders MUST NOT emit `"patch"`.
-- `snapshot_version` (required) — monotonically increasing integer that survives across kernel restarts (persisted in `metadata.rts.snapshot_version` and incremented on every kernel emission). For `mode: "hydrate"`, this is the version that was last persisted before close; the kernel resumes its counter from this value + 1.
-- `snapshot` (object, required when `mode == "snapshot"` or `mode == "hydrate"`) — the full `metadata.rts` contents per RFC-005. Schema governed by RFC-005, not this RFC.
-- `patch` (array, required when `mode == "patch"`, V1.5+) — RFC 6902 operation list.
-- `trigger` (required) — what caused this emission. Kernel-emitted triggers: `save | shutdown | timer | end_of_run | hydrate_complete`. Extension-emitted trigger: `open` (when the extension opens an `.llmnb`).
-
-#### Hydrate request/response semantics
-
-The extension's `hydrate` envelope is request-shaped: the extension expects a `mode:"snapshot"` `trigger:"hydrate_complete"` confirmation from the kernel within 10 seconds. If no confirmation arrives, the extension MUST surface a "kernel failed to hydrate" warning and treat agents from `config.recoverable.agents[]` as not-respawned (the operator can retry or proceed without resume).
-
-The kernel MUST process at most one `hydrate` envelope per session. A second `hydrate` envelope received after the first MUST be rejected with a `wire-failure` LogRecord; the operator's intent for "load a different notebook" is to close and reopen, not to re-hydrate in place.
-
-#### Partial hydration (V1.5+)
-
-V1's `hydrate` mode carries the full `snapshot`. V1.5 may add a `selectors` field allowing the extension to request only specific subsections (e.g., `["event_log", "blobs"]` for a "show me the runs but don't respawn agents" mode). V1 receivers MUST reject any envelope carrying `selectors` with a `wire-failure` LogRecord.
-
-#### Cadence and triggers
-
-The kernel emits `notebook.metadata` on the four triggers specified in RFC-005:
-
-1. **operator save** — extension reports save event (over a future operator.action subtype, or via a synchronous request/response handshake — see §"Open issues" below).
-2. **clean shutdown** — kernel pre-shutdown hook.
-3. **periodic timer** — every 30 seconds while the file is dirty.
-4. **end_of_run** — `event_log` gains a closed span.
+- V1 senders MUST NOT emit `mode: "patch"`; V1 receivers MUST reject inbound patch mode with a `wire-failure` LogRecord.
+- The inner `snapshot` schema is governed by RFC-005, not this RFC.
+- The kernel MUST process at most one `hydrate` envelope per session and respond with `mode: "snapshot"` / `trigger: "hydrate_complete"` within 10 seconds.
+- V1 receivers MUST reject V1.5 partial-hydrate selectors with a `wire-failure` LogRecord.
 
 #### Queue-overflow direct-write fallback
 
@@ -382,74 +355,19 @@ If no extension is attached when the kernel would otherwise emit `notebook.metad
 
 #### Schema governance split
 
-This RFC governs the *transport* of `metadata.rts` (the envelope and Family F semantics). RFC-005 governs the *content* (the schema of `metadata.rts` itself). A V1 reader MUST validate the envelope per this RFC, then validate the inner snapshot per RFC-005's `schema_version`. Mismatched majors between the wire and the snapshot are a kernel bug; receivers MUST log and discard.
+This RFC governs the *transport* of `metadata.rts`. RFC-005 governs the *content*. A V1 reader MUST validate the envelope per Family F, then validate the inner snapshot per RFC-005's `schema_version`. Mismatched majors between the wire and the snapshot are a kernel bug; receivers MUST log and discard.
 
 ## Transports (v2.1.0)
 
-The wire-format is **transport-invariant**: the Family A/B/C/F/G envelope shapes specified above flow identically over PTY (V1), Unix sockets, and TCP (V1.5). The transport boundary is responsible for framing (newline-delimited JSON in V1) and authentication; envelope dispatch never knows which transport it is running over. See [docs/atoms/concepts/transport-mode.md](../atoms/concepts/transport-mode.md) for the canonical statement.
+The wire-format is **transport-invariant**: the Family A/B/C/F/G envelope shapes specified above flow identically over PTY (V1), Unix sockets, and TCP (V1.5). The canonical transport catalogue lives in [atoms/concepts/transport-mode](../atoms/concepts/transport-mode.md); this RFC records the boundary consequence that envelope dispatch never depends on transport.
 
 ### §T1 — `kernel.handshake` envelope (first envelope on every transport)
 
-Before any Family A/B/C/F/G frame flows, the driver MUST send a `kernel.handshake` envelope and the kernel MUST respond. The handshake negotiates `wire_version`, declares the driver's capabilities, and (for TCP) carries bearer-token auth. On `WIRE_MAJOR` mismatch or auth failure, the kernel sends an error response and closes the transport.
-
-#### Driver → kernel (request)
-
-```jsonc
-{
-  "type": "kernel.handshake",
-  "payload": {
-    "client_name":     "llmnb-cli | vscode-extension | <custom>",
-    "client_version":  "<semver>",
-    "wire_version":    "1.0.0",
-    "transport":       "pty | unix | tcp",
-    "auth": {                                   // present iff transport == "tcp"
-      "scheme": "bearer",
-      "token":  "<token>"
-    },
-    "capabilities": ["family_a", "family_b", "family_c", "family_f", "family_g"]
-  }
-}
-```
-
-#### Kernel → driver (success response)
-
-```jsonc
-{
-  "type": "kernel.handshake",
-  "payload": {
-    "kernel_version":         "<semver>",
-    "wire_version":           "1.0.0",
-    "session_id":             "<uuid>",
-    "accepted_capabilities":  ["family_a", "family_b", "family_c", "family_f", "family_g"],
-    "warnings":               ["minor_version_skew"]   // optional
-  }
-}
-```
-
-#### Kernel → driver (error response)
-
-```jsonc
-{
-  "type": "kernel.handshake",
-  "payload": {
-    "wire_version": "1.0.0",
-    "kernel_version": "<semver>",
-    "error": "version_mismatch_major | auth_failed | kernel_busy | wire-failure"
-  }
-}
-```
-
-After an error response the kernel closes the transport. The driver gets one chance per connection.
+Before any Family A/B/C/F/G frame flows, the driver MUST send a `kernel.handshake` envelope and the kernel MUST respond. The request, success response, error response, auth rules, version-skew semantics, and single-client behavior live in [atoms/protocols/wire-handshake](../atoms/protocols/wire-handshake.md). After an error response the kernel closes the transport; the driver gets one chance per connection.
 
 ### §T2 — Transport catalogue
 
-| Transport | Status | Bind / advertisement | Auth | Default deployment |
-|---|---|---|---|---|
-| **PTY** | V1 (RFC-008) | Parent spawns child; no advertisement | Implicit parent-child trust | Local (extension hosts kernel) |
-| **Unix socket** | V1.5 | `~/.llmnb/runtime/<pid>.sock` (mode 0600); token in `<pid>.token` (mode 0600) | Filesystem perms + bearer token | Local same-user IPC |
-| **TCP** | V1.5 (PLAN-S5.0.3d) | Explicit `--bind HOST:PORT` (default `127.0.0.1:7474`) | Bearer token via `LLMNB_AUTH_TOKEN` env | Trusted networks (CI, devcontainers, single-tenant cloud) |
-
-The TCP transport MUST default-bind to `127.0.0.1`; binding to `0.0.0.0` is an explicit operator decision documented in `llmnb serve --help`. There is no mTLS in V1.5 — TCP is for **trusted networks only**. mTLS / cert-pinning is a V2+ amendment (see PLAN-S5.0.3 §10 risk #3).
+The catalogue is owned by [transport-mode](../atoms/concepts/transport-mode.md). This RFC preserves the wire-level constraints: PTY remains the V1 local default; Unix socket and TCP are V1.5 transports; TCP MUST default-bind to `127.0.0.1`; binding to `0.0.0.0` is an explicit operator decision documented in `llmnb serve --help`. mTLS / cert-pinning is V2+.
 
 ### §T3 — Auth model (TCP)
 
@@ -646,5 +564,5 @@ Extension applies the snapshot via `vscode.NotebookEdit.updateNotebookMetadata`.
 
 ## Changelog
 
-- **2026-04-28 (atom-refactor Phase 4 Op-4)**: §1 Family A "Mandatory attributes per run" gains a "Situational / optional attributes" subsection registering two new optional Family A span attributes — `llmnb.section_id` (operator-side [section](../atoms/concepts/section.md) the cell was issued from) and `llmnb.output.kind` (12-value typed-output enum per [output-kind atom](../atoms/concepts/output-kind.md)). Both are situational; V1 producers SHOULD emit when known, V1 consumers MUST tolerate absence. Per [BSP-002 §13.5.2](../notebook/BSP-002-conversation-graph.md) and [KB-notebook-target.md §0.8](../notebook/KB-notebook-target.md#08-typed-outputs--v1-ships-the-tag-v2-ships-lenses). Status bumped to v2.0.4. Definitions now live in `docs/atoms/`. No behavioral or wire-format breaking changes; existing consumers that don't read the new keys continue to work.
+- **2026-04-28 (atom-refactor Phase 4 Op-4)**: §1 registers optional Family A span attributes `llmnb.section_id` and `llmnb.output.kind`. Definitions live in [section](../atoms/concepts/section.md) and [output-kind](../atoms/concepts/output-kind.md); this RFC keeps only the wire round-trip requirements. Status bumped to v2.0.4. No behavioral or wire-format breaking changes; existing consumers that don't read the new keys continue to work.
 - See `Status` changelog at the top of this RFC for prior versions (v2.0.3, v2.0.2, v2.0.1, v2.0.0).
