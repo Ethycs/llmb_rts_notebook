@@ -1,6 +1,6 @@
 # Context manifest
 
-**Status**: V1 shipped (deterministic structural walk; ranking/budget/summary-trust deferred to V2; K-AS-A walker landing, submodule commit `87cb127`)
+**Status**: V1 shipped (deterministic structural walk; ranking/budget/summary-trust deferred to V2; K-AS-A walker landing, submodule commit `87cb127`; S4 cross-agent handoff replays manifest output across agents, `fe2121a`)
 **Source specs**: [BSP-008 §3](../../notebook/BSP-008-contextpacker-runframes.md#3-contextpacker-v1-algorithm), [BSP-008 §4](../../notebook/BSP-008-contextpacker-runframes.md#4-contextmanifest-schema), [PLAN-S3.5-context-packer.md](../../notebook/PLAN-S3.5-context-packer.md), [KB-notebook-target.md §0.6](../../notebook/KB-notebook-target.md#06-contextpacker--simple-v1-contract), [KB-notebook-target.md §22.2](../../notebook/KB-notebook-target.md#222-contextpacker-algorithm)
 **Related atoms**: [run-frame](run-frame.md), [cell](cell.md), [section](section.md), [turn](turn.md), [contracts/context-packer](../contracts/context-packer.md)
 

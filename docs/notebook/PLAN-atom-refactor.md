@@ -1,9 +1,9 @@
 # Plan: docs/atoms/ refactor — atomic-doc deduplication
 
-**Status**: Plan, ready for execution. 2026-04-28.
+**Status**: Executed 2026-04-28 (Phase 1 `f8223bf` → Phase 4 `4207504`); §4 row D1 superseded 2026-04-29 by [decisions/v1-section-status-interruptibility](../atoms/decisions/v1-section-status-interruptibility.md). Plan retained as the historical execution record + the canonical 24-row V1 decision table referenced by atom Status fields.
 **Audience**: an LLM (or operator) picking this up cold. Self-contained.
-**Goal**: replace prose duplication across BSPs / FSPs / KBs with a wiki-style atomic-doc layer. One concept = one atom. Originals link to atoms instead of restating definitions.
-**Time budget**: ~8h wall-clock with three parallel agents in Phase 3, otherwise ~12h sequential.
+**Goal** (executed): replaced prose duplication across BSPs / FSPs / KBs with a wiki-style atomic-doc layer. One concept = one atom. Originals link to atoms instead of restating definitions.
+**Time budget** (actual): ~45 min wall-clock with three parallel agents in Phase 3 (~10× the ~8h estimate; observed multi-agent velocity).
 
 ---
 

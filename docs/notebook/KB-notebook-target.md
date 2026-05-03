@@ -80,6 +80,17 @@ V1 cannot ship without three new BSPs filling gaps:
 
 These land before any cell-side slice that depends on them.
 
+### 0.12 Post-2026-04-28 V1 substrate additions (status, not new decisions)
+
+Several V1 substrate improvements have shipped since the 2026-04-28 deconfliction pass that pinned §0.1-§0.11. None of them are new V1 decisions — they're all within the Issue 2 slice ladder scope ratified in §0.10. Recorded here so future readers don't think §0 has gone stale:
+
+- **S4 cross-agent context handoff** shipped (`fe2121a`). Per BSP-002 §4.6; replays missing turns through agents via [context-manifest atom](../atoms/concepts/context-manifest.md). See [PLAN-S4-cross-agent-handoff.md](PLAN-S4-cross-agent-handoff.md).
+- **S5.0 cell-magic vocabulary** + **S5.0.1 injection defenses** shipped. Replaces the legacy `/spawn` / `@<id>:` directive grammar with `@@<kind>` cell-magic + `@<flag>` line-magic. The cell schema collapsed to `{text, outputs, bound_agent_id}` with kind/flags now parse-derived from `text`. See [PLAN-S5.0-cell-magic-vocabulary.md](PLAN-S5.0-cell-magic-vocabulary.md), [magic atom](../atoms/concepts/magic.md), [discipline/text-as-canonical](../atoms/discipline/text-as-canonical.md), [discipline/certified-magic-emitter](../atoms/discipline/certified-magic-emitter.md).
+- **S5.0.3.x headless executor** shipped (TCP transport + handshake envelope per RFC-006 v2.1.0 + RFC-008 v1.0.1; smoke driver `73c6940`; live-mode `27c0fcc`). See [PLAN-S5.0.3.1-executor-live-mode.md](PLAN-S5.0.3.1-executor-live-mode.md), [protocols/wire-handshake atom](../atoms/protocols/wire-handshake.md), [concepts/transport-mode atom](../atoms/concepts/transport-mode.md).
+- **S5c-stop** in flight on `vendor/LLMKernel @ wip/s5c-stop`; not yet on main.
+
+Section-status interruptibility lock supersedes original D1 row in [PLAN-atom-refactor.md §4](PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms) (`section.status` ships in V1 as the structural-op gate; see [decisions/v1-section-status-interruptibility](../atoms/decisions/v1-section-status-interruptibility.md)).
+
 ---
 
 ## 1. One-sentence system definition

@@ -338,17 +338,21 @@ S6 now also writes `metadata.rts.zone.run_frames.<run_id>` per [decisions/v1-run
 
 **Estimated**: +1 day folded into S6 (S6 sized at 2 days total for cell-binding + RunFrame minimal). **Atoms touched**: [run-frame](../atoms/concepts/run-frame.md), [decisions/v1-runframe-minimal](../atoms/decisions/v1-runframe-minimal.md).
 
-### 6.5 Slice-ladder totals after Issue 2
+### 6.5 Slice-ladder totals after Issue 2 — and observed velocity (2026-05-02 update)
 
-| Phase | Slices | Days |
-|---|---|---|
-| Foundation | S0.5 + S1 + S2 | ~2.0 |
-| Multi-turn + context | S3 + S3.5 + S4 | ~3.5 |
-| Git-style + sections | S5 + S5.5 | ~3.5 |
-| Persistence + UX | S6 + S7 + S8 + S9 + S10 | ~5.0 |
-| **Total V1 UX runway** | **S0.5 → S10** | **~14-18 days** (sequential; less in parallel) |
+| Phase | Slices | BSP-005 budget | Status (as of 2026-05-02) |
+|---|---|---|---|
+| Foundation | S0.5 + S1 + S2 | ~2.0 d | ✅ S0.5 (`14873a1`) + S1+S2 (`26ac581`) shipped |
+| Multi-turn + context | S3 + S3.5 + S4 | ~3.5 d | ✅ S3 (`ac2bb4d`+`b4cb550`), S3.5 (`64a34d4`), S4 (`fe2121a`) shipped |
+| Git-style + sections | S5 + S5.5 | ~3.5 d | 🔧 S5a (`5b5533e`), S5b (reverted `f5dea1a`), S5c-stop in flight on `vendor/LLMKernel @ wip/s5c-stop`; S5.5 queued |
+| Headless executor (new — not in original ladder) | S5.0.x | n/a | ✅ S5.0.3d (TCP+handshake, `ae7b1a6`), S5.0.3e (smoke driver, `73c6940`), S5.0.3.1 (live mode, `27c0fcc`) |
+| Persistence + UX | S6 + S7 + S8 + S9 + S10 | ~5.0 d | 🔧 S8 partial (`8d9bd39`); S9 (`5de3401`+`64a34d4`); S6/S7/S10 queued |
 
-Issue 1's ~10-day estimate was optimistic and predated the Issue 2 amendment. The ~17-18 day figure above is the realistic V1 UX shipping target after KB-target §0.10's additions.
+**Velocity reality**: the BSP-005 "working day" unit was sized for one mega-round agent in series. Observed wall-clock velocity with multi-agent parallel execution + atom-defined contracts is **~10× the budget**. S0.5 → S4 + S5.0.x + S5a + S8/S9 partials shipped in roughly 1 working day of wall-clock (overnight gap excluded). Remaining V1 UX work (S5.5 + S6 + S7 + S8-finish + S10 + S5c-stop completion) realistically lands in a small number of additional working hours at this pace.
+
+Don't pace to the "days" budget — pace to the slice ordering + dependency graph, which remain normative.
+
+> **Magic vocabulary note**: §2 above references the legacy `/spawn` and `@<id>:` directive shapes. The current canonical syntax is the `@@<kind>` cell-magic + `@<flag>` line-magic vocabulary; see [PLAN-S5.0-cell-magic-vocabulary.md](PLAN-S5.0-cell-magic-vocabulary.md) and [magic atom](../atoms/concepts/magic.md). The slice ladder itself is syntax-agnostic.
 
 ## Changelog
 
