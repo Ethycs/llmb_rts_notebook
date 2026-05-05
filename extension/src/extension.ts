@@ -188,7 +188,6 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
           if (prop === 'trace' || prop === 'debug' || prop === 'info' ||
               prop === 'warn' || prop === 'error') {
             return (msg: string, ...args: unknown[]): void => {
-              // eslint-disable-next-line no-console
               console.error(`[ext-log][${String(prop)}] ${msg}`,
                 ...(args.length > 0 ? [JSON.stringify(args)] : []));
               const orig = Reflect.get(target, prop, receiver) as (m: string, ...a: unknown[]) => void;

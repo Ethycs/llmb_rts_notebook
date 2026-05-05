@@ -117,7 +117,7 @@
     "watch": "tsc -watch -p ./",
     "package": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --external:node-pty --format=cjs --platform=node --minify",
     "package:renderer": "esbuild src/renderers/run-renderer.ts --bundle --outfile=dist/run-renderer.js --format=esm --platform=browser --minify",
-    "lint": "eslint src --ext ts",
+    "lint": "eslint src",
     "build:tests": "tsc -p ./tsconfig.test.json",
     "pretest:unit": "npm run build:tests",
     "test:unit": "mocha --config .mocharc-unit.cjs",
