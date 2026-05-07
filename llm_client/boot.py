@@ -233,7 +233,10 @@ def boot_minimal_kernel(
     server.start()
 
     # Re-bind dispatcher + tracker to real kernel (matches original smoke).
-    dispatcher = CustomMessageDispatcher(kernel)
+    # PLAN-S6.0 §3.D: plumb ``read_only`` to the dispatcher so its
+    # ``is_writable()`` self-report matches the connection's mode.
+    # ``EventLogReplayer.project_state`` asserts on this at the boundary.
+    dispatcher = CustomMessageDispatcher(kernel, read_only=read_only)
     tracker = RunTracker(
         trace_id=session_id,
         sink=dispatcher,
