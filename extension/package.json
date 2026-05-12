@@ -93,6 +93,11 @@
         "command": "llmnb.pinStatusHeader.openMenu",
         "title": "LLMNB: Pin status — open menu",
         "category": "LLMNB"
+      },
+      {
+        "command": "llmnb.inspect.openManifestDetail",
+        "title": "LLMNB: Inspect — show context manifest for this run",
+        "category": "LLMNB"
       }
     ],
     "configuration": {

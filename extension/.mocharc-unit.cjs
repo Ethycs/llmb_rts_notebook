@@ -18,11 +18,21 @@ const path = require('node:path');
 // tests have been migrated into test/unit/ yet. Until then, the unit
 // tier is a no-op — pointing mocha at a missing dir errors on
 // "argument 'id' must be a non-empty string". Detect the missing dir
-// and feed mocha an empty file pattern that resolves cleanly.
+// and feed mocha an empty file pattern that resolves cleanly. We walk
+// recursively so subdirectories under `test/unit/` (e.g.
+// `test/unit/inspect/`) count toward the "has tests" check.
 const unitDir = path.join(__dirname, 'out', 'test', 'test', 'unit');
-const hasUnitTests =
-  fs.existsSync(unitDir) &&
-  fs.readdirSync(unitDir).some((f) => f.endsWith('.test.js'));
+function dirHasTestFiles(dir) {
+  if (!fs.existsSync(dir)) return false;
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isFile() && entry.name.endsWith('.test.js')) return true;
+    if (entry.isDirectory()) {
+      if (dirHasTestFiles(path.join(dir, entry.name))) return true;
+    }
+  }
+  return false;
+}
+const hasUnitTests = dirHasTestFiles(unitDir);
 
 module.exports = {
   spec: hasUnitTests

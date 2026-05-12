@@ -83,6 +83,7 @@ import {
 } from './notebook/pin-status-header.js';
 import { registerResetContaminationCommand } from './notebook/commands/reset-contamination.js';
 import { registerRevealCellCommand } from './notebook/commands/reveal-cell.js';
+import * as inspect from './inspect/index.js';
 
 const NOTEBOOK_TYPE = 'llmnb';
 
@@ -490,6 +491,21 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
   activePinStatusHeader = pinStatusHeader;
   context.subscriptions.push({ dispose: () => pinStatusHeader.dispose() });
   context.subscriptions.push(registerPinStatusHeaderCommand(pinStatusRegistry, NOTEBOOK_TYPE));
+
+  // BSP-008 §11 — Inspect mode (read-only V1). Adds a per-cell status-bar
+  // item that summarizes the latest RunFrame + ContextManifest, plus a
+  // command (`llmnb.inspect.openManifestDetail`) that opens a per-manifest
+  // detail QuickPick. All read paths consume metadata.rts.zone.{run_frames,
+  // context_manifests} through the existing serializer + Family F applier;
+  // no parallel reader, no kernel changes.
+  context.subscriptions.push(
+    inspect.activate({
+      context,
+      notebookType: NOTEBOOK_TYPE,
+      router,
+      logger
+    })
+  );
 
   // RFC-005 §"metadata.rts.blobs" — instantiate a per-session BlobResolver so
   // renderers can resolve `$blob:sha256:` sentinels in attribute values. The
