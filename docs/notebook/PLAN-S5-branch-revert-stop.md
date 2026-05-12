@@ -1,6 +1,6 @@
 # Plan: S5 — Branch / revert / stop (line-magic vocabulary)
 
-**Status**: ready (refresh after S5.0/S5.0.1/S5.0.3)
+**Status**: V1 shipped (S5a branch, S5b revert, S5c stop; outer commits `5b5533e`, `f5dea1a`, `d2c2bc6`)
 **Audience**: an LLM (or operator) picking this up cold. Self-contained.
 **Goal**: ship the three git-style operator controls — `@branch`, `@revert`, `@stop` — end-to-end on the post-S5.0 magic substrate. Wire `AgentSupervisor.fork / revert / stop`, the `agent_branch` / `agent_revert` / `agent_stop` operator-action handlers, the writer intent handlers (`fork_agent`, `move_agent_head`), and the line-magic dispatch path that the S5.0 registry already reserves as stubs.
 **Time budget**: ~1.4 days. The substrate (turn DAG materialized at `metadata.rts.zone.agents.<id>.turns[]`, magic registry with reserved stubs, operator-action envelopes catalogued) is already shipped; the supervisor methods and writer handlers are NOT. Cross-layer (kernel + extension); single-agent feasible.

@@ -1,6 +1,6 @@
 # Plan: S5.0.3 — Driver extraction, public wire, external runnability
 
-**Status**: ready
+**Status**: V1 shipped (S5.0.3a-e campaign — wire promotion through console-script tests; outer commits `ef52369`..`b493ee5`)
 **Audience**: an LLM (or operator) picking this up cold. Self-contained.
 **Goal**: separate the kernel (server) from the driver (client) at the package level; promote the wire envelope schemas to a public API; add a TCP+token transport so external clients (a headless `llmnb` CLI, future Rust/Go drivers, remote orchestrators) can drive the kernel without forking the codebase.
 **Time budget**: ~2.3 dispatcher-days across 5 sub-slices (a/b/c sequential; d/e parallel after c).

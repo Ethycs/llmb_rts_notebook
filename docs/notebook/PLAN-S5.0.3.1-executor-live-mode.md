@@ -1,6 +1,6 @@
 # Plan: S5.0.3.1 — Executor live-mode completion (async recv loop + per-cell semantics)
 
-**Status**: ready
+**Status**: V1 shipped (S5.0.3.1 live-mode executor end-to-end; outer commit `27c0fcc`)
 **Audience**: an LLM (or operator) picking this up cold. Self-contained.
 **Goal**: complete `llm_client.executor.run_notebook(mode="live")` so it ships per-cell operator-action envelopes, drains kernel responses asynchronously, and persists the resulting Family F snapshot back to the notebook — replacing the current `NotImplementedError` raised after the hydrate envelope ships.
 **Time budget**: ~0.4 dispatcher-day (single agent). Re-derived from reading the existing driver code; the `KernelConnection.recv` path already exists for TCP (`llm_client/transport/tcp.py:137`), the in-process path returns `{}` synchronously (`llm_client/boot.py:97`), and `llm_client.driver.ship_envelope` already implements the correlation-id wait loop. The remaining work is a thin `_run_live_mode` body and one integration test.

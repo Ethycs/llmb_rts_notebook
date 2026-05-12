@@ -1,6 +1,6 @@
 # Driver
 
-**Status**: V1.5 shipped (PLAN-S5.0.3e landed 2026-04-29; outer commit pin TBD-after-commit; submodule pin TBD-after-commit; live-mode functional as of PLAN-S5.0.3.1 / outer commit `27c0fcc`, 2026-04-30)
+**Status**: V1.5 shipped (PLAN-S5.0.3e landed 2026-04-29; outer commit pin `b493ee5`; submodule pin `2c090a4`; live-mode functional as of PLAN-S5.0.3.1 / outer commit `27c0fcc`, 2026-04-30)
 **Source specs**: [PLAN-S5.0.3 §3](../../notebook/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#3-reorg-shape) (package layout), [PLAN-S5.0.3 §6](../../notebook/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#6-cli-surface) (executor CLI), [PLAN-S5.0.3 §9](../../notebook/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#9-interface-contracts-locked-before-dispatch) (driver interface contracts), [RFC-008 §"Transport boundary"](../../rfcs/RFC-008-pty-transport.md)
 **Related atoms**: [agent](agent.md), [transport-mode](transport-mode.md), [discipline/wire-as-public-api](../discipline/wire-as-public-api.md), [contracts/kernel-client](../contracts/kernel-client.md), [protocols/wire-handshake](../protocols/wire-handshake.md)
 
@@ -49,9 +49,9 @@ V2+ candidates: a Rust orchestrator over TCP; a Jupyter ZMQ shim driver wrapping
 
 Pre-S5.0.3, every smoke and one-off automation imported kernel internals because there was no other path. Each new driver path multiplied the "almost-the-wire-but-not-quite" surface, and changes to internals silently broke smokes that were supposed to be exercising the wire. Naming "driver" as a category — and locking the lint boundary — makes the contract surface visible. Anything that wants to drive the kernel either uses the wire or it isn't a driver.
 
-<!-- S5.0.3b ship note: llm_client/ package created; boot_minimal_kernel + KernelConnection in llm_client/boot.py; ship_envelope + collect_snapshots in llm_client/driver.py; transport stubs in llm_client/transport/; _run_agent_supervisor_smoke refactored to consume boot_minimal_kernel; lint boundary enforced by tests/test_lint_boundary.py. Source commit: <TBD-after-commit>. Status NOT flipped — awaiting S5.0.3c/d/e. -->
+<!-- S5.0.3b ship note: llm_client/ package created; boot_minimal_kernel + KernelConnection in llm_client/boot.py; ship_envelope + collect_snapshots in llm_client/driver.py; transport stubs in llm_client/transport/; _run_agent_supervisor_smoke refactored to consume boot_minimal_kernel; lint boundary enforced by tests/test_lint_boundary.py. Source commit: `221ffd2` (outer pin `10662c2`). Status NOT flipped — awaiting S5.0.3c/d/e. -->
 
-<!-- S5.0.3e ship note (campaign endpoint): console-script entry point `llmnb` verified (pyproject.toml [project.scripts]); `llmnb smoke <name>` migrated to native via llm_client._test_helpers.smokes shim (option a — lint-exempted _test_helpers, no subprocess spawn); deprecation notices added to `python -m llm_kernel {paper-telephone,agent-supervisor,metadata-writer,pty-mode}-smoke` aliases (print to stderr, V2 hard-removes); pixi task `check-builds` added; campaign acceptance tests in tests/test_campaign_smoke.py; tests/test_console_script.py added. Status flipped to V1.5 shipped. Source commit: TBD-after-commit. After this campaign: V2 removes the old `python -m llm_kernel *-smoke` aliases; multi-client kernel; Rust/Go orchestrator driver over TCP. -->
+<!-- S5.0.3e ship note (campaign endpoint): console-script entry point `llmnb` verified (pyproject.toml [project.scripts]); `llmnb smoke <name>` migrated to native via llm_client._test_helpers.smokes shim (option a — lint-exempted _test_helpers, no subprocess spawn); deprecation notices added to `python -m llm_kernel {paper-telephone,agent-supervisor,metadata-writer,pty-mode}-smoke` aliases (print to stderr, V2 hard-removes); pixi task `check-builds` added; campaign acceptance tests in tests/test_campaign_smoke.py; tests/test_console_script.py added. Status flipped to V1.5 shipped. Source commit: outer `b493ee5`; submodule `2c090a4`. After this campaign: V2 removes the old `python -m llm_kernel *-smoke` aliases; multi-client kernel; Rust/Go orchestrator driver over TCP. -->
 
 <!-- S5.0.3.1 ship note (live-mode): _run_live_mode no longer raises NotImplementedError. Executor now boots the kernel, ships a hydrate envelope via ship_envelope, and collects snapshots via collect_snapshots. This is the first non-extension, non-smoke driver to traverse the complete wire path in a real (non-stub, non-replay) execution. Source commit: outer 27c0fcc, 2026-04-30. -->
 
@@ -69,7 +69,7 @@ Pre-S5.0.3, every smoke and one-off automation imported kernel internals because
      cells; True auto-rejects). Stub mode is deterministic (10x byte-
      identical); replay mode records verbatim and matches by ordinal+cell_id.
      Live mode V1: boots kernel + ships hydrate then raises NotImplementedError
-     citing S5.0.3d. Source commit: <TBD-after-commit>. Status NOT flipped. -->
+     citing S5.0.3d. Source commit: `385589a` (S5.0.3c CLI subcommands endpoint). Status NOT flipped. -->
 
 <!-- S5.0.3d ship note: TCP transport + handshake envelope shipped.
      Files added: vendor/LLMKernel/llm_kernel/serve_mode.py (kernel-side
@@ -96,7 +96,7 @@ Pre-S5.0.3, every smoke and one-off automation imported kernel internals because
      (kernel_busy + reconnect-after-disconnect), test_auth_token_storage.py
      (init/verify/refuse-tracked/custom-name/env-precedence), and
      vendor/LLMKernel/tests/test_serve_subcommand.py (argv parsing).
-     Source commit: <TBD-after-commit>. Status: this slice flips
+     Source commit: outer `ae7b1a6` (submodule bump); atoms Status-flip outer `38360b3` / `2653dcd`. Status: this slice flips
      wire-handshake + transport-mode atoms to V1.5 shipped. -->
 
 `connect_to_kernel(bind, token=..., transport="tcp")` is the **clean external-driver entry point** that ships with this slice. Unlike `boot_minimal_kernel` (which uses MagicMock scaffolding for in-process smokes), `connect_to_kernel` opens a real socket, performs the handshake, and returns a `KernelConnection` backed by the transport. Drivers running in a separate process from the kernel (the headless `llmnb execute` against a remote kernel; future Rust/Go orchestrators reading the JSON wire schemas) use this path. See [protocols/wire-handshake](../protocols/wire-handshake.md) for the envelope shape.

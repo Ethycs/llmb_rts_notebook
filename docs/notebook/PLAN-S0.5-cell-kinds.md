@@ -1,6 +1,6 @@
 # Plan: S0.5 — Cell kinds typed enum
 
-**Status**: ready
+**Status**: V1 shipped (S5.0 vocabulary materialized cell-kinds; outer commit `336a6c7`)
 **Audience**: an LLM (or operator) picking this up cold. Self-contained.
 **Goal**: add a required `metadata.rts.cells[<id>].kind` enum field to the writer so V1 cells carry one of `agent | markdown | scratch | checkpoint` (with `tool | artifact | control | native` reserved as forward-compat slots), unblocking every downstream slice that branches on cell kind.
 **Time budget**: 0.5 days. Single-agent. Not parallelizable internally; blocks S5 / S5.5 / S6 / S3.5's checkpoint-handling.

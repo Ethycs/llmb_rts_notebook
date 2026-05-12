@@ -1,6 +1,6 @@
 # Plan: S3.5 — ContextPacker simple-walker
 
-**Status**: ready
+**Status**: V1 shipped (S3.5 ContextPacker + G10/G11/G12 acceptance; outer commits `64a34d4`, `441923f`)
 **Audience**: an LLM (or operator) picking this up cold. Self-contained.
 **Goal**: implement the V1 ContextPacker as a pure, deterministic structural walker that produces a `ContextManifest` per cell run, persisted via the new `record_context_manifest` BSP-003 intent.
 **Time budget**: 1 day. Single-agent. Depends on S3 (multi-turn) shipped; blocks S4's cross-agent handoff.

@@ -1,6 +1,6 @@
 # Plan: S4.1 — Turn-graph persistence + writer-handler completion
 
-**Status**: ready
+**Status**: V1 shipped (S4.1 turn-graph persistence + S4.2 update_agent_session handler; outer commits `2e73e0e`, `935fda0`)
 **Audience**: an LLM (or operator) picking this up cold. Self-contained.
 **Goal**: close the V1.5 substrate gap PLAN-S4 §10 queued (and that S5a / S5b inherited): land the metadata-writer turn-graph persistence — `append_turn`, `fork_agent`, `move_agent_head`, plus a real `record_event` shape for `kind: "agent_ref_move"` — migrate `AgentSupervisor._missed_turns` off the in-memory `_turns` cache onto `metadata.rts.zone.agents.<id>.turns[]`, and re-enable the three multi-agent live smokes PLAN-S4 §9 deferred.
 **Time budget**: ~0.7-0.9 day. Up from PLAN-S4 §10's "0.3-0.5 day delta" guess after reading the code: four writer handlers (not one) need to flip + a new `agent_ref_move` event branch on `record_event`; the supervisor migration deletes `record_turn` + `_turns` (option (a) below) which forces test-rewrite churn for ~14 existing tests that call `sup.record_turn(...)`. Single-agent feasible.

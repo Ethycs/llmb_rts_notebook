@@ -1,6 +1,6 @@
 # Plan: S5.0 — Cell magic vocabulary (IPython-style `@`/`@@`)
 
-**Status**: ready
+**Status**: V1 shipped (S5.0 cell-magic dispatcher + submodule bump; outer commit `336a6c7`)
 **Audience**: an LLM (or operator) picking this up cold. Self-contained.
 **Goal**: adopt the IPython magic model — `@line_magic` for one-line cell-flag mutations, `@@cell_magic` for cell-kind declarations — with `@@break` as the explicit cell separator. Cells and `@@<magic>` blocks are interchangeable: constructing a cell IS writing a `@@<kind>` block bounded by `@@break`s.
 **Time budget**: ~2.85 days. Single cross-layer agent (kernel parser/registry + extension editor/serializer).
