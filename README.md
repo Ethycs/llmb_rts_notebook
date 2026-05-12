@@ -14,7 +14,7 @@ with [`docs/atoms/`](docs/atoms/) holding canonical definitions and
 [`docs/notebook/`](docs/notebook/) + [`docs/rfcs/`](docs/rfcs/)
 holding behavioral and wire-format specs.
 
-## Status — V1 substrate operationally functional (2026-05-02)
+## Status — V1 kernel feature-complete + Inspect mode shipped (2026-05-07)
 
 V1 cell-side substrate is shipped end-to-end. Operator `@@spawn` /
 `@@agent` / `@<flag>` cell-magic dispatches; agent processes spawn and
@@ -23,6 +23,45 @@ and the headless executor all work. The cell schema collapsed in S5.0
 to `{text, outputs, bound_agent_id}` with kind/flags parse-derived from
 text via the `@@` cell-magic + `@` line-magic vocabulary
 ([magic atom](docs/atoms/concepts/magic.md)).
+
+**V1.6+ shipped since 2026-05-02:**
+
+- **BSP-007 overlay graph** — operator-side, git-style commits over
+  the agent turn DAG. `apply_commit` / `revert_to_commit` / `diff` /
+  `branch` primitives; 17 V1 op kinds; §6 cell-merge correctness
+  validators; K90-K95 failure modes. ([commit `3a430cb`](docs/notebook/BSP-007-overlay-git-semantics.md))
+- **BSP-008 RunFrames + ContextPacker integration** — every agent
+  turn now persists a `record_context_manifest` + start/terminal
+  `record_run_frame` trail through the BSP-003 intent path.
+  ([commit `3a430cb`](docs/notebook/BSP-008-contextpacker-runframes.md))
+- **PLAN-S6.0 in-tree event log + hydrate-replay safety** — the
+  event log lives in `metadata.rts.event_log[]`; `EventLogReplayer`
+  asserts `dispatcher.is_writable() == False` at the boundary to
+  prevent double-emission on reopen. ([commit `03de446`](vendor/LLMKernel/llm_kernel/event_log.py))
+- **Inspect mode V1 (read-only)** — per-cell status bar item shows
+  latest RunFrame + ContextManifest summary; click opens manifest
+  detail QuickPick rendering the inclusion/exclusion trace per
+  BSP-008 §11. ([commit `92c7412`](extension/src/inspect/))
+- **Standalone TCP server** — `python -m llm_kernel serve` with
+  bearer-token auth lets external drivers (CLI, future Rust/Go
+  orchestrators) attach over TCP. Validation task filed at
+  [`docs/ops/validate-serve-mode.md`](docs/ops/validate-serve-mode.md).
+- **Tier-3 live OAuth+mitm smoke green** — 6 Anthropic API calls
+  intercepted; notify + report_completion emitted by the agent.
+  Three latent harness bugs surfaced and fixed in `28c3658`
+  (LogRecord `name` collision, missing `send_user_turn` after spawn,
+  missing stdin close).
+- **Engineering Guide §11.9** — new anti-pattern entry on
+  `logger.*(..., extra={...})` keys colliding with reserved
+  `LogRecord` attribute names; codifies the rule from the
+  magic-injection-defense atom on the path of anyone editing logging.
+- **Repo hygiene** — legacy `vendor/LLMKernel/vscode-llm-kernel-extension/`
+  removed (74 files); platforms expanded to `win-64`+`linux-64`+`osx-arm64`;
+  ESLint 9 flat config landed for the active extension.
+
+Test surface: **795 kernel tests + 225 stub contract tests + 100
+outer driver tests** all green; full kernel suite runs in ~30s under
+xdist.
 
 Shipped slices (per [BSP-005 §6.5](docs/notebook/BSP-005-cell-roadmap.md#65-slice-ladder-totals-after-issue-2--and-observed-velocity-2026-05-02-update)):
 
@@ -37,8 +76,11 @@ Shipped slices (per [BSP-005 §6.5](docs/notebook/BSP-005-cell-roadmap.md#65-sli
 | ✅ | S5.0 cell-magic vocabulary + S5.0.1 injection defenses | `336a6c7` + `88ffb15` |
 | ✅ | S5.0.3.x headless executor (TCP + handshake + live mode) | `ae7b1a6` → `27c0fcc` |
 | ✅ | S5a / S8 partial / S9 interrupt | `5b5533e` / `8d9bd39` / `5de3401`+`64a34d4` |
-| 🔧 | S5c-stop in flight | `vendor/LLMKernel @ wip/s5c-stop` |
-| ⬜ | S5.5 sections, S6 cell-binding + RunFrame, S7 sidebar trees, S8 finishing, S10 three-pane + search | queued |
+| ✅ | S5c stop | `wip/s5c-stop` merged |
+| ✅ | S6.0 in-tree event log + hydrate-replay safety | `264b69c` + `03de446` |
+| ✅ | BSP-007 overlay applier + BSP-008 RunFrames | `3a430cb` |
+| ✅ | Inspect mode V1 (read-only per-cell + manifest detail) | `92c7412` |
+| ⬜ | S5.5 sections, S7 sidebar trees, History mode panel, S10 three-pane + search | queued |
 
 Observed velocity is roughly 10× the BSP-005 "working day" budget
 (which was sized for one mega-round agent in series); see [BSP-005 §6.5](docs/notebook/BSP-005-cell-roadmap.md#65-slice-ladder-totals-after-issue-2--and-observed-velocity-2026-05-02-update).

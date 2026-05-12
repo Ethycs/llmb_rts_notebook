@@ -5,7 +5,7 @@ of [`vendor/vscode-jupyter`](../vendor/vscode-jupyter/) per
 [DR-0011](../docs/decisions/0011-subtractive-fork-vscode-jupyter.md)
 and [chapter 07](../docs/dev-guide/07-subtractive-fork-and-storage.md).
 
-## Status — operationally functional (2026-05-02)
+## Status — operationally functional + Inspect mode V1 (2026-05-07)
 
 V1 substrate is shipped. Extension registers a single
 `NotebookController` for `.llmnb`, dispatches via the cell-magic
@@ -30,13 +30,21 @@ Shipped extension surfaces:
 - **S8** partial inline `vscode.diff` for `propose_edit` spans
   (production code; contract tests pending).
 - **S9** cell-toolbar interrupt button (SIGINT to agent process).
+- **Inspect mode V1** (commit `92c7412`) — read-only per-cell view of
+  the latest RunFrame + ContextManifest produced by the kernel's
+  BSP-008 substrate ([atoms/concepts/run-frame.md](../docs/atoms/concepts/run-frame.md),
+  [atoms/concepts/context-manifest.md](../docs/atoms/concepts/context-manifest.md)).
+  Cell-toolbar status item shows `▶ <run_id> (<status>) · N cells / K
+  excluded`; click opens a manifest detail QuickPick rendering the
+  inclusion/exclusion trace per [BSP-008 §11](../docs/notebook/BSP-008-contextpacker-runframes.md).
+  Surfaced by the `llmnb.inspect.openManifestDetail` command. Read-only
+  in V1; no mutation paths. Code under [src/inspect/](src/inspect/);
+  33 unit + 6 contract tests at [test/unit/inspect/](test/unit/inspect/)
+  and [test/contract/inspect-cell-status.test.ts](test/contract/inspect-cell-status.test.ts).
 
-Queued: S5.5 sections, S6 cell↔turn binding write-back + RunFrame
-minimal, S7 sidebar trees, S8 finishing, S10 three-pane mental model +
+Queued: S5.5 sections, History mode (overlay-commit timeline panel),
+S7 sidebar trees, S8 finishing, S10 three-pane mental model +
 FSP-002 search/collapse.
-
-S5c-stop (`/stop` semantics) is in flight on the kernel submodule
-branch `vendor/LLMKernel @ wip/s5c-stop`.
 
 See [docs/notebook/BSP-005-cell-roadmap.md §6.5](../docs/notebook/BSP-005-cell-roadmap.md#65-slice-ladder-totals-after-issue-2--and-observed-velocity-2026-05-02-update) for the
 full slice ladder + observed velocity.

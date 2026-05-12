@@ -98,7 +98,7 @@ cd extension && pixi run -e kernel npm run test:contract -- --grep "parseCellDir
 
 The `--ignore` list excludes upstream LLMKernel tests that depend on `ipywidgets` (not in our Pixi env). Keep this list updated as upstream churns; cf. Engineering Guide §9.2.
 
-Expected: ~291 passed + 2 skipped + 0 errors in <30s.
+Expected (as of 2026-05-07): **795 passed + 2 skipped + 0 errors** in <30s. Plus **100 passed** in the outer driver tests (`pixi run -e kernel python -m pytest tests/`).
 
 #### Extension contract suite (includes integration smoke + Layer 1 e2e)
 
@@ -106,7 +106,7 @@ Expected: ~291 passed + 2 skipped + 0 errors in <30s.
 cd extension && pixi run -e kernel npm run test:contract
 ```
 
-Expected: ~106 passing + 1 pending (the live-Claude e2e test; see §6).
+Expected (as of 2026-05-07): **225 passing + 1 pending** in the stub tier (`npm run test:stub`). Plus **33 unit tests** under `test/unit/` (`npm run test:unit`) including the Inspect mode tests added with the BSP-008 §11 ship.
 
 ### Tier 3 — kernel smokes
 
@@ -131,13 +131,30 @@ Asserts: `MetadataWriter` builds a `notebook.metadata` Family F snapshot with th
 #### Tier 3c — agent-supervisor (live Anthropic; needs auth)
 
 ```bash
-LLMKERNEL_USE_PASSTHROUGH=1 PYTHONPATH=vendor/LLMKernel \
+LLMKERNEL_USE_PASSTHROUGH=1 LLMKERNEL_USE_BARE=1 PYTHONPATH=vendor/LLMKernel \
   pixi run -e kernel python -m llm_kernel agent-supervisor-smoke
 ```
 
 Asserts: a real Claude Code subprocess spawns with the project's MCP config, makes 5+ Anthropic API calls (intercepted via mitmproxy), emits `notify` + `report_completion`, and run records flow through to the dispatcher. **Requires a working `.env` with `ANTHROPIC_API_KEY` at the repo root.** ~30s; ~$0.01-0.05 in API cost per run.
 
 Without `LLMKERNEL_USE_PASSTHROUGH=1`, the smoke calls Anthropic directly without mitm — same auth, just no flow capture.
+
+`LLMKERNEL_USE_BARE=1` forces the API-key auth path (bypasses Claude's OAuth keychain). Required when no prior `claude login` has happened — without it Claude hangs on browser-based auth.
+
+**Tier-3 status (2026-05-07): reliably green.** The harness recently fixed three latent bugs surfaced by re-running it after weeks of dormancy (commit `28c3658`):
+
+- `mcp_server._log_run` had `extra={"name": ...}` colliding with `LogRecord.name` — every MCP tool call raised `KeyError`, tools appeared "unavailable" to the agent. Fixed by namespacing to `"span.name"`. See Engineering Guide §11.9.
+- The smoke spawn path never seeded the initial agent turn. With `--input-format=stream-json`, Claude ignores the trailing positional argv and reads turns from stdin only. Fixed by calling `supervisor.send_user_turn(...)` after `spawn(...)`.
+- The smoke harness never closed Claude's stdin. With stream-json input, Claude waits for more turns until stdin EOF. Fixed by `handle.popen.stdin.close()` after the turn write.
+
+**`LLMNB_CLAUDE_BIN` env-var override.** The pixi env ships a stale `claude.cmd` wrapper (v2.1.119) pointing at paths that may not exist. The supervisor's discovery probe finds it first. If you have a newer `claude` installed elsewhere (e.g. via `npm install -g @anthropic-ai/claude-code` under nvm-managed node), set `LLMNB_CLAUDE_BIN` to its absolute path before running the smoke:
+
+```bash
+# PowerShell
+$env:LLMNB_CLAUDE_BIN = "$env:APPDATA\npm\claude.cmd"
+```
+
+The supervisor's `zone_control.locate_claude_bin()` consults this env var first.
 
 ### Tier 4 — Layer 1 e2e (live VS Code + real kernel)
 
