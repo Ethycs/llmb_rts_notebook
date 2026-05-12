@@ -12,10 +12,12 @@ The section is distinct from the kernel-side [zone](zone.md). Kernel `zone_id` =
 
 ## Schema
 
+> **V1 storage shape note**: The JSON diagram below shows the per-entry schema. In the V1 production implementation (`llm_kernel/overlay_applier.py`), `zone.sections` is a **dict keyed by `section_id`**, not a list: `zone.sections[<section_id>] = { id, title, ... }`. This dict shape is normative for V1 (O(1) lookup; pinned by BSP-007 §2.2). Future S5.5 work must conform to the dict-keyed container. The list notation below describes the per-entry fields only.
+
 ```jsonc
 "zone": {
-  "sections": [
-    {
+  "sections": {                                  // dict keyed by section_id (V1)
+    "sec_01HZX...": {
       "id": "sec_01HZX...",                     // ULID; immutable
       "title": "Architecture",                   // mutable
       "parent_section_id": null,                 // V1: MUST be null (flat)
@@ -28,7 +30,7 @@ The section is distinct from the kernel-side [zone](zone.md). Kernel `zone_id` =
       "collapsed": false,
       "flow_policy": null                        // V2+ slot; MUST be null in V1
     }
-  ]
+  }
 }
 ```
 

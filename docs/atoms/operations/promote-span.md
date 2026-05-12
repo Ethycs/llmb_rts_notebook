@@ -19,7 +19,7 @@
 }
 ```
 
-Returns: `new_cell_id` (deterministic from `commit_id` + `span_id`).
+Returns: `new_cell_id`. By default this is **non-deterministic** (`prom_<span_id>_<uuid8>`); callers who need replay-stable addressing MUST pass an explicit `new_cell_id` param (see §"Cell-id determinism" below).
 
 ## Decision D7 — kind inferred from span type
 
@@ -55,6 +55,16 @@ If the operator passes an explicit `cell_kind` that conflicts with the inference
 
 - **V1**: one cell per promote; deterministic kind inference; default section placement.
 - **V2+**: bulk-promote selections; promote-with-summary affordance (auto-checkpoint a promoted prose span); cross-zone promote.
+
+## Cell-id determinism (Option A — V1 trade-off)
+
+**Decision**: V1 uses Option A (non-deterministic by default; caller-supplied override for determinism).
+
+By default `new_cell_id` is `prom_<span_id>_<uuid8>` — non-deterministic across replays. This is acceptable because `commit_id` is minted *after* all ops succeed (atomicity), so the op cannot depend on `commit_id` without a two-phase mint (Option B). Option B would be more correct for replay equivalence but adds significant implementation complexity.
+
+**Replay equivalence is preserved when the caller supplies `new_cell_id`** from a stable, deterministic source (e.g., a ULID derived from the notebook's session and span_id). Callers who need stable replay MUST pass the explicit `new_cell_id` param.
+
+Option B (mint `commit_id` before dispatch so ops can derive deterministic cell-ids) is deferred to V2. If replay-exact provenance becomes a hard requirement before V2, the applier can be extended to a two-phase path without changing the op signature.
 
 ## See also
 

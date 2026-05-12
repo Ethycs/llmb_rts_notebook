@@ -49,6 +49,21 @@ Forbidden in V1. **K94**. The operator must split first if they need to re-arran
 
 Sub-turn addressing per BSP-002 §13.3: `cell:c_a` resolves to the whole merged cell; `cell:c_a.1` ... `cell:c_a.(N+M)` resolve to individual turns in display order. `cell:c_b` becomes invalid and returns a "merged into c_a" hint per BSP-007 ref-resolution.
 
+### Writer-owned metadata stamps (V1 decision — writer-owned)
+
+On a successful `merge_cells(cell_a, cell_b)`, the overlay applier (`llm_kernel/overlay_applier.py`) stamps the following **writer-owned** fields on `cell_a`'s metadata record (inside `metadata.rts.cells[cell_a]`):
+
+- **`merged_from: [cell_b, ...]`** — ordered list of absorbed cell-ids. Allows the operator UI to explain "c_b was merged into c_a" without re-walking `commits[]`. Persists across serialize/deserialize.
+- **`sub_turn_addressing: True`** — signals to the renderer that `cell:c_a.k` (1-indexed) addressing is now valid for this cell.
+
+**Ownership decision**: these fields are **writer-owned** (not renderer-derived). The trade-off:
+- *Benefit*: the operator UI can surface merge history without growing the renderer's overlay-walk complexity.
+- *Cost*: writer-owned fields that future renderers must respect; they cannot be ignored.
+
+A renderer-derived alternative (walking `commits[]` at render time) was considered but rejected for V1 because overlay history depth may be unbounded. Writer-owned stamps keep the renderer O(1) for merge history.
+
+See BSP-007 §6.4 for the sub-turn addressing semantics.
+
 ## V1 vs V2+
 
 - **V1**: same-section, same-kind, same-agent merges only. Re-merge forbidden.

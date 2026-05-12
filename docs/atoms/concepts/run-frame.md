@@ -21,7 +21,7 @@ RunFrames are append-only; they survive notebook close → reopen via the `metad
   "turn_head_before":     "turn_id | null",          // null if first turn for this agent
   "turn_head_after":      "turn_id | null",          // null if run failed before any turn committed
   "context_manifest_id":  "ulid",                    // points at ContextManifest
-  "status":               "complete | failed | interrupted",
+  "status":               "running | complete | failed | interrupted",
   "started_at":           "iso8601",
   "ended_at":             "iso8601 | null"           // null while running; set on terminal status
 }
@@ -29,7 +29,8 @@ RunFrames are append-only; they survive notebook close → reopen via the `metad
 
 ## Invariants
 
-- **Immutable historical record.** Once written, fields do not change with one exception: terminal-status update is allowed via `record_run_frame` idempotent on `run_id` (start frame writes `status: "complete"` placeholder; terminal frame sets the actual status + `ended_at`). V2 may split this into `update_run_frame_status` for cleanliness.
+- **`status: "running"` is the intermediate status** emitted by the AgentSupervisor at run start (BSP-008 §8). It is replaced by a terminal status (`complete | failed | interrupted`) via a follow-up `record_run_frame` with the same `run_id` (idempotent on `run_id`). A RunFrame with `status: "running"` and `ended_at: null` represents an in-flight run.
+- **Immutable historical record.** Once written, fields do not change with one exception: terminal-status update is allowed via `record_run_frame` idempotent on `run_id` (start frame writes `status: "running"`, `ended_at: null`; terminal frame sets the actual terminal status + `ended_at`). V2 may split this into `update_run_frame_status` for cleanliness.
 - **Append-only.** RunFrames are never deleted. Re-running a cell creates a NEW RunFrame; the prior one is preserved.
 - **Pinned to original `cell_id` across overlay edits** (decision S5). Splits, merges, moves do not rewrite RunFrames. Inspect mode resolves the original `cell_id` against current overlay state and renders any "since split / since merged into ..." hints.
 - **Pinned to original flag state** (decision F1). Toggling pin/exclude/scratch/checkpoint after a run does NOT modify the RunFrame. New runs see new flag state; old RunFrames record what was true at the time.

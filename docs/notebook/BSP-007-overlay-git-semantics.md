@@ -73,6 +73,8 @@ The overlay graph is a chain of **commits**, each of which records an ordered li
 
 Persistence follows BSP-003's directory-mirroring rule (BSP-002 §8.1). Future directory layout: `overlay/commits/<commit_id>.json` and `overlay/refs.json`. Round-trip equivalence with the JSON form is required.
 
+**`zone.sections` shape (V1 pinned by applier)**: The [section atom](../atoms/concepts/section.md) schema diagram shows `sections: [...]` (a list). The V1 overlay applier (`llm_kernel/overlay_applier.py`) implements `zone.sections` as a **dict keyed by `section_id`** (`zone.sections[<section_id>] = { id, title, parent_section_id, cell_range, summary, status, collapsed, flow_policy }`). The dict shape ships V1 — it enables O(1) section lookup and is the normative production shape. The section atom's list diagram is a display convenience; it describes the per-entry schema, not the container type. Future S5.5 work MUST conform to the dict-keyed shape; any spec or atom that implies a list container must be read with this note in view.
+
 ### 2.3 Refs
 
 - `HEAD` always exists once the first commit lands; before that, the overlay is empty and the cell layout is the bare BSP-002 turn ordering.
@@ -208,6 +210,8 @@ These are all subsumed by §6.1 but enumerated explicitly because each is a dist
 ### 6.4 Sub-turn output
 
 (KB-target §0.2.) A successful `merge_cells(cell_a, cell_b)` produces sub-turns: cell_a's existing turns become `cell_a.1 ... cell_a.N`; cell_b's turns are appended as `cell_a.(N+1) ... cell_a.(N+M)`. The sub-turn addressing (`cell:c_a.k`) is the V1 stable handle for any inbound reference (KB-target §14).
+
+The applier also stamps **writer-owned** fields `merged_from: [cell_b]` and `sub_turn_addressing: True` on `cell_a`. These persist in `metadata.rts.cells[cell_a]` so Inspect mode can surface merge provenance in O(1) without walking `commits[]`. See [merge-cells atom §"Writer-owned metadata stamps"](../atoms/operations/merge-cells.md#writer-owned-metadata-stamps-v1-decision--writer-owned) for the full ownership rationale.
 
 ## 7. Failure modes (K-class — overlay-commit namespace, K90+)
 

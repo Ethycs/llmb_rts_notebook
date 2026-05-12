@@ -538,6 +538,27 @@ Generalization: **a settings.json under a test fixture's `.vscode/` is part of t
 
 This anti-pattern surfaced as 3 simultaneous extension-test failures (K71 + K72 + a `lastAcceptedVersion === undefined` assertion in `metadata-applier.test.ts`). All three had the same root cause and all three were fixed by deleting one line from `extension/test/fixtures/workspace/.vscode/settings.json`. The cost of finding it: most of an hour of speculation that the failures were the bug we'd already fixed twice. The cost of avoiding it: knowing the priority order.
 
+### 11.9 `extra=` keys colliding with `LogRecord` reserved names
+
+Python's `logging.LogRecord` reserves a fixed set of attribute names (`name`, `msg`, `args`, `levelname`, `levelno`, `pathname`, `filename`, `module`, `exc_info`, `exc_text`, `stack_info`, `lineno`, `funcName`, `created`, `msecs`, `relativeCreated`, `thread`, `threadName`, `processName`, `process`, `message`). When `logger.info(msg, extra={"name": ...})` runs, Python raises `KeyError: "Attempt to overwrite 'name' in LogRecord"` and the log call dies before any handler sees it.
+
+This is exactly what happened to `mcp_server._log_run`:
+
+1. The B1-fallback (no run-tracker) path emitted a structured log line as a stand-in for the RFC-003 envelope.
+2. The `extra` dict carried `"name": tool_name` directly — the OTel span semantic with no namespace.
+3. Every MCP tool call hit this path and raised `KeyError`.
+4. The `KeyError` bubbled out of the handler, claude saw "No such tool available: <tool_name>" for every call, and the agent gave up.
+
+The Tier-3 live smoke caught it. Unit tests didn't, because they exercised the run-tracker path (where `extra=` isn't constructed in the same shape) and the file-only logging path (which doesn't surface the error to a meaningful place).
+
+The fix was one line: `"name": tool_name` → `"span.name": tool_name`. The dot makes the key a namespaced string, not the reserved attribute name.
+
+Generalization: **anywhere you write `logger.*(..., extra={...})`, every key in `extra` MUST be namespaced (contain a `.`) or guaranteed not to collide with the reserved set above.** This rule lives in `docs/atoms/discipline/magic-injection-defense.md` as a positive pattern; the §11.9 entry points implementation work at it. The atom is the principle; this entry is the trip-wire.
+
+The diagnostic trick: when a tool/handler/callback is mysteriously failing with no log output at all, suspect a logging error inside the handler is suppressing its own stack trace. Test the failing code path inside `try: logger.info("x", extra={...}) except Exception as e: print(e)` and watch for `KeyError` on a reserved key.
+
+The cost of finding it via Tier-3 smoke: ~15 minutes of test invocations once the symptom narrowed to "MCP tools unavailable." The cost of avoiding it: namespacing every `extra=` key by reflex.
+
 ---
 
 ## 12. The Bell System reference, in practice

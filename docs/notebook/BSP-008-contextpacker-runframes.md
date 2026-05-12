@@ -201,7 +201,9 @@ RunFrames are persisted in `metadata.rts.zone.run_frames.<run_id>`. New collecti
 | record_run_frame | kernel (AgentSupervisor) | run_frames.<run_id> | Append-only; idempotent on run_id |
 ```
 
-A single run produces multiple intents over its lifetime: one `record_run_frame` at start (`status: "complete" | "failed" | "interrupted"` set at end via a follow-up `record_run_frame` with the same `run_id` — idempotency-on-`run_id` allows update-in-place for the terminal status field). V2 may split this into a separate `update_run_frame_status` intent if cleaner; V1's idempotency-by-id covers it.
+A single run produces multiple intents over its lifetime: one `record_run_frame` at start (with `status: "running"` and `ended_at: null`); a follow-up `record_run_frame` with the same `run_id` and a terminal `status` (`complete | failed | interrupted`) plus `ended_at` — idempotency-on-`run_id` allows update-in-place for the terminal status and timing fields. V2 may split this into a separate `update_run_frame_status` intent if cleaner; V1's idempotency-by-id covers it.
+
+**V1 timing limitation**: The terminal `record_run_frame` is emitted by the AgentSupervisor at stdin-write success — i.e., when the user turn has been delivered to the agent process, NOT when the agent finishes its reply. The agent's response streams asynchronously through the stdout reader. As a consequence, `started_at` and `ended_at` in the terminal frame are stamped within the same call, making the V1 `duration` (as seen in Inspect mode) read as approximately 0 ms. This is misleading and is a known V1 limitation. A V2 stdout-completion detector (see §13 FLAGGED entry) will provide accurate end-to-end durations. Inspect mode UI SHOULD label durations as "dispatch duration (V1)" to make the limitation visible to operators.
 
 ## 9. Module placement
 
@@ -297,6 +299,8 @@ What V1 shapes do not need reshaping for V2:
 - **K-class codes** K104+ stay reserved for V2 ContextPacker failure modes (budget overflow rejected, ranking divergence detected, etc.).
 
 The discipline: **V1 underdelivers in policy but commits to the schema shape.** V2 fills in the policy without migrating the data.
+
+**FLAGGED for V2 — stdout-completion detector**: V1 terminal-frame timing reflects supervisor dispatch (stdin-write success), not agent reply completion. The `ended_at` field in the terminal RunFrame is stamped when the user turn is delivered to the agent's stdin — the agent's stdout response streams asynchronously afterward. V1 Inspect-mode durations will therefore read as ~0 ms. A V2 slice should add a stdout-completion detector that observes the agent's `stop_reason` envelope (or EOF on stdout) and resubmits a terminal `record_run_frame` with an accurate `ended_at`. The writer's idempotency-on-`run_id` supports this without schema changes. Inspect mode UI labels durations as "dispatch duration (V1)" until the V2 detector ships.
 
 ## Changelog
 
