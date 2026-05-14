@@ -1,6 +1,6 @@
 # Transport mode
 
-**Status**: V1.5 shipped (PTY shipped in V1; TCP shipped in PLAN-S5.0.3d 2026-04-29; outer commit pin `ae7b1a6`; submodule pin `fc04eaa`; Unix socket remains V1.5 partial — handshake/contract complete, transport adapter in V1)
+**Status**: V1.5 shipped (PTY shipped in V1; TCP shipped in PLAN-S5.0.3d 2026-04-29; outer commit pin `ae7b1a6`; submodule pin `fc04eaa`; CLI `--connect tcp://…` flag wired through `llmnb execute` 2026-05-14; Unix socket remains V1.5 partial — handshake/contract complete, transport adapter in V1, `--connect unix://` rejected at the CLI surface with a clear message)
 **Source specs**: [PLAN-S5.0.3 §5](../../notebook/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#5-external-transport-tcp--token), [PLAN-S5.0.3 §7.1](../../notebook/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#71-round-0-operator-30min) (RFC-008 v1.0.1 amendment noting TCP), [RFC-008 §"Transport boundary"](../../rfcs/RFC-008-pty-transport.md), [RFC-006](../../rfcs/RFC-006-kernel-extension-wire-format.md) (envelope contract is transport-invariant)
 **Related atoms**: [protocols/wire-handshake](../protocols/wire-handshake.md), [discipline/wire-as-public-api](../discipline/wire-as-public-api.md), [concepts/driver](../concepts/driver.md), [contracts/kernel-client](../contracts/kernel-client.md)
 
