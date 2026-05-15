@@ -553,7 +553,7 @@ The Tier-3 live smoke caught it. Unit tests didn't, because they exercised the r
 
 The fix was one line: `"name": tool_name` → `"span.name": tool_name`. The dot makes the key a namespaced string, not the reserved attribute name.
 
-Generalization: **anywhere you write `logger.*(..., extra={...})`, every key in `extra` MUST be namespaced (contain a `.`) or guaranteed not to collide with the reserved set above.** This rule lives in `docs/atoms/discipline/magic-injection-defense.md` as a positive pattern; the §11.9 entry points implementation work at it. The atom is the principle; this entry is the trip-wire.
+Generalization: **anywhere you write `logger.*(..., extra={...})`, every key in `extra` MUST be namespaced (contain a `.`) or guaranteed not to collide with the reserved set above.** This entry is the rule's home — Engineering_Guide §11 is where project-specific logging anti-pattern trip-wires live; no separate atom is needed unless the discipline grows beyond logging.
 
 The diagnostic trick: when a tool/handler/callback is mysteriously failing with no log output at all, suspect a logging error inside the handler is suppressing its own stack trace. Test the failing code path inside `try: logger.info("x", extra={...}) except Exception as e: print(e)` and watch for `KeyError` on a reserved key.
 
