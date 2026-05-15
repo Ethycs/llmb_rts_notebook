@@ -30,3 +30,12 @@ _ingest/prototypes/r2-prototype/run.log
 .llmnb-overflow-snapshot.json
 .llmnb-overflow-snapshot.json.tmp
 .run-smoke/
+
+# ipython REPL history (auto-created when the kernel boots in-process)
+profile_default/
+
+# claude-agent worktrees (created by the harness; one-shot, auto-cleaned)
+.claude/worktrees/
+
+# one-off install logs
+claude_install.log
