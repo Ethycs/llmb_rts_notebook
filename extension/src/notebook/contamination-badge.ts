@@ -40,6 +40,10 @@ export interface ContaminationLogEntry {
   source: string;
   ts: string;
   layer: string;
+  /** PLAN-S5.0.4 §3.4 — when set, the receiving cell's bound agent
+   *  held an active ``magic_emit_privileges`` grant at scan time. The
+   *  promotion chip renders only for entries with this code. */
+  k_class?: string;
 }
 
 /** Per-cell shape under `notebook.metadata.rts.cells[<id>]` (PLAN-S5.0.1
@@ -48,6 +52,10 @@ export interface ContaminationLogEntry {
 export interface RtsCellsSlot {
   contaminated?: boolean;
   contamination_log?: ContaminationLogEntry[];
+  /** PLAN-S5.0.4 §3.5 — the cell's bound agent (cell-kinds atom). The
+   *  promotion chip uses this to check the agent's active privilege
+   *  grant before rendering. */
+  bound_agent_id?: string | null;
 }
 
 /** Notebook-scoped registry of contamination state. Drives the badge
@@ -103,13 +111,18 @@ export class ContaminationRegistry implements NotebookMetadataObserver {
         contaminated: r['contaminated'] === true,
         contamination_log: Array.isArray(r['contamination_log'])
           ? (r['contamination_log'] as ContaminationLogEntry[])
-          : []
+          : [],
+        bound_agent_id:
+          typeof r['bound_agent_id'] === 'string'
+            ? (r['bound_agent_id'] as string)
+            : null
       };
       const prev = this.byCellId.get(id);
       if (
         !prev ||
         prev.contaminated !== next.contaminated ||
-        (prev.contamination_log?.length ?? 0) !== (next.contamination_log?.length ?? 0)
+        (prev.contamination_log?.length ?? 0) !== (next.contamination_log?.length ?? 0) ||
+        prev.bound_agent_id !== next.bound_agent_id
       ) {
         this.byCellId.set(id, next);
         changed = true;
@@ -242,4 +255,139 @@ function truncate(s: string, max: number): string {
   if (typeof s !== 'string') return '';
   if (s.length <= max) return s;
   return s.slice(0, max - 1) + '…';
+}
+
+// ---------------------------------------------------------------------------
+// PLAN-S5.0.4 §3.5 — promotion chip
+// ---------------------------------------------------------------------------
+
+/** Command id for the promotion-chip click. Registered in
+ *  extension.ts activation; the handler emits a
+ *  ``promote_stream_magic`` operator-action envelope to the kernel
+ *  with ``{cell_id, line}`` parameters. */
+export const PROMOTE_STREAM_MAGIC_COMMAND_ID = 'llmnb.promoteStreamMagic';
+
+/** K-class string the kernel stamps when a privileged agent's stream
+ *  emits a magic-shaped line. Per PLAN-S5.0.4 §3.4. */
+export const K3L_PRIVILEGED_AGENT_STREAM_MAGIC = 'K3L';
+
+/** Read-only registry of currently-known magic-emit privilege grants.
+ *  Drives the promotion-chip visibility: a chip renders only when the
+ *  source cell's ``bound_agent_id`` has an active grant. */
+export interface PrivilegeRegistry {
+  hasGrant(agent_id: string): boolean;
+}
+
+/** Descriptor for the promotion chip. Returned by
+ *  ``computePromotionChip``; the status-bar provider renders one
+ *  ``NotebookCellStatusBarItem`` per descriptor. */
+export interface PromotionChip {
+  cell_id: string;
+  agent_id: string;
+  /** The verbatim line the operator clicks to promote. Carried in
+   *  the operator-action envelope. */
+  line: string;
+  text: string;
+}
+
+/** Render the promotion-chip text from the magic line. */
+export function formatPromotionChipText(line: string): string {
+  const head = (line || '').split(/\r?\n/)[0] ?? '';
+  return `↑ promote ${truncate(head, 32)}`;
+}
+
+/** PLAN-S5.0.4 §3.5 — pure compute. Returns an array of promotion
+ *  chips for the cell. Renders one chip per K3L-tagged
+ *  ``contamination_log`` entry, but only when the cell's
+ *  ``bound_agent_id`` has an active privilege grant. Without a grant
+ *  -- or for K3L-free contamination -- returns the empty list (no
+ *  chip).
+ *
+ *  The grant check prevents the chip from rendering for unprivileged
+ *  agents whose K3L marker would never have been emitted in the
+ *  first place; this is a defense-in-depth re-check on the renderer
+ *  side per the certified-magic-emitter atom's "promotion chip" rule.
+ */
+export function computePromotionChips(
+  cell: vscode.NotebookCell,
+  contamination: ContaminationRegistry,
+  privileges: PrivilegeRegistry
+): PromotionChip[] {
+  const candidates = candidateCellIds(cell);
+  for (const id of candidates) {
+    const slot = contamination.get(id);
+    if (!slot || slot.contaminated !== true) {
+      continue;
+    }
+    const agentId = slot.bound_agent_id;
+    if (typeof agentId !== 'string' || !agentId) {
+      return [];
+    }
+    if (!privileges.hasGrant(agentId)) {
+      return [];
+    }
+    const log = Array.isArray(slot.contamination_log) ? slot.contamination_log : [];
+    const chips: PromotionChip[] = [];
+    for (const entry of log) {
+      if (entry?.k_class === K3L_PRIVILEGED_AGENT_STREAM_MAGIC) {
+        chips.push({
+          cell_id: id,
+          agent_id: agentId,
+          line: entry.line,
+          text: formatPromotionChipText(entry.line)
+        });
+      }
+    }
+    return chips;
+  }
+  return [];
+}
+
+/** Status-bar provider rendering promotion chips. Sibling of
+ *  ``ContaminationBadgeStatusBarProvider``; registered in
+ *  extension.ts activation alongside it. */
+export class PromotionChipStatusBarProvider
+  implements vscode.NotebookCellStatusBarItemProvider, vscode.Disposable {
+  private readonly emitter = new vscode.EventEmitter<void>();
+  public readonly onDidChangeCellStatusBarItems = this.emitter.event;
+  private readonly subs: vscode.Disposable[] = [];
+
+  public constructor(
+    private readonly contamination: ContaminationRegistry,
+    private readonly privileges: PrivilegeRegistry &
+      { onDidChange?: vscode.Event<void> }
+  ) {
+    this.subs.push(contamination.onDidChange(() => this.emitter.fire()));
+    if (privileges.onDidChange) {
+      this.subs.push(privileges.onDidChange(() => this.emitter.fire()));
+    }
+  }
+
+  public dispose(): void {
+    this.subs.forEach((s) => s.dispose());
+    this.emitter.dispose();
+  }
+
+  public provideCellStatusBarItems(
+    cell: vscode.NotebookCell,
+    _token: vscode.CancellationToken
+  ): vscode.NotebookCellStatusBarItem[] {
+    const chips = computePromotionChips(cell, this.contamination, this.privileges);
+    return chips.map((chip) => {
+      const item = new vscode.NotebookCellStatusBarItem(
+        chip.text,
+        vscode.NotebookCellStatusBarAlignment.Left
+      );
+      item.tooltip =
+        `Agent ${chip.agent_id} emitted magic via stream rather than ` +
+        `invoking the emit_magic_cell tool.\n` +
+        `Click to promote (synthesizes an emit_magic_cell call on your behalf).`;
+      item.command = {
+        command: PROMOTE_STREAM_MAGIC_COMMAND_ID,
+        title: 'Promote stream magic to tool call',
+        arguments: [{ cell_id: chip.cell_id, line: chip.line }]
+      };
+      return item;
+    });
+  }
 }
