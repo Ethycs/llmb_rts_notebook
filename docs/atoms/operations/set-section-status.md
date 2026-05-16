@@ -1,6 +1,6 @@
 # Operation: set-section-status
 
-**Status**: V1 spec'd (lands with BSP-005 S5.5)
+**Status**: V1 spec'd — queued for PLAN-S5.5 Phase 1b (operation kind not yet in `OVERLAY_OPERATION_KINDS`; AgentSupervisor auto-flip on RunFrame start/end queued; K95 transition gating queued). `test_set_section_status_not_yet_shipped` in `test_overlay_applier.py` pins the current "not yet implemented" state so a Phase 1b implementer knows where to wire.
 **Source specs**: [BSP-007 §3.3](../../notebook/BSP-007-overlay-git-semantics.md#33-section-level-new-per-kb-target-01-kb-target-6) (section-level operations), [decisions/v1-section-status-interruptibility](../decisions/v1-section-status-interruptibility.md) (the rule this enforces)
 **Related atoms**: [section](../concepts/section.md), [overlay-commit](../concepts/overlay-commit.md), [rename-section](rename-section.md), [delete-section](delete-section.md)
 

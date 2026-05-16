@@ -1,6 +1,6 @@
 # Operation: create-section
 
-**Status**: V1 spec'd (lands with BSP-005 S5.5)
+**Status**: V1 shipped via BSP-007 overlay applier (submodule `3a430cb`; `overlay_applier._validate_create_section`); kernel tests in `test_overlay_applier.py` (PLAN-S5.5 Phase 1a)
 **Source specs**: [BSP-007 §3.3](../../notebook/BSP-007-overlay-git-semantics.md#33-section-level-new-per-kb-target-01-kb-target-6) (operation), [BSP-002 §13.1.1](../../notebook/BSP-002-conversation-graph.md#1311-schema--metadatartszonesections) (section schema), [PLAN-atom-refactor.md §4 rows D3, SD3](../../notebook/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms)
 **Related atoms**: [section](../concepts/section.md), [overlay-commit](../concepts/overlay-commit.md), [delete-section](delete-section.md), [rename-section](rename-section.md)
 

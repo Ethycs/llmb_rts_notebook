@@ -1,6 +1,6 @@
 # Section
 
-**Status**: V1 spec'd (S5.5 in BSP-005)
+**Status**: V1 partial-ship — schema + create/rename/delete/move_cells operations shipped via BSP-007 overlay applier (submodule `3a430cb`); status state-machine (`set_section_status`, K95 transitions, AgentSupervisor auto-flip) + extension renderer queued as PLAN-S5.5 Phase 1b
 **Source specs**: [BSP-002 §13.1](../../notebook/BSP-002-conversation-graph.md#131-section-as-overlay-graph-concept), [KB-notebook-target.md §6](../../notebook/KB-notebook-target.md#6-sections-and-zones), [KB-notebook-target.md §0.1](../../notebook/KB-notebook-target.md#01-naming-reconciliation) (the zone→section rename)
 **Related atoms**: [cell](cell.md), [zone](zone.md), [overlay-commit](overlay-commit.md), [context-manifest](context-manifest.md)
 

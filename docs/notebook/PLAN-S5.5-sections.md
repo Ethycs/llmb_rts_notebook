@@ -1,6 +1,6 @@
 # Plan: S5.5 — Sections (overlay-graph narrative range)
 
-**Status**: ready
+**Status**: Phase 1a shipped (2026-05-16) — kernel CRUD operations + persistence schema landed via BSP-007 overlay applier (submodule `3a430cb`); `_validate_create_section` / `_rename_section` / `_delete_section` / `_move_cells_into_section` operational; 12 tests in `test_overlay_applier.py` cover happy paths + K90 rejection cases. **Phase 1b queued**: status state-machine (`set_section_status` operation kind + K95 transition gating + AgentSupervisor RunFrame auto-flip), extension renderer (header decoration + collapse + commands), dual-representation invariant assertion at write time, 8+ more tests. K-class shipped as **K90** (not K42 sub-reasons as the original design read) per the BSP-007 overlay-rejection scheme.
 **Audience**: an LLM (or operator) picking this up cold. Self-contained.
 **Goal**: implement `metadata.rts.zone.sections[]` per [section atom](../atoms/concepts/section.md) and [BSP-002 §13.1](BSP-002-conversation-graph.md), including the four V1 status values as the interruptibility lock per [decisions/v1-section-status-interruptibility](../atoms/decisions/v1-section-status-interruptibility.md). Wire the create / rename / delete operations and the cell ↔ section dual-representation invariant.
 **Time budget**: 1.5 days. Cross-layer (kernel + extension). Two-agent parallelizable (K-MW-S5.5 + X-EXT-S5.5).
