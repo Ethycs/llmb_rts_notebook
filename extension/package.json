@@ -98,6 +98,26 @@
         "command": "llmnb.inspect.openManifestDetail",
         "title": "LLMNB: Inspect — show context manifest for this run",
         "category": "LLMNB"
+      },
+      {
+        "command": "llmnb.section.create",
+        "title": "LLMNB: Section — create",
+        "category": "LLMNB"
+      },
+      {
+        "command": "llmnb.section.rename",
+        "title": "LLMNB: Section — rename",
+        "category": "LLMNB"
+      },
+      {
+        "command": "llmnb.section.delete",
+        "title": "LLMNB: Section — delete (empty section only)",
+        "category": "LLMNB"
+      },
+      {
+        "command": "llmnb.section.setStatus",
+        "title": "LLMNB: Section — set status",
+        "category": "LLMNB"
       }
     ],
     "configuration": {

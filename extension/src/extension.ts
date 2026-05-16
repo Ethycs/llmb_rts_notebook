@@ -83,6 +83,7 @@ import {
 } from './notebook/pin-status-header.js';
 import { registerResetContaminationCommand } from './notebook/commands/reset-contamination.js';
 import { registerRevealCellCommand } from './notebook/commands/reveal-cell.js';
+import { registerSectionCommands } from './notebook/commands/section-ops.js';
 import * as inspect from './inspect/index.js';
 
 const NOTEBOOK_TYPE = 'llmnb';
@@ -452,6 +453,14 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
   // the provenance chip click in the run-renderer; resolves the target
   // cellId against the active llmnb notebook editor and scrolls + flashes.
   context.subscriptions.push(registerRevealCellCommand(NOTEBOOK_TYPE));
+
+  // PLAN-S5.5 Phase 2 — section operator commands. Exposes create /
+  // rename / delete / setStatus to the Command Palette; each ships
+  // an `apply_overlay_commit` envelope so the kernel-side section
+  // validators (overlay_applier._validate_*) handle the state.
+  for (const d of registerSectionCommands(router)) {
+    context.subscriptions.push(d);
+  }
 
   // PLAN-S5.0.2 §3.2 — bridge renderer `command.invoke` postMessages into
   // VS Code commands. The provenance chip's click handler emits
