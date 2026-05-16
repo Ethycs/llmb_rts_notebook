@@ -84,6 +84,10 @@ import {
 import { registerResetContaminationCommand } from './notebook/commands/reset-contamination.js';
 import { registerRevealCellCommand } from './notebook/commands/reveal-cell.js';
 import { registerSectionCommands } from './notebook/commands/section-ops.js';
+import {
+  registerSectionHeaderProvider,
+  DocumentBackedSectionMetadataSource
+} from './notebook/sections/section-header-provider.js';
 import * as inspect from './inspect/index.js';
 
 const NOTEBOOK_TYPE = 'llmnb';
@@ -459,6 +463,19 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
   // an `apply_overlay_commit` envelope so the kernel-side section
   // validators (overlay_applier._validate_*) handle the state.
   for (const d of registerSectionCommands(router)) {
+    context.subscriptions.push(d);
+  }
+
+  // PLAN-S5.5 Phase 3 — section-header decoration. Renders a status-
+  // bar item on every section-member cell (header on the first cell;
+  // continuation on subsequent cells); click → QuickPick that
+  // dispatches to the Phase 2 rename / delete / setStatus commands.
+  const sectionMetadataSource = new DocumentBackedSectionMetadataSource(NOTEBOOK_TYPE);
+  context.subscriptions.push(sectionMetadataSource);
+  context.subscriptions.push(
+    router.registerMetadataObserver(sectionMetadataSource)
+  );
+  for (const d of registerSectionHeaderProvider(NOTEBOOK_TYPE, sectionMetadataSource)) {
     context.subscriptions.push(d);
   }
 

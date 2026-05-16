@@ -118,6 +118,11 @@
         "command": "llmnb.section.setStatus",
         "title": "LLMNB: Section — set status",
         "category": "LLMNB"
+      },
+      {
+        "command": "llmnb.section.openActions",
+        "title": "LLMNB: Section — actions (rename / delete / set status)",
+        "category": "LLMNB"
       }
     ],
     "configuration": {
