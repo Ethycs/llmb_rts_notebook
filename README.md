@@ -14,7 +14,7 @@ with [`docs/atoms/`](docs/atoms/) holding canonical definitions and
 [`docs/notebook/`](docs/notebook/) + [`docs/rfcs/`](docs/rfcs/)
 holding behavioral and wire-format specs.
 
-## Status — V1 kernel feature-complete + Inspect mode shipped (2026-05-07)
+## Status — Cell↔file magic matrix symmetric + Tier-2 CLI attach shipped (2026-05-16)
 
 V1 cell-side substrate is shipped end-to-end. Operator `@@spawn` /
 `@@agent` / `@<flag>` cell-magic dispatches; agent processes spawn and
@@ -24,7 +24,29 @@ to `{text, outputs, bound_agent_id}` with kind/flags parse-derived from
 text via the `@@` cell-magic + `@` line-magic vocabulary
 ([magic atom](docs/atoms/concepts/magic.md)).
 
-**V1.6+ shipped since 2026-05-02:**
+**V1.6+ shipped since 2026-05-02 (most recent first):**
+
+- **PLAN-S5.0.5 — cell-magic file encode/decode** (commits `ce214ba` Phase 1
+  / `1c9e81f` Phase 2; submodule `7139a3f` → `02fb2d3`). `@@import` extended
+  to accept `.magic` and `.ipynb` in addition to native `.llmnb`; new
+  `@@export path:"…" [format:…] [overwrite:…]` cell-magic serializes the
+  current notebook to disk. Kernel-speaks-magic throughout — no
+  operator-action envelope round-trip, no RFC-006 bump, no extension
+  changes. Three new K-classes (K3M path-outside-workspace, K3N
+  overwrite-refused, K3O bundled I/O failure with `cause` sub-code). The
+  cell↔file matrix is now symmetric in all four quadrants.
+  ([PLAN-S5.0.5](docs/notebook/PLAN-S5.0.5-magic-file-encode-decode.md))
+- **PLAN-S5.0.4 — privileged magic emission** (extension `838aa85`;
+  kernel `2306aef` / `bc24720` / `987b7ef`). `emit_magic_cell` MCP tool
+  + `magic_emit_privileges[]` store + `promote_stream_magic` operator
+  action. Privileged agents can produce cells via the structural
+  channel; unprivileged stream emissions stay sanitized.
+- **Tier-2 `llmnb execute --connect`** (commit `df95ad4`, 2026-05-14). The
+  CLI can now attach to a long-lived `llmnb serve` kernel instead of
+  spawning a fresh PTY-loopback each invocation. Token from
+  `--auth-token-env` (default `LLMNB_AUTH_TOKEN`); never on argv.
+  Unblocks per-cell execution against a shared kernel from any non-VS
+  Code driver.
 
 - **BSP-007 overlay graph** — operator-side, git-style commits over
   the agent turn DAG. `apply_commit` / `revert_to_commit` / `diff` /
@@ -59,9 +81,9 @@ text via the `@@` cell-magic + `@` line-magic vocabulary
   removed (74 files); platforms expanded to `win-64`+`linux-64`+`osx-arm64`;
   ESLint 9 flat config landed for the active extension.
 
-Test surface: **795 kernel tests + 225 stub contract tests + 100
-outer driver tests** all green; full kernel suite runs in ~30s under
-xdist.
+Test surface: **857 kernel tests + 225 stub contract tests + 109
+outer driver tests** all green (2026-05-16); full kernel suite runs
+in ~20s under xdist.
 
 Shipped slices (per [BSP-005 §6.5](docs/notebook/BSP-005-cell-roadmap.md#65-slice-ladder-totals-after-issue-2--and-observed-velocity-2026-05-02-update)):
 
@@ -80,6 +102,11 @@ Shipped slices (per [BSP-005 §6.5](docs/notebook/BSP-005-cell-roadmap.md#65-sli
 | ✅ | S6.0 in-tree event log + hydrate-replay safety | `264b69c` + `03de446` |
 | ✅ | BSP-007 overlay applier + BSP-008 RunFrames | `3a430cb` |
 | ✅ | Inspect mode V1 (read-only per-cell + manifest detail) | `92c7412` |
+| ✅ | Tier-2 `llmnb execute --connect` (attach to running kernel) | `df95ad4` |
+| ✅ | S5.0.4 privileged magic emission (`emit_magic_cell` + promotion chip) | `838aa85` + submodule `987b7ef` |
+| ✅ | S5.0.5 Phase 1 — multi-format `@@import` (`.magic` / `.ipynb`) + `notebook_format` public module | `ce214ba` + submodule `7139a3f` |
+| ✅ | S5.0.5 Phase 2 — `@@export` cell-magic + K3M/K3N/K3O | `1c9e81f` + submodule `02fb2d3` |
+| 🔵 | PLAN-S5.0.6 Nvim driver V1 — design locked, implementation queued | `8639949` (PLAN doc only) |
 | ⬜ | S5.5 sections, S7 sidebar trees, History mode panel, S10 three-pane + search | queued |
 
 Observed velocity is roughly 10× the BSP-005 "working day" budget
