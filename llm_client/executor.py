@@ -38,6 +38,7 @@ from pathlib import Path
 from typing import Any, Iterable, Literal, Optional
 
 from llm_kernel.wire import WIRE_VERSION  # noqa: F401  (re-exported in result)
+from llm_kernel.cell_text import parse_cell  # PLAN-S5.5 Phase 4 — @@section
 
 from llm_client.notebook import (
     detect_format,
@@ -406,8 +407,66 @@ def _derive_cell_envelope(
             },
         }
 
+    if kind == "section":
+        # PLAN-S5.5 Phase 4 — ``@@section <title> [id:"sec_..."]`` cell.
+        # Re-parses the cell text to extract the typed args
+        # (``args["title"]`` / ``args["section_id"]``) since the
+        # persisted record only carries ``text`` / ``kind``. Ships an
+        # ``apply_overlay_commit`` envelope with a ``create_section`` op
+        # — the same shape the Phase 2 ``llmnb.section.create`` command
+        # produces. Section is created EMPTY; population is a separate
+        # operator gesture (Command Palette or
+        # ``move_cells_into_section`` op).
+        try:
+            parsed = parse_cell(text)
+            title = parsed.args.get("title") or parsed.args.get("section_name")
+            section_id = parsed.args.get("section_id")
+        except Exception:  # noqa: BLE001 — defensive; degrade to no-op
+            return None
+        if not isinstance(title, str) or not title.strip():
+            # No title → no section. W4-tolerant; the cell is recorded
+            # as a structural no-op so the run completes cleanly.
+            return None
+        if not isinstance(section_id, str) or not section_id:
+            section_id = _mint_section_id_from_title(title)
+        return {
+            "type": "operator.action",
+            "request_id": request_id,
+            "payload": {
+                "action_type": "zone_mutate",
+                "intent_kind": "apply_overlay_commit",
+                "parameters": {
+                    "operations": [{
+                        "kind": "create_section",
+                        "section_id": section_id,
+                        "title": title,
+                    }],
+                    "message": f"@@section {title}",
+                },
+                "intent_id": f"sec-cell-{section_id[:12]}-{ordinal}",
+                "originating_cell_id": cell_id,
+            },
+        }
+
     # markdown, scratch, native, or unknown -> no envelope (W4 tolerant).
     return None
+
+
+def _mint_section_id_from_title(title: str) -> str:
+    """Mint a kernel-safe section_id from an operator-supplied title.
+
+    Mirrors the extension-side ``mintSectionIdFromTitle`` in
+    ``extension/src/notebook/commands/section-ops.ts`` so the same
+    title produces compatible (though not identical, since uuid tail
+    differs) ids whether the operator types ``@@section`` in a
+    ``.magic`` file or invokes the Command Palette. Pure helper;
+    deterministic-test seam is its caller-controlled input.
+    """
+    import re as _re
+    import uuid as _uuid
+    slug = _re.sub(r"[^a-z0-9]+", "_", title.lower()).strip("_")[:24]
+    tail = _uuid.uuid4().hex[:6]
+    return f"sec_{slug + '_' if slug else ''}{tail}"
 
 
 def _run_live_mode(
