@@ -43,9 +43,9 @@ The MCP tool call is the **agent-to-operator wire**: agents emit JSON-RPC tool c
 
 Every input schema is JSON Schema Draft-2020-12 with `additionalProperties: false`. Every result envelope MUST carry `_rfc_version` and a kernel-assigned `run_id` (UUIDv4) correlating to the LangSmith / event-log run.
 
-## V1 catalog (13 tools)
+## V1 catalog (14 tools)
 
-Native (10): `ask`, `clarify`, `propose`, `request_approval`, `report_progress`, `report_completion`, `report_problem`, `present`, `notify`, `escalate`. Proxied (3): `read_file`, `write_file`, `run_command`. Per RFC-001 §"Specification" no tool not in this catalog MAY be exposed to V1 agents.
+Native (11): `ask`, `clarify`, `propose`, `request_approval`, `report_progress`, `report_completion`, `report_problem`, `present`, `notify`, `escalate`, `emit_magic_cell` (PLAN-S5.0.4 — privileged-agent magic emission per [discipline/certified-magic-emitter](../discipline/certified-magic-emitter.md); requires an `magic_emit_privileges[]` grant or rejects with K3K). Proxied (3): `read_file`, `write_file`, `run_command`. Per RFC-001 §"Specification" no tool not in this catalog MAY be exposed to V1 agents.
 
 ## Schema-version handshake
 
@@ -71,7 +71,7 @@ Every invocation emits a Family A span (see [protocols/family-a-otlp-spans](fami
 
 ## V1 vs V2+
 
-- **V1**: thirteen tools fixed; per-zone policy MAY auto-approve `risk_level=low`.
+- **V1**: fourteen tools fixed (thirteen RFC-001 + `emit_magic_cell` per PLAN-S5.0.4); per-zone policy MAY auto-approve `risk_level=low`.
 - **V2+**: capability tokens (`read_files`, `write_files`, etc. per [decisions/capabilities-deferred-v2](../decisions/capabilities-deferred-v2.md)) gate tool availability per agent; new tools added via additive RFC-001 minor bump.
 
 ## See also
