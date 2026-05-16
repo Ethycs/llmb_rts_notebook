@@ -1,6 +1,6 @@
 # Operation: set-section-status
 
-**Status**: V1 spec'd — queued for PLAN-S5.5 Phase 1b (operation kind not yet in `OVERLAY_OPERATION_KINDS`; AgentSupervisor auto-flip on RunFrame start/end queued; K95 transition gating queued). `test_set_section_status_not_yet_shipped` in `test_overlay_applier.py` pins the current "not yet implemented" state so a Phase 1b implementer knows where to wire.
+**Status**: V1 shipped via PLAN-S5.5 Phase 1b — `overlay_applier._validate_set_section_status` enforces the 4-value status enum (`open | in_progress | complete | frozen`) and the allowed-transitions set per [decisions/v1-section-status-interruptibility](../decisions/v1-section-status-interruptibility.md). K90 on unknown section / invalid status value; K95 (`forbidden_section_transition`) on disallowed transitions (e.g. `frozen → in_progress`, `complete → in_progress`). 11 state-machine tests in `test_overlay_applier.py`. AgentSupervisor auto-flip on RunFrame start/end is queued as Phase 1c (operator-driven transitions work today; kernel-driven flip requires RunFrame hooks).
 **Source specs**: [BSP-007 §3.3](../../notebook/BSP-007-overlay-git-semantics.md#33-section-level-new-per-kb-target-01-kb-target-6) (section-level operations), [decisions/v1-section-status-interruptibility](../decisions/v1-section-status-interruptibility.md) (the rule this enforces)
 **Related atoms**: [section](../concepts/section.md), [overlay-commit](../concepts/overlay-commit.md), [rename-section](rename-section.md), [delete-section](delete-section.md)
 
