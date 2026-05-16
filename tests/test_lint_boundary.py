@@ -38,9 +38,15 @@ EXEMPT_PATTERNS: list[str] = [
 # stdlib-only parser (BSP-005 §S5.0) whose `parse_cell` and
 # `split_at_breaks` are explicitly the public splitter+parser; reusing
 # them in `llm_client.notebook` avoids duplicating ~530 LoC and the
-# silent-drift hazard that duplication would create. Adding new
-# allow-list entries requires an explicit decision here.
-_ALLOWED_KERNEL_PUBLIC: tuple[str, ...] = ("wire", "cell_text")
+# silent-drift hazard that duplication would create.
+# `llm_kernel.notebook_format` is added (S5.0.5) because the format
+# converters (llmnb_to_magic, magic_to_llmnb, ipynb_to_llmnb,
+# llmnb_to_ipynb, detect_format) were promoted from llm_client/notebook.py
+# so kernel-side magic handlers and driver-side CLI both consume the
+# canonical implementation. The driver's `llm_client/notebook.py`
+# is now a thin re-export shim of this module.
+# Adding new allow-list entries requires an explicit decision here.
+_ALLOWED_KERNEL_PUBLIC: tuple[str, ...] = ("wire", "cell_text", "notebook_format")
 _alt = "|".join(_ALLOWED_KERNEL_PUBLIC)
 # Regex: matches any llm_kernel import not in the allow-list.
 _FORBIDDEN = re.compile(rf"llm_kernel\.(?!({_alt})(\.|$))")

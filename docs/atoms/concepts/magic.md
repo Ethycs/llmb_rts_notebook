@@ -32,7 +32,7 @@ Per `vendor/LLMKernel/llm_kernel/magic_registry.py` `CELL_MAGICS`:
 | `endpoint` | active | Declarative endpoint registration; writes `metadata.rts.config.endpoints[<name>]` |
 | `template` | active | Magic code generator — looks up `metadata.rts.config.templates[<name>]`, splits at `@@break`, inserts each fragment as a new cell with `generated_by` provenance (S5.0.2; `magic_registry.py:294`, `magic_generators._handle_template`) |
 | `expand` | active | Magic code generator — parses body verbatim through `cell_text.split_at_breaks`, emits each fragment as a new cell with provenance (S5.0.2; `magic_registry.py:295`, `magic_generators._handle_expand`) |
-| `import` | active | Magic code generator — reads another `.llmnb` from workspace and copies its cells with provenance (S5.0.2; `magic_registry.py:296`, `magic_generators._handle_import`) |
+| `import` | active | Magic code generator — reads a notebook file from workspace and copies its cells with provenance. Supports `.llmnb` (native), `.magic` (split at `@@break`), and `.ipynb` (via `notebook_format.ipynb_to_llmnb`) per PLAN-S5.0.5; explicit `format:"llmnb"\|"magic"\|"ipynb"` kwarg overrides extension-based detection. (`magic_registry.py:296`, `magic_generators._handle_import`) |
 | `compare` | stub (V1.5+) | Runs body across N endpoints; one output region per endpoint |
 | `section` | stub (S5.5) | Section boundary |
 | `tool` / `artifact` / `native` | stub (V2+) | Reserved kinds; round-trip identically; renderer falls through |
