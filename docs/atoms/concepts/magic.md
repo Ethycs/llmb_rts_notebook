@@ -33,6 +33,7 @@ Per `vendor/LLMKernel/llm_kernel/magic_registry.py` `CELL_MAGICS`:
 | `template` | active | Magic code generator — looks up `metadata.rts.config.templates[<name>]`, splits at `@@break`, inserts each fragment as a new cell with `generated_by` provenance (S5.0.2; `magic_registry.py:294`, `magic_generators._handle_template`) |
 | `expand` | active | Magic code generator — parses body verbatim through `cell_text.split_at_breaks`, emits each fragment as a new cell with provenance (S5.0.2; `magic_registry.py:295`, `magic_generators._handle_expand`) |
 | `import` | active | Magic code generator — reads a notebook file from workspace and copies its cells with provenance. Supports `.llmnb` (native), `.magic` (split at `@@break`), and `.ipynb` (via `notebook_format.ipynb_to_llmnb`) per PLAN-S5.0.5; explicit `format:"llmnb"\|"magic"\|"ipynb"` kwarg overrides extension-based detection. (`magic_registry.py:296`, `magic_generators._handle_import`) |
+| `export` | active | Side-effect emitter — serializes the current notebook to a file on disk. `@@export path:"out.llmnb" [format:"llmnb"\|"magic"\|"ipynb"] [overwrite:true]`. Kernel-side handler (`file_actions.apply_export`); no driver round-trip per PLAN-S5.0.5 §1. Path must resolve under `workspace_root` (K3M); existing target requires `overwrite:true` (K3N); I/O / format failures surface as K3O with a `cause` sub-code. Atomic write via `<path>.tmp` + `os.replace`. (PLAN-S5.0.5 §5.1; `magic_registry.py:_ExportCellMagic`) |
 | `compare` | stub (V1.5+) | Runs body across N endpoints; one output region per endpoint |
 | `section` | stub (S5.5) | Section boundary |
 | `tool` / `artifact` / `native` | stub (V2+) | Reserved kinds; round-trip identically; renderer falls through |
@@ -85,6 +86,8 @@ Value forms in named args:
 | K34 | `incompatible_kind_change` — `@mark <new_kind>` whose target is unknown / body-incompatible |
 
 K35 (plain magic in hash mode) and K36 (cell contaminated by agent emission) are shipped — see [PLAN-S5.0.1](../../notebook/PLAN-S5.0.1-cell-magic-injection-defense.md) §3.9; hash-mode primitives + emission ban + auth lifecycle landed in S5.0.1a/b/c (submodule commits `360b658` / `94d1c39` / `ac25656`).
+
+K3M / K3N / K3O ship with PLAN-S5.0.5 Phase 2 (`@@export`): path-outside-workspace, target-exists-no-overwrite, and bundled I/O / format failure with a `cause` sub-code. K3O is shared with multi-format `@@import` for parse / format errors. See [PLAN-S5.0.5 §7](../../notebook/PLAN-S5.0.5-magic-file-encode-decode.md#7-k-class-additions).
 
 ## Invariants
 
