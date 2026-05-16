@@ -338,17 +338,17 @@ S6 now also writes `metadata.rts.zone.run_frames.<run_id>` per [decisions/v1-run
 
 **Estimated**: +1 day folded into S6 (S6 sized at 2 days total for cell-binding + RunFrame minimal). **Atoms touched**: [run-frame](../atoms/concepts/run-frame.md), [decisions/v1-runframe-minimal](../atoms/decisions/v1-runframe-minimal.md).
 
-### 6.5 Slice-ladder totals after Issue 2 — and observed velocity (2026-05-02 update)
+### 6.5 Slice-ladder totals after Issue 2 — and observed velocity (2026-05-16 update)
 
-| Phase | Slices | BSP-005 budget | Status (as of 2026-05-02) |
+| Phase | Slices | BSP-005 budget | Status (as of 2026-05-16) |
 |---|---|---|---|
 | Foundation | S0.5 + S1 + S2 | ~2.0 d | ✅ S0.5 (`14873a1`) + S1+S2 (`26ac581`) shipped |
 | Multi-turn + context | S3 + S3.5 + S4 | ~3.5 d | ✅ S3 (`ac2bb4d`+`b4cb550`), S3.5 (`64a34d4`), S4 (`fe2121a`) shipped |
-| Git-style + sections | S5 + S5.5 | ~3.5 d | 🔧 S5a (`5b5533e`), S5b (reverted `f5dea1a`), S5c-stop in flight on `vendor/LLMKernel @ wip/s5c-stop`; S5.5 queued |
-| Headless executor (new — not in original ladder) | S5.0.x | n/a | ✅ S5.0.3d (TCP+handshake, `ae7b1a6`), S5.0.3e (smoke driver, `73c6940`), S5.0.3.1 (live mode, `27c0fcc`) |
-| Persistence + UX | S6 + S7 + S8 + S9 + S10 | ~5.0 d | 🔧 S8 partial (`8d9bd39`); S9 (`5de3401`+`64a34d4`); S6/S7/S10 queued |
+| Git-style + sections | S5 + S5.5 | ~3.5 d | ✅ S5a (`5b5533e`), S5b-revert (submodule `d85c3f4`), S5c-stop (submodule `4461794`); 🔵 S5.5 sections design locked in [PLAN-S5.5](PLAN-S5.5-sections.md), implementation queued |
+| Headless executor + magic vocab | S5.0.x | n/a | ✅ S5.0.3d-e + S5.0.3.1 (`ae7b1a6` → `27c0fcc`); Tier-2 `--connect` (`df95ad4`); S5.0.4 privileged emission (extension `838aa85` + submodule `987b7ef`); S5.0.5 Phase 1 multi-format `@@import` (`ce214ba` + submodule `7139a3f`); S5.0.5 Phase 2 `@@export` + K3M/K3N/K3O (`1c9e81f` + submodule `02fb2d3`); 🔵 PLAN-S5.0.6 nvim driver design locked (`8639949`) |
+| Persistence + UX | S6 + S7 + S8 + S9 + S10 | ~5.0 d | ✅ S6.0 in-tree event log (`264b69c` + `03de446`); BSP-007 overlay applier + BSP-008 RunFrames (`3a430cb`); Inspect mode V1 (`92c7412`); S8 partial (`8d9bd39`); S9 (`5de3401`+`64a34d4`); 🔵 S7 sidebar trees / S10 three-pane + search queued |
 
-**Velocity reality**: the BSP-005 "working day" unit was sized for one mega-round agent in series. Observed wall-clock velocity with multi-agent parallel execution + atom-defined contracts is **~10× the budget**. S0.5 → S4 + S5.0.x + S5a + S8/S9 partials shipped in roughly 1 working day of wall-clock (overnight gap excluded). Remaining V1 UX work (S5.5 + S6 + S7 + S8-finish + S10 + S5c-stop completion) realistically lands in a small number of additional working hours at this pace.
+**Velocity reality**: the BSP-005 "working day" unit was sized for one mega-round agent in series. Observed wall-clock velocity with multi-agent parallel execution + atom-defined contracts is **~10× the budget**. The bulk of V1 UX shipped during 2026-05-02 → 2026-05-16; remaining work (S5.5 sections + S7 sidebar trees + S10 three-pane + search + S5.0.6 nvim driver) all have PLAN docs and atoms in place — implementation only.
 
 Don't pace to the "days" budget — pace to the slice ordering + dependency graph, which remain normative.
 
