@@ -1,6 +1,31 @@
 # Plan: S5.5 — Sections (overlay-graph narrative range)
 
-**Status**: V1 shipped (2026-05-16) — kernel + operator commands + section-header decoration + `@@section` cell magic. PLAN-S5.5 is **feature-complete** (V1). **Phase 1** (kernel): 1a CRUD + 1b state-machine + 1c dual-rep invariant in `apply_commit` + 1d AgentSupervisor auto-flip via `_maybe_flip_section_on_run_start` / `_run_end` with reference counting; 32 kernel tests. **Phase 2** (extension commands): `llmnb.section.create` / `.rename` / `.delete` / `.setStatus` Command Palette commands ship `apply_overlay_commit` envelopes; 19 contract tests. **Phase 3** (section-header decoration): per-section-member-cell `NotebookCellStatusBarItem` showing `§ <title> (<status>) · N cells` on the first cell and `▸ <title>` on continuation cells; click → QuickPick dispatches to the Phase 2 rename / delete / set-status commands; ~15 compute + actions tests. **Phase 4** (`@@section` cell magic): `magic_registry._SectionCellMagic` flips from stub to active; extracts `title` (positional or named) + optional `id:` (otherwise minted from title); CLI driver's `executor._derive_cell_envelope` ships an `apply_overlay_commit` envelope with a `create_section` op for `kind=section` cells. 6 kernel parser tests + 5 driver envelope tests. **Collapse handler + extension cell-directive `@@section` recognition deferred to V1.5+** — VS Code's notebook API doesn't expose per-range collapse; the extension's `pty-kernel-client.ts` currently ships generic `set_cell_metadata` for `@@section` (no-op section creation); VS Code users use the Command Palette today. Nvim/CLI users get `@@section` end-to-end via `llmnb execute`. K-class surface: **K90** (6 sub-reasons) + **K95** `forbidden_section_transition`.
+**Status**: V1 shipped (2026-05-17) — PLAN-S5.5 is **feature-complete**. Five phases landed in a single multi-day wall-clock push (1a/b/c/d kernel substrate, 2 Command Palette commands, 3 section-header decoration, 4 `@@section` cell magic kernel+CLI, 4-ext `@@section` recognition in the VS Code pty-kernel-client). **Collapse handler deferred to V1.5+** — VS Code's notebook API doesn't expose per-range collapse and operators have no current need; tracked as a non-blocking nice-to-have. K-class surface: **K90** (6 sub-reasons: `unknown_section`, `duplicate_section_id`, `nested_sections_forbidden`, `section_not_empty`, `cell_ids_required`, `invalid_status`, `section_membership_mismatch`) + **K95** `forbidden_section_transition`.
+
+**Ship SHAs**:
+
+| Phase | What | Submodule | Parent |
+|---|---|---|---|
+| 1a | CRUD tests + atom Status flips | `7e7ef49` | `9ba9b9a` |
+| 1b | `set_section_status` state machine + K95 transitions | `0733de9` | `7721499` |
+| 1c | Dual-representation invariant in `apply_commit` | `b3abe4f` | `85989b4` |
+| 1d | AgentSupervisor RunFrame auto-flip (ref-counted) | `11b2363` | `dbfe75a` |
+| 2 | Command Palette commands (create / rename / delete / setStatus) | — | `4c8e8a7` |
+| 3 | Section-header `NotebookCellStatusBarItem` + actions QuickPick | — | `6f40e5a` |
+| 4 | `@@section` cell magic — kernel parser + CLI executor envelope mapping | `efa6a46` | `107cf23` |
+| 4-ext | `@@section` recognition in pty-kernel-client.ts | — | (this commit) |
+
+**Phase 1** (kernel substrate): create/rename/delete/move_cells_into_section validators (from BSP-007's overlay_applier) plus the new `set_section_status` validator that enforces the 4-status enum (`open | in_progress | complete | frozen`) and 8 allowed transitions; `_assert_dual_representation_consistent` runs at the end of every overlay commit and catches drift between `cells[<id>].section_id` and `sections[<id>].cell_range[]`; AgentSupervisor's `_maybe_flip_section_on_run_start` / `_run_end` reference-count active runs per section and submit `set_section_status` intents at the 0↔1 boundaries. 32 kernel tests.
+
+**Phase 2** (extension commands): `extension/src/notebook/commands/section-ops.ts` ships four `apply_overlay_commit` envelopes from the Command Palette. Pure envelope builders + DI prompt sinks make the command flow testable without VS Code's modal bus. 27 contract tests.
+
+**Phase 3** (section-header decoration): `extension/src/notebook/sections/section-header-provider.ts` renders a `NotebookCellStatusBarItem` on every section-member cell. First cell of each section: `§ <title> (<status>) · N cells`. Continuation cells: `▸ <title>`. Click → `llmnb.section.openActions` QuickPick dispatches to the Phase 2 rename / delete / setStatus commands. Pure-compute split mirrors the Inspect-mode discipline. 35 compute + actions tests.
+
+**Phase 4** (`@@section` cell magic): `magic_registry._SectionCellMagic` flips from stub to active; extracts `title` (positional or named) + optional `id:` (otherwise minted from title); CLI driver's `executor._derive_cell_envelope` ships an `apply_overlay_commit` envelope with a `create_section` op for `kind=section` cells. Section is created EMPTY; population is a separate operator gesture (Command Palette or the `move_cells_into_section` overlay op). 6 kernel parser tests + 5 driver envelope tests.
+
+**Phase 4-ext** (VS Code recognition): `pty-kernel-client.ts` short-circuits `magic === 'section'` before the generic `cell_magic` dispatch, parses title + optional id via the new `parseSectionMagicArgs` helper in `section-ops.ts`, and ships the same `apply_overlay_commit` envelope the CLI executor builds. VS Code operators typing `@@section MyTitle` in a cell now get the same end-to-end section creation that nvim/CLI users have had since Phase 4. 8 args-parsing tests.
+
+**Test surface total**: 113 section-related tests across the kernel, driver, and extension layers.
 **Audience**: an LLM (or operator) picking this up cold. Self-contained.
 **Goal**: implement `metadata.rts.zone.sections[]` per [section atom](../atoms/concepts/section.md) and [BSP-002 §13.1](BSP-002-conversation-graph.md), including the four V1 status values as the interruptibility lock per [decisions/v1-section-status-interruptibility](../atoms/decisions/v1-section-status-interruptibility.md). Wire the create / rename / delete operations and the cell ↔ section dual-representation invariant.
 **Time budget**: 1.5 days. Cross-layer (kernel + extension). Two-agent parallelizable (K-MW-S5.5 + X-EXT-S5.5).

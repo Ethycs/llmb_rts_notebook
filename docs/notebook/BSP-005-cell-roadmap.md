@@ -322,11 +322,26 @@ Implements the V1 ContextPacker as a pure, deterministic structural walker per [
 
 **Position**: between S5 and S6.
 **Driver**: KB-target §0.1, §6.
-**Status**: amendment ratified into the slice ladder above.
+**Status**: V1 shipped 2026-05-17 (kernel + commands + decoration + cell magic + extension recognition). See [PLAN-S5.5-sections.md](PLAN-S5.5-sections.md) for the per-phase ship narrative.
 
-Implements `metadata.rts.zone.sections[]` per the [section atom](../atoms/concepts/section.md). Flat sections only in V1 per [decisions/v1-flat-sections](../atoms/decisions/v1-flat-sections.md) — `parent_section_id` slot exists but MUST be `null`. Operations land via overlay commits ([create-section](../atoms/operations/create-section.md), [rename-section](../atoms/operations/rename-section.md), [delete-section](../atoms/operations/delete-section.md)).
+Implements `metadata.rts.zone.sections[]` per the [section atom](../atoms/concepts/section.md). Flat sections only in V1 per [decisions/v1-flat-sections](../atoms/decisions/v1-flat-sections.md) — `parent_section_id` slot exists but MUST be `null`. Operations land via overlay commits ([create-section](../atoms/operations/create-section.md), [rename-section](../atoms/operations/rename-section.md), [delete-section](../atoms/operations/delete-section.md), [set-section-status](../atoms/operations/set-section-status.md)).
 
-**Estimated**: 1.5 days. **Atoms touched**: [section](../atoms/concepts/section.md), [decisions/v1-flat-sections](../atoms/decisions/v1-flat-sections.md), [operations/create-section](../atoms/operations/create-section.md).
+**Estimated**: 1.5 days. **Actual**: 1 wall-clock day (multi-phase, single agent). **Atoms touched**: [section](../atoms/concepts/section.md), [decisions/v1-flat-sections](../atoms/decisions/v1-flat-sections.md), [decisions/v1-section-status-interruptibility](../atoms/decisions/v1-section-status-interruptibility.md), [operations/create-section](../atoms/operations/create-section.md), [operations/rename-section](../atoms/operations/rename-section.md), [operations/delete-section](../atoms/operations/delete-section.md), [operations/set-section-status](../atoms/operations/set-section-status.md).
+
+**Ship SHAs** (per phase):
+
+| Phase | What | Submodule | Parent |
+|---|---|---|---|
+| 1a | CRUD tests + atom Status flips | `7e7ef49` | `9ba9b9a` |
+| 1b | `set_section_status` state machine + K95 transition gating | `0733de9` | `7721499` |
+| 1c | dual-representation invariant in `apply_commit` | `b3abe4f` | `85989b4` |
+| 1d | AgentSupervisor RunFrame auto-flip (ref-counted) | `11b2363` | `dbfe75a` |
+| 2 | Command Palette: create / rename / delete / setStatus | — | `4c8e8a7` |
+| 3 | Section-header `NotebookCellStatusBarItem` + actions QuickPick | — | `6f40e5a` |
+| 4 | `@@section` cell magic (kernel parser + CLI executor mapping) | `efa6a46` | `107cf23` |
+| 4-ext | `@@section` recognition in pty-kernel-client.ts | — | (this commit) |
+
+**Test surface**: 32 kernel + 27 Phase 2 ext + 35 Phase 3 ext + 6 Phase 4 kernel + 5 Phase 4 driver + 8 Phase 4-ext = **113 section-related tests** (in addition to existing overlay_applier + agent_supervisor coverage).
 
 ### 6.4 S6 expanded — RunFrame minimal + Inspect mode
 

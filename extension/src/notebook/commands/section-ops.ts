@@ -196,6 +196,61 @@ export class VsCodeSectionPromptSink implements SectionPromptSink {
 // without touching the id (rename only mutates title).
 // --------------------------------------------------------------------------
 
+/** Parse the raw args string of an ``@@section`` cell magic into
+ *  typed fields (title + optional explicit section_id). Mirrors the
+ *  kernel-side ``_SectionCellMagic._refine_args`` semantics so the
+ *  extension's dispatch produces the same overlay-commit envelope the
+ *  CLI driver's ``_derive_cell_envelope`` produces. Pure; tests call
+ *  this directly without spinning up the pty-kernel client.
+ *
+ *  Accepted forms:
+ *
+ *    @@section MyTitle
+ *    @@section "Multi Word Title"
+ *    @@section title:"Multi Word Title"
+ *    @@section MyTitle id:"sec_explicit"
+ *
+ *  Returns ``{}`` when no title can be extracted; the caller falls
+ *  through to the generic ``set_cell_metadata`` path (cell records as
+ *  kind=section but no section is created — operator can fix by
+ *  retyping with a title). */
+export function parseSectionMagicArgs(
+  argsStr: string
+): { title?: string; section_id?: string } {
+  if (typeof argsStr !== 'string') return {};
+  const out: { title?: string; section_id?: string } = {};
+
+  // Optional explicit ``id:"sec_..."``. Match first so we can strip it
+  // before extracting the title (otherwise the positional match might
+  // accidentally consume part of the id).
+  const idMatch = argsStr.match(/id:"([^"]+)"/);
+  if (idMatch) {
+    out.section_id = idMatch[1];
+  }
+
+  // Title resolution: try ``title:"..."`` named arg, then leading
+  // quoted token, then leading unquoted token.
+  const titleNamedMatch = argsStr.match(/title:"([^"]+)"/);
+  if (titleNamedMatch) {
+    out.title = titleNamedMatch[1];
+    return out;
+  }
+  const trimmed = argsStr.trim();
+  if (trimmed.startsWith('"')) {
+    const quoted = trimmed.match(/^"([^"]+)"/);
+    if (quoted) {
+      out.title = quoted[1];
+      return out;
+    }
+  }
+  const positional = trimmed.match(/^(\S+)/);
+  if (positional && positional[1] !== 'id:' && !positional[1].startsWith('id:')) {
+    out.title = positional[1];
+  }
+  return out;
+}
+
+
 export function mintSectionIdFromTitle(title: string): string {
   const slug = title
     .toLowerCase()

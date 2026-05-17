@@ -38,6 +38,10 @@ import type {
   OtlpLogRecord
 } from '../messaging/types.js';
 import { encodeAttrs } from '../otel/attrs.js';
+import {
+  mintSectionIdFromTitle,
+  parseSectionMagicArgs
+} from './commands/section-ops.js';
 
 // `node-pty` is loaded lazily. The native binding builds at install time and
 // may be missing on platforms without a working ConPTY / forkpty. Tests inject
@@ -514,10 +518,68 @@ export class PtyKernelClient implements KernelClient {
       // write.
       this.writeFrame(envelope);
       return;
+    } else if (
+      input.directive &&
+      input.directive.kind === 'cell_magic' &&
+      input.directive.magic === 'section'
+    ) {
+      // PLAN-S5.5 Phase 4 (extension-side recognition) — ``@@section``
+      // short-circuits to an ``apply_overlay_commit`` envelope with a
+      // ``create_section`` op. Mirrors the CLI driver's
+      // ``executor._derive_cell_envelope`` mapping so VS Code operators
+      // get the same end-to-end behaviour nvim / CLI users have had since
+      // Phase 4 kernel-side.
+      //
+      // When the args don't yield a title, fall through to the generic
+      // ``set_cell_metadata`` path below so the cell still records as
+      // ``kind=section`` (operator can retype with a title later).
+      const parsed = parseSectionMagicArgs(input.directive.args);
+      if (parsed.title) {
+        const sectionId =
+          parsed.section_id ?? mintSectionIdFromTitle(parsed.title);
+        envelope = {
+          type: 'operator.action',
+          payload: {
+            action_type: 'zone_mutate',
+            intent_kind: 'apply_overlay_commit',
+            parameters: {
+              operations: [
+                {
+                  kind: 'create_section',
+                  section_id: sectionId,
+                  title: parsed.title
+                }
+              ],
+              message: `@@section ${parsed.title}`
+            },
+            intent_id: `sec-cell-${sectionId.slice(0, 12)}`,
+            originating_cell_id: input.cellUri
+          }
+        };
+        this.writeFrame(envelope);
+        return;
+      }
+      // Title missing — fall through to generic cell_magic dispatch.
+      envelope = {
+        type: 'operator.action',
+        payload: {
+          action_type: 'set_cell_metadata',
+          intent_kind: 'set_cell_metadata',
+          parameters: {
+            cell_id: input.cellUri,
+            kind: input.directive.cell_kind,
+            magic: input.directive.magic,
+            args: input.directive.args
+          },
+          originating_cell_id: input.cellUri
+        }
+      };
+      this.writeFrame(envelope);
+      return;
     } else if (input.directive && input.directive.kind === 'cell_magic') {
       // BSP-005 S5.0 — generic cell-magic dispatch for kinds that don't
       // map to ``agent_spawn`` / ``agent_continue`` (markdown, scratch,
-      // checkpoint, endpoint, compare, section, …). Maps to
+      // checkpoint, endpoint, compare, …). Maps to
       // ``set_cell_metadata`` carrying the kind + structured args; the
       // kernel-side handler decides whether the magic is active or
       // pending (V1.5/S5/S5.5/V2+ slices return K42).

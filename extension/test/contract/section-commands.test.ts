@@ -14,6 +14,7 @@ import {
   buildSetSectionStatusEnvelope,
   mintIntentId,
   mintSectionIdFromTitle,
+  parseSectionMagicArgs,
   runSectionCreateCommand,
   runSectionDeleteCommand,
   runSectionRenameCommand,
@@ -306,6 +307,60 @@ suite('contract: PLAN-S5.5 Phase 2 — section operator commands', () => {
     assert.equal(SECTION_RENAME_COMMAND_ID, 'llmnb.section.rename');
     assert.equal(SECTION_DELETE_COMMAND_ID, 'llmnb.section.delete');
     assert.equal(SECTION_SET_STATUS_COMMAND_ID, 'llmnb.section.setStatus');
+  });
+
+});
+
+// ---------------------------------------------------------------------------
+// parseSectionMagicArgs — Phase 4 extension recognition for @@section
+// ---------------------------------------------------------------------------
+
+suite('contract: PLAN-S5.5 Phase 4 ext — @@section args parsing', () => {
+
+  test('test_positional_unquoted_title', () => {
+    const r = parseSectionMagicArgs('Architecture');
+    assert.equal(r.title, 'Architecture');
+    assert.equal(r.section_id, undefined);
+  });
+
+  test('test_positional_quoted_multi_word_title', () => {
+    const r = parseSectionMagicArgs('"Runtime Concerns"');
+    assert.equal(r.title, 'Runtime Concerns');
+  });
+
+  test('test_named_title_kwarg', () => {
+    const r = parseSectionMagicArgs('title:"Multi Word Title"');
+    assert.equal(r.title, 'Multi Word Title');
+  });
+
+  test('test_positional_with_explicit_id', () => {
+    const r = parseSectionMagicArgs('Tests id:"sec_tests_pinned"');
+    assert.equal(r.title, 'Tests');
+    assert.equal(r.section_id, 'sec_tests_pinned');
+  });
+
+  test('test_named_title_with_explicit_id', () => {
+    const r = parseSectionMagicArgs('id:"sec_x" title:"Foo Bar"');
+    assert.equal(r.title, 'Foo Bar');
+    assert.equal(r.section_id, 'sec_x');
+  });
+
+  test('test_empty_args_yields_no_title', () => {
+    const r = parseSectionMagicArgs('');
+    assert.equal(r.title, undefined);
+    assert.equal(r.section_id, undefined);
+  });
+
+  test('test_only_id_no_title', () => {
+    const r = parseSectionMagicArgs('id:"sec_orphan"');
+    assert.equal(r.title, undefined);
+    assert.equal(r.section_id, 'sec_orphan');
+  });
+
+  test('test_non_string_input_safe', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const r = parseSectionMagicArgs(undefined as unknown as string);
+    assert.deepEqual(r, {});
   });
 
 });
