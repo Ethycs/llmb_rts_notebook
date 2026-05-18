@@ -1,6 +1,6 @@
 # Plan: S5.5 — Sections (overlay-graph narrative range)
 
-**Status**: V1 shipped (2026-05-17) — PLAN-S5.5 is **feature-complete**. Five phases landed in a single multi-day wall-clock push (1a/b/c/d kernel substrate, 2 Command Palette commands, 3 section-header decoration, 4 `@@section` cell magic kernel+CLI, 4-ext `@@section` recognition in the VS Code pty-kernel-client). **Collapse handler deferred to V1.5+** — VS Code's notebook API doesn't expose per-range collapse and operators have no current need; tracked as a non-blocking nice-to-have. K-class surface: **K90** (6 sub-reasons: `unknown_section`, `duplicate_section_id`, `nested_sections_forbidden`, `section_not_empty`, `cell_ids_required`, `invalid_status`, `section_membership_mismatch`) + **K95** `forbidden_section_transition`.
+**Status**: V1 shipped (2026-05-18) — PLAN-S5.5 is **feature-complete including collapse**. Six phases landed: 1a/b/c/d kernel substrate, 2 Command Palette commands, 3 section-header decoration, 4 `@@section` cell magic kernel+CLI, 4-ext `@@section` recognition in the VS Code pty-kernel-client, 5 markdown-rendered section cells for VS Code's native fold engine. The earlier "collapse deferred" note was an over-cautious read of the VS Code API — markdown-header folding handles section ranges natively when section cells are rendered as markdown-typed with a `# <title>` heading source. K-class surface: **K90** (6 sub-reasons: `unknown_section`, `duplicate_section_id`, `nested_sections_forbidden`, `section_not_empty`, `cell_ids_required`, `invalid_status`, `section_membership_mismatch`) + **K95** `forbidden_section_transition`.
 
 **Ship SHAs**:
 
@@ -13,7 +13,8 @@
 | 2 | Command Palette commands (create / rename / delete / setStatus) | — | `4c8e8a7` |
 | 3 | Section-header `NotebookCellStatusBarItem` + actions QuickPick | — | `6f40e5a` |
 | 4 | `@@section` cell magic — kernel parser + CLI executor envelope mapping | `efa6a46` | `107cf23` |
-| 4-ext | `@@section` recognition in pty-kernel-client.ts | — | (this commit) |
+| 4-ext | `@@section` recognition in pty-kernel-client.ts | — | `645e23a` |
+| 5 | Markdown-rendered section cells + serializer guard (native fold) | (kernel side) | (this commit) |
 
 **Phase 1** (kernel substrate): create/rename/delete/move_cells_into_section validators (from BSP-007's overlay_applier) plus the new `set_section_status` validator that enforces the 4-status enum (`open | in_progress | complete | frozen`) and 8 allowed transitions; `_assert_dual_representation_consistent` runs at the end of every overlay commit and catches drift between `cells[<id>].section_id` and `sections[<id>].cell_range[]`; AgentSupervisor's `_maybe_flip_section_on_run_start` / `_run_end` reference-count active runs per section and submit `set_section_status` intents at the 0↔1 boundaries. 32 kernel tests.
 
@@ -25,7 +26,9 @@
 
 **Phase 4-ext** (VS Code recognition): `pty-kernel-client.ts` short-circuits `magic === 'section'` before the generic `cell_magic` dispatch, parses title + optional id via the new `parseSectionMagicArgs` helper in `section-ops.ts`, and ships the same `apply_overlay_commit` envelope the CLI executor builds. VS Code operators typing `@@section MyTitle` in a cell now get the same end-to-end section creation that nvim/CLI users have had since Phase 4. 8 args-parsing tests.
 
-**Test surface total**: 113 section-related tests across the kernel, driver, and extension layers.
+**Phase 5** (collapse via native markdown fold): section cells render as markdown-typed in the nbformat shape so VS Code's native markdown-header folding kicks in on each section range. `magic_to_llmnb` synthesizes `# <title>` as the outer `source` field when the cell parses with a `kind=section` + parseable title; the canonical `@@section <title>` magic text is preserved verbatim in `metadata.rts.cells[<id>].text` (the source of truth for `llmnb_to_magic` and the kernel's run-time dispatch). The extension's `sanitizeMarkdownCellMetadata` was generalized via a `MARKUP_RENDERED_KINDS` set so the markup-cell sanitizer preserves `kind="section"` instead of forcing `"markdown"`. Net result: clicking the chevron next to a section header folds the section's cells until the next heading — native VS Code behavior, no custom collapse logic, no new VS Code API. 7 kernel round-trip tests + 6 extension serializer contract tests.
+
+**Test surface total**: 126 section-related tests across the kernel, driver, and extension layers.
 **Audience**: an LLM (or operator) picking this up cold. Self-contained.
 **Goal**: implement `metadata.rts.zone.sections[]` per [section atom](../atoms/concepts/section.md) and [BSP-002 §13.1](BSP-002-conversation-graph.md), including the four V1 status values as the interruptibility lock per [decisions/v1-section-status-interruptibility](../atoms/decisions/v1-section-status-interruptibility.md). Wire the create / rename / delete operations and the cell ↔ section dual-representation invariant.
 **Time budget**: 1.5 days. Cross-layer (kernel + extension). Two-agent parallelizable (K-MW-S5.5 + X-EXT-S5.5).

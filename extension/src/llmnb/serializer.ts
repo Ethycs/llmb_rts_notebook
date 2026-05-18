@@ -122,14 +122,25 @@ function encodeCell(cell: vscode.NotebookCellData): IpynbCellRaw {
   };
 }
 
+/** Cell-kinds that render as Markup in VS Code (cell_type === 'markdown').
+ *  PLAN-S5.5 Phase 5 added `section` to this set so section cells'
+ *  kind survives the markup-cell sanitization rather than being forced
+ *  to `"markdown"`. Hard-coding the set here (rather than importing
+ *  from a shared module) keeps the serializer free of cross-package
+ *  dependencies — the source of truth is cell-kinds.md atom; this
+ *  module's job is to enforce the invariants. */
+const MARKUP_RENDERED_KINDS: ReadonlySet<string> = new Set(['markdown', 'section']);
+
 /** Strip `bound_agent_id` from a markdown cell's `metadata.rts.cell` slot
  *  per atoms/concepts/cell-kinds.md ("`markdown` MUST NOT carry
- *  `bound_agent_id`"). Also ensures `kind` resolves to `"markdown"` on
- *  the slot so cell-kinds round-trip without depending on the load-side
- *  default. Tolerates the legacy flat shape (`metadata.rts.kind`) and
- *  the namespaced shape (`metadata.rts.cell.kind`) — see
- *  cell-badge.ts:readCellMetadataSlot. Returns a new object; does not
- *  mutate the input. */
+ *  `bound_agent_id`"). For markup-rendered kinds (`markdown`, `section`),
+ *  preserve the `kind` value verbatim so section cells survive the
+ *  Markup serialize round-trip without losing their identity. When a
+ *  cell lands as Markup but its `kind` slot is missing or names a
+ *  non-markup kind, default to `"markdown"` (legacy / fallback
+ *  behavior). Tolerates the legacy flat shape (`metadata.rts.kind`)
+ *  and the namespaced shape (`metadata.rts.cell.kind`). Returns a new
+ *  object; does not mutate the input. */
 function sanitizeMarkdownCellMetadata(
   meta: Record<string, unknown>
 ): Record<string, unknown> {
@@ -144,7 +155,13 @@ function sanitizeMarkdownCellMetadata(
   if (cellRaw && typeof cellRaw === 'object' && !Array.isArray(cellRaw)) {
     const cell = { ...(cellRaw as Record<string, unknown>) };
     delete cell['bound_agent_id'];
-    cell['kind'] = 'markdown';
+    const existingKind = cell['kind'];
+    if (
+      typeof existingKind !== 'string' ||
+      !MARKUP_RENDERED_KINDS.has(existingKind)
+    ) {
+      cell['kind'] = 'markdown';
+    }
     rts['cell'] = cell;
   } else {
     // No namespaced cell slot yet — write a minimal one so the kind is
@@ -158,7 +175,10 @@ function sanitizeMarkdownCellMetadata(
   if ('bound_agent_id' in rts) {
     delete rts['bound_agent_id'];
   }
-  if (typeof rts['kind'] === 'string') {
+  if (
+    typeof rts['kind'] === 'string' &&
+    !MARKUP_RENDERED_KINDS.has(rts['kind'] as string)
+  ) {
     rts['kind'] = 'markdown';
   }
   out['rts'] = rts;
