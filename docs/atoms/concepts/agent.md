@@ -10,26 +10,43 @@ An **agent** is a named, mutable ref pointing into the [turn](turn.md) DAG, plus
 
 ## Schema
 
+The per-agent dict at `metadata.rts.zone.agents.<id>` has two members: `turns[]` (the agent's contributions to the turn DAG; each record carries its own `provider`, `claude_session_id`, `cell_id`, `created_at`) and `session` (the mutable agent ref + runtime state). The agent's `id` is the dict key, not a duplicated field.
+
 ```jsonc
-// metadata.rts.zone.agents.<id>.session
+// metadata.rts.zone.agents.<id>
 {
-  "id":                 "alpha",
-  "head_turn_id":       "t_01HZX7K3...",       // mutable — the git-branch-ref pointer
-  "provider":           "claude-code",         // V1: only claude-code
-  "claude_session_id":  "9d4f-...",            // current bound session; changes on /branch or /revert
-  "runtime_status":     "alive | idle | exited",
-  "pid":                32856,                 // null when idle/exited
-  "last_seen_turn_id":  "t_01HZX7K3...",       // the most recent turn this agent's session has been fed
-  "work_dir":           "/.llmnb-agents/alpha",
-  "created_at":         "...",
-  "model":              "claude-haiku-4-5-20251001"
+  "turns": [
+    {
+      "id":                "t_01HZX7K3...",        // immutable turn id
+      "parent_id":         "t_01HZW...",           // null on first turn
+      "agent_id":          "alpha",
+      "claude_session_id": "9d4f-...",             // session that produced this turn
+      "role":              "user" | "assistant",
+      "body":              "...",
+      "spans":             [],                     // OTLP spans for assistant turns
+      "cell_id":           "vscode-notebook-cell:.../#abc",
+      "created_at":        "...",
+      "provider":          "claude-code"           // V1: only claude-code
+    }
+  ],
+  "session": {
+    "head_turn_id":       "t_01HZX7K3...",         // mutable — the git-branch-ref pointer
+    "last_seen_turn_id":  "t_01HZX7K3...",         // most recent turn this session has been fed
+    "claude_session_id":  "9d4f-...",              // current bound session; changes on /branch or /revert
+    "runtime_status":     "alive | idle | exited | terminated",
+    "pid":                32856,                   // null when idle/exited/terminated
+    "fork_case":          "A" | "B"                // optional; present after /branch
+  }
 }
 ```
+
+The `provider` lives on each turn record (so the per-cell badge can render the correct provider for the turn that produced the cell). Cross-agent ergonomics like `work_dir`, `model`, and the spawn `created_at` are out of scope for V1's persisted state — they live in the in-process `AgentSupervisor` registry, not in `metadata.rts`.
 
 `runtime_status`:
 - `alive` — process running, accepting turns over stdin.
 - `idle` — process exited gracefully; resumable via `claude --resume <claude_session_id>`.
 - `exited` — process exited and cannot be resumed; the conversation rebuilds from turn replay if re-engaged.
+- `terminated` — process killed (SIGTERM via `/stop` or supervisor lifecycle); like `exited` but distinguishes "operator asked us to quit" from "process died on its own".
 
 **Note on `interrupting`**: the S9-kernel `AgentSupervisor.interrupt(agent_id)` (submodule commit `87cb127`) sends SIGINT to a live process so claude aborts its current generation; the process stays alive for the next turn. The kernel's enum stays at `alive | idle | exited` — `interrupting` is **extension-side optimistic-UI state**: when the X-EXT cell-toolbar interrupt button fires, the badge shows "interrupting…" until the next `alive`-state span confirms the abort completed. The kernel never persists `interrupting` to `metadata.rts.zone.agents.<id>.session.runtime_status`.
 

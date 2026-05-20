@@ -14,7 +14,7 @@ After S6, the kernel persists every conversation, every section, every RunFrame.
 - Agents in the active zone (alpha, beta, …) — clicking an agent should jump to its first cell.
 - Recent activity — event log entries with click-through to the relevant cell.
 
-Driver: [BSP-005 §"S7"](BSP-005-cell-roadmap.md). Atoms: [concepts/zone](../atoms/concepts/zone.md), [concepts/agent](../atoms/concepts/agent.md), [concepts/section](../atoms/concepts/section.md), [protocols/family-d-event-log](../atoms/protocols/family-d-event-log.md), [protocols/family-f-notebook-metadata](../atoms/protocols/family-f-notebook-metadata.md).
+Driver: [BSP-005 §"S7"](BSP-005-cell-roadmap.md). Atoms: [concepts/zone](../atoms/concepts/zone.md), [concepts/agent](../atoms/concepts/agent.md), [concepts/section](../atoms/concepts/section.md), [concepts/run-frame](../atoms/concepts/run-frame.md), [protocols/family-f-notebook-metadata](../atoms/protocols/family-f-notebook-metadata.md). The in-tree event log schema is canonical in [PLAN-S6.0-event-log-substrate](PLAN-S6.0-event-log-substrate.md) (the array of captured RFC-006 envelopes); there is no separate event-log atom in V1.
 
 Hard dependencies:
 - [PLAN-S5.5-sections.md](PLAN-S5.5-sections.md) shipped — section nodes appear in the agents tree.
@@ -70,10 +70,12 @@ Hard dependencies:
    - Inline action: "Jump to first cell" — uses the kernel-side back-reference `turn.cell_id` from the agent's first turn.
 
 4. **`ActivityTreeProvider`** — `extension/src/sidebar/activity-tree.ts`:
-   - Source: `metadata.rts.event_log[]` plus `metadata.rts.zone.run_frames.*`.
-   - Render most-recent-first.
-   - Entry types: `agent_spawn`, `agent_branch`, `agent_revert`, `agent_stop`, `ref_move`, `run_start`, `run_end`.
-   - Click → `vscode.commands.executeCommand("revealNotebookCell", entry.cell_id)`.
+   - Sources: `metadata.rts.zone.event_log[]` (raw RFC-006 envelope stream, PLAN-S6.0 §3.A) + `metadata.rts.zone.run_frames.*`.
+   - Entry types displayed: `agent_spawn`, `agent_branch`, `agent_revert`, `agent_stop`, `ref_move`, `run_start`, `run_end`. **Consumer-side synthesis**: the kernel does NOT emit these as discrete entry types. The provider derives them as follows:
+     - `agent_*` and `ref_move` — filter `zone.event_log[*]` for entries with `message_type == "operator.action"` and dispatch on `payload.action_type` (e.g. `agent_spawn`, `zone_mutate` carrying `move_agent_head` intent).
+     - `run_start` / `run_end` — synthesized from `zone.run_frames[*]` `started_at` / `ended_at` (Family A `run.start` / `run.complete` envelopes are excluded from `event_log` by the writer per `metadata_writer.py:645-647`; RunFrames are the canonical source).
+   - Render most-recent-first, capped at 500 entries with "Load more" affordance.
+   - Click → `vscode.commands.executeCommand("llmnb.revealCell", { cell_id: entry.cell_id })` (the existing local command at `extension/src/notebook/commands/reveal-cell.ts`; VS Code has no built-in `revealNotebookCell`).
 
 5. **Live updates.** All three providers wire to the metadata-applier's `onLastAcceptedVersion` hook (existing per [protocols/family-f-notebook-metadata](../atoms/protocols/family-f-notebook-metadata.md)). On every accepted snapshot, fire `onDidChangeTreeData`. Throttle to 200ms to avoid flicker on bursty turns.
 
@@ -84,10 +86,11 @@ Hard dependencies:
 This is a pure read-side slice. No new wire envelopes.
 
 The trees consume:
-- `metadata.rts.layout.*` — for zone display order ([protocols/family-b-layout](../atoms/protocols/family-b-layout.md)).
-- `metadata.rts.zone.agents.*` — agent state ([concepts/agent](../atoms/concepts/agent.md)).
-- `metadata.rts.zone.sections[]` — section state ([concepts/section](../atoms/concepts/section.md)).
-- `metadata.rts.event_log[]` — event entries ([protocols/family-d-event-log](../atoms/protocols/family-d-event-log.md)).
+- `metadata.rts.layout.tree.children[*]` — for zone display order ([protocols/family-b-layout](../atoms/protocols/family-b-layout.md)). The layout root is a recursive tree at `layout.tree`, not flattened keys under `layout.*`; zone nodes appear as `children[*]` of type `"zone"`.
+- `metadata.rts.zone.agents.<id>.session.*` — agent runtime state ([concepts/agent](../atoms/concepts/agent.md) §Schema). Note: `runtime_status`, `head_turn_id`, `claude_session_id`, `pid` all live under the nested `session` dict, not at the agent top level.
+- `metadata.rts.zone.agents.<id>.turns[0].cell_id` — first-cell back-reference for the "Jump to first cell" affordance (written by `append_turn` per `metadata_writer.py:1579`).
+- `metadata.rts.zone.sections` — section dict keyed by `section_id` ([concepts/section](../atoms/concepts/section.md)).
+- `metadata.rts.zone.event_log[]` — captured RFC-006 envelope stream ([PLAN-S6.0 §3.A](PLAN-S6.0-event-log-substrate.md#3a-storage-location)). Filtered consumer-side by `message_type`/`action_type` per §3.4.
 - `metadata.rts.zone.run_frames.*` — run records ([concepts/run-frame](../atoms/concepts/run-frame.md)).
 
 Internal `TreeNode` types defined in `extension/src/sidebar/types.ts`; no public API.
@@ -126,10 +129,10 @@ Expected count: 9 extension tests.
 ## §7. Atoms touched + Atom Status fields needing update
 
 - [concepts/zone.md](../atoms/concepts/zone.md) — verify the kernel-side zone definition is still the only normative source.
-- [concepts/agent.md](../atoms/concepts/agent.md) — sidebar uses every field; verify atom and code agree on enum values.
+- [concepts/agent.md](../atoms/concepts/agent.md) — sidebar navigates the `session` nesting; atom schema block updated 2026-05-19 to show the nested shape and include `terminated` in the `runtime_status` enum (slice 1 prep).
 - [concepts/section.md](../atoms/concepts/section.md) — sidebar reads `cell_range[]` order; confirm atom invariant about ordering.
-- [protocols/family-d-event-log.md](../atoms/protocols/family-d-event-log.md) — verify the entry kinds the sidebar consumes are all enumerated.
-- [protocols/family-f-notebook-metadata.md](../atoms/protocols/family-f-notebook-metadata.md) — `onLastAcceptedVersion` hook contract verified.
+- [PLAN-S6.0-event-log-substrate.md](PLAN-S6.0-event-log-substrate.md) — verify the captured envelope shape the activity tree synthesizes from.
+- [protocols/family-f-notebook-metadata.md](../atoms/protocols/family-f-notebook-metadata.md) — `onLastAcceptedVersion` hook landed 2026-05-19 on `NotebookMetadataApplier` (slice 1 prep).
 
 ## §8. Cross-references (sibling PLANs)
 

@@ -200,6 +200,37 @@ suite('contract: NotebookMetadataApplier (RFC-006 §8)', () => {
     }
   });
 
+  test('fires onLastAcceptedVersion on each successful apply', async function (): Promise<void> {
+    // PLAN-S7 §3.5 — sidebar TreeDataProviders subscribe here to refresh
+    // on every accepted snapshot. The event must fire after the version
+    // is committed (so getLastAcceptedVersion observed from inside the
+    // handler is monotonic), and must NOT fire on W7/W8 rejections.
+    this.timeout(15000);
+    const nb = await newNotebook();
+    const applier = new NotebookMetadataApplier(new FixedProvider(nb), silentLogger());
+    const accepted: number[] = [];
+    applier.onLastAcceptedVersion((v) => accepted.push(v));
+    const failures = captureFailures(applier);
+    try {
+      applier.onNotebookMetadata(snapshotPayload({ snapshot_version: 1 }));
+      await new Promise((r) => setTimeout(r, 50));
+      applier.onNotebookMetadata(snapshotPayload({ snapshot_version: 2 }));
+      await new Promise((r) => setTimeout(r, 50));
+      // W7 rejection — must not fire onLastAcceptedVersion.
+      applier.onNotebookMetadata(
+        snapshotPayload({ schema_version: '2.0.0', snapshot_version: 3 })
+      );
+      await new Promise((r) => setTimeout(r, 25));
+      // W8 rejection — must not fire onLastAcceptedVersion.
+      applier.onNotebookMetadata(snapshotPayload({ snapshot_version: 1 }));
+      await new Promise((r) => setTimeout(r, 25));
+      assert.deepEqual(accepted, [1, 2]);
+      assert.equal(failures.length, 2);
+    } finally {
+      applier.dispose();
+    }
+  });
+
   test('accepts equal snapshot_version (>= last seen)', async function (): Promise<void> {
     this.timeout(15000);
     const nb = await newNotebook();

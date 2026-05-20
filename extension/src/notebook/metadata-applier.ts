@@ -82,10 +82,18 @@ export class WindowActiveNotebookProvider implements ActiveNotebookProvider {
 export class NotebookMetadataApplier implements NotebookMetadataObserver {
   private lastAcceptedVersion: number | undefined;
   private readonly failureEmitter = new vscode.EventEmitter<MetadataApplierFailure>();
+  private readonly acceptedVersionEmitter = new vscode.EventEmitter<number>();
 
   /** Subscribe to wire-failure events (RFC-006 W7/W8). The router stub for
    *  the operator-acknowledgment surface will subscribe here in V2. */
   public readonly onFailure = this.failureEmitter.event;
+
+  /** Fires after each accepted snapshot apply with the new
+   *  `snapshot_version`. Consumers (e.g. PLAN-S7 sidebar TreeDataProviders)
+   *  subscribe here to refresh views derived from `metadata.rts`. The
+   *  event fires only on the success path — W7/W8 rejections go through
+   *  `onFailure` instead. */
+  public readonly onLastAcceptedVersion = this.acceptedVersionEmitter.event;
 
   public constructor(
     private readonly active: ActiveNotebookProvider,
@@ -94,6 +102,7 @@ export class NotebookMetadataApplier implements NotebookMetadataObserver {
 
   public dispose(): void {
     this.failureEmitter.dispose();
+    this.acceptedVersionEmitter.dispose();
   }
 
   /** RunLifecycleObserver-style hook invoked by `MessageRouter` for inbound
@@ -199,6 +208,11 @@ export class NotebookMetadataApplier implements NotebookMetadataObserver {
       this.logger.debug(
         `[metadata-applier] applied snapshot v=${snapshotVersion} (uri=${notebook.uri.toString()})`
       );
+      try {
+        this.acceptedVersionEmitter.fire(snapshotVersion);
+      } catch (err) {
+        this.logger.warn(`[metadata-applier] accepted-version emitter threw: ${String(err)}`);
+      }
     } catch (err) {
       this.logger.error(
         `[metadata-applier] applyEdit threw: ${String(err)}`
