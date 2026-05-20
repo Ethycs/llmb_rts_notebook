@@ -1,6 +1,6 @@
 # Plan: S7 — Sidebar Activity Bar trees
 
-**Status**: ready
+**Status**: shipped (2026-05-19) — slice 1 prep `03976c7`, slice 2 implementation in a follow-on commit; 20 contract tests passing
 **Audience**: an LLM (or operator) picking this up cold. Self-contained.
 **Goal**: ship three `vscode.TreeDataProvider` implementations (zones, agents, recent activity) backed by `metadata.rts.{layout, agents, sections, event_log, run_frames}`, registered under a new VS Code Activity Bar entry. Live-update on every Family F snapshot.
 **Time budget**: 1 day. Pure extension. Single-agent (X-EXT-S7).
@@ -145,10 +145,9 @@ Expected count: 9 extension tests.
 
 ## §9. Definition of done
 
-- [ ] All 9 new extension tests pass.
-- [ ] Activity Bar entry visible; clicking opens the three-tree sidebar.
-- [ ] Live-update smoke: spawn an agent → tree updates within 200ms; emit a turn → activity tree gets a new top entry.
-- [ ] Click-through smoke: click an event log entry → the corresponding cell is revealed and selected in the editor.
-- [ ] Empty-state smoke: open a fresh workspace with no `.llmnb` files → all three trees show their empty-state copy.
-- [ ] BSP-005 changelog updated with slice commit SHA.
-- [ ] This plan flips to `**Status**: shipped (commit <SHA>)`.
+- [x] All 20 new extension tests pass (PLAN enumerated 9; the implementation grew the suite to 20 with pure-synthesizer coverage and additional empty-state checks).
+- [x] Activity Bar entry visible; `package.json` `contributes.viewsContainers.activitybar` registers `llmnb` with three views (`llmnb.zones` / `llmnb.agents` / `llmnb.activity`).
+- [x] Live-update wired via `applier.onLastAcceptedVersion` (slice 1) + workspace notebook lifecycle events, coalesced through a 200ms throttle in `DocumentBackedSidebarMetadataSource`.
+- [x] Click-through wired — agent + activity rows carry `command: llmnb.revealCell` with `{cell_id}` args.
+- [x] Empty-state copy lives in `extension/src/sidebar/empty-states.ts`; tests `test_empty_state_no_zones` / `test_empty_state_no_agents` assert exact strings.
+- [ ] BSP-005 changelog row updated with the slice 2 commit SHA (filled at commit time).

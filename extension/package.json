@@ -123,8 +123,38 @@
         "command": "llmnb.section.openActions",
         "title": "LLMNB: Section — actions (rename / delete / set status)",
         "category": "LLMNB"
+      },
+      {
+        "command": "llmnb.sidebar.activity.loadMore",
+        "title": "LLMNB: Sidebar — load older activity entries",
+        "category": "LLMNB"
       }
     ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "llmnb",
+          "title": "RTS Notebook",
+          "icon": "$(notebook)"
+        }
+      ]
+    },
+    "views": {
+      "llmnb": [
+        {
+          "id": "llmnb.zones",
+          "name": "Zones"
+        },
+        {
+          "id": "llmnb.agents",
+          "name": "Agents"
+        },
+        {
+          "id": "llmnb.activity",
+          "name": "Recent activity"
+        }
+      ]
+    },
     "configuration": {
       "title": "LLMNB",
       "properties": {

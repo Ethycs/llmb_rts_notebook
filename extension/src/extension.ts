@@ -89,6 +89,13 @@ import {
   DocumentBackedSectionMetadataSource
 } from './notebook/sections/section-header-provider.js';
 import * as inspect from './inspect/index.js';
+import {
+  DocumentBackedSidebarMetadataSource,
+  type SidebarMetadataSource
+} from './sidebar/metadata-source.js';
+import { ZonesTreeProvider } from './sidebar/zones-tree.js';
+import { AgentsTreeProvider } from './sidebar/agents-tree.js';
+import { ActivityTreeProvider } from './sidebar/activity-tree.js';
 
 const NOTEBOOK_TYPE = 'llmnb';
 
@@ -110,6 +117,10 @@ let activeContaminationRegistry: ContaminationRegistry | undefined;
 let activeContaminationProvider: ContaminationBadgeStatusBarProvider | undefined;
 let activePinStatusRegistry: PinStatusRegistry | undefined;
 let activePinStatusHeader: PinStatusHeaderHost | undefined;
+let activeSidebarSource: SidebarMetadataSource | undefined;
+let activeSidebarZones: ZonesTreeProvider | undefined;
+let activeSidebarAgents: AgentsTreeProvider | undefined;
+let activeSidebarActivity: ActivityTreeProvider | undefined;
 
 // Diagnostic ring buffers — populated only when LLMNB_E2E_VERBOSE === '1'.
 // Tests subscribe via the ExtensionApi accessors; production builds zero
@@ -479,6 +490,42 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
     context.subscriptions.push(d);
   }
 
+  // PLAN-S7 — Sidebar Activity Bar trees (zones / agents / recent activity).
+  // The shared metadata source listens to the metadata-applier's
+  // onLastAcceptedVersion event (slice 1) plus VS Code's notebook/editor
+  // lifecycle events, coalescing all change signals through a 200ms
+  // throttle. Each provider reads from the active or all-open notebook(s)
+  // and renders a TreeView via the Activity Bar contribution in package.json.
+  const sidebarSource = new DocumentBackedSidebarMetadataSource(NOTEBOOK_TYPE, applier);
+  activeSidebarSource = sidebarSource;
+  context.subscriptions.push({ dispose: () => sidebarSource.dispose() });
+
+  const zonesProvider = new ZonesTreeProvider(sidebarSource);
+  activeSidebarZones = zonesProvider;
+  context.subscriptions.push({ dispose: () => zonesProvider.dispose() });
+  context.subscriptions.push(
+    vscode.window.createTreeView('llmnb.zones', { treeDataProvider: zonesProvider })
+  );
+
+  const agentsProvider = new AgentsTreeProvider(sidebarSource);
+  activeSidebarAgents = agentsProvider;
+  context.subscriptions.push({ dispose: () => agentsProvider.dispose() });
+  context.subscriptions.push(
+    vscode.window.createTreeView('llmnb.agents', { treeDataProvider: agentsProvider })
+  );
+
+  const activityProvider = new ActivityTreeProvider(sidebarSource);
+  activeSidebarActivity = activityProvider;
+  context.subscriptions.push({ dispose: () => activityProvider.dispose() });
+  context.subscriptions.push(
+    vscode.window.createTreeView('llmnb.activity', { treeDataProvider: activityProvider })
+  );
+  context.subscriptions.push(
+    vscode.commands.registerCommand('llmnb.sidebar.activity.loadMore', () => {
+      activityProvider.loadMore();
+    })
+  );
+
   // PLAN-S5.0.2 §3.2 — bridge renderer `command.invoke` postMessages into
   // VS Code commands. The provenance chip's click handler emits
   //   {type: "command.invoke", payload: {command, args}}
@@ -689,7 +736,11 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
     getRecentPtyBytes: () => ptyByteRing.join(''),
     getRecentLogRecords: () => [...logRecordRing],
     getRecentFrames: () => [...frameRing],
-    getActivationDiagnostics: () => ({ ...activationDiagnostics })
+    getActivationDiagnostics: () => ({ ...activationDiagnostics }),
+    getSidebarMetadataSource: () => activeSidebarSource,
+    getSidebarZonesProvider: () => activeSidebarZones,
+    getSidebarAgentsProvider: () => activeSidebarAgents,
+    getSidebarActivityProvider: () => activeSidebarActivity
   };
 }
 
@@ -799,6 +850,14 @@ export interface ExtensionApi {
   getRecentFrames?(): unknown[];
   /** FSP-003 Pillar A — activation lifecycle snapshot for typed-wait dumps. */
   getActivationDiagnostics(): ActivationDiagnosticsSnapshot;
+  /** PLAN-S7 — Sidebar metadata source (DocumentBacked production impl). */
+  getSidebarMetadataSource(): SidebarMetadataSource | undefined;
+  /** PLAN-S7 §3.2 — Zones tree provider. */
+  getSidebarZonesProvider(): ZonesTreeProvider | undefined;
+  /** PLAN-S7 §3.3 — Agents tree provider. */
+  getSidebarAgentsProvider(): AgentsTreeProvider | undefined;
+  /** PLAN-S7 §3.4 — Activity tree provider. */
+  getSidebarActivityProvider(): ActivityTreeProvider | undefined;
 }
 
 /**
