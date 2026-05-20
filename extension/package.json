@@ -177,6 +177,11 @@
         {
           "id": "llmnb.activity",
           "name": "Recent activity"
+        },
+        {
+          "id": "llmnb.search",
+          "name": "Find in cells",
+          "type": "webview"
         }
       ]
     },
@@ -202,13 +207,14 @@
     "watch": "tsc -watch -p ./",
     "package": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --external:node-pty --format=cjs --platform=node --minify",
     "package:renderer": "esbuild src/renderers/run-renderer.ts --bundle --outfile=dist/run-renderer.js --format=esm --platform=browser --minify",
+    "package:search-view": "esbuild src/sidebar/search/search-view-renderer.ts --bundle --outfile=dist/search-view.js --format=iife --platform=browser --minify",
     "lint": "eslint src",
     "build:tests": "tsc -p ./tsconfig.test.json",
     "pretest:unit": "npm run build:tests",
     "test:unit": "mocha --config .mocharc-unit.cjs",
-    "pretest:stub": "npm run build:tests && npm run package && npm run package:renderer",
+    "pretest:stub": "npm run build:tests && npm run package && npm run package:renderer && npm run package:search-view",
     "test:stub": "vscode-test --config .vscode-test-stub.mjs",
-    "pretest:live": "npm run build:tests && npm run package && npm run package:renderer",
+    "pretest:live": "npm run build:tests && npm run package && npm run package:renderer && npm run package:search-view",
     "test:live": "vscode-test --config .vscode-test-live.mjs",
     "test:contract": "npm run test:unit && npm run test:stub",
     "pretest:e2e": "npm run build && npm run package",

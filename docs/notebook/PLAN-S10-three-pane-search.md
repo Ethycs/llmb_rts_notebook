@@ -1,6 +1,9 @@
 # Plan: S10 — Three-pane mental model + FSP-002 search/collapse
 
-**Status**: shipped (2026-05-19, **reduced scope V1**) — streaming + artifact badges, bulk-collapse + find wrapper commands. The "floating search bar" and "per-cell gutter color" features from the original plan are deferred to V2 pending VS Code API exposure.
+**Status**: shipped (2026-05-19) — three landings:
+1. **Streaming + artifact cell badges** + **bulk-collapse / find wrapper commands** (initial reduced V1 — `b07e6f9`).
+2. **Sidebar Find-in-cells WebviewView** — a 4th view in the `llmnb` activity-bar container delivering the full FSP-002 §2.1 search UX (scope filter, case / whole-word / regex toggles, M-of-N counter, click-to-reveal, debounced live results, F70 invalid-regex tooltip). Lives in the sidebar rather than as a literal "floating bar above the editor" because that pixel placement is the genuine API ceiling — even `vscode-jupyter` doesn't ship one — but the operator-visible UX is the FSP-002 spec verbatim. (Sidebar follow-on commit: see slice 2 below.)
+3. **Per-cell gutter color** for the three-pane visual remains the only deferred-to-V2+ item — `notebookCellDecoration` isn't even on Microsoft's API proposal list. The native cell-focus highlight covers "current"; streaming/artifact are now badges; the "pane color" affordance the original plan called for is genuinely off the table until VS Code exposes the decoration provider.
 
 ## Reduced-scope note (2026-05-19)
 
@@ -21,7 +24,7 @@ A feasibility probe before slice execution found three of PLAN-S10's mechanisms 
 
 **Deferred to V2+ pending API exposure**:
 - Three-pane gutter coloring per cell (S1's `TextEditorDecorationType` border trick covers per-agent gutter; the streaming/current/artifact PANE distinction is now informally carried by badge presence).
-- Floating search bar with M-of-N counter, scope selector, regex toggle, auto-expand on collapsed-cell match.
+- ~~Floating search bar with M-of-N counter, scope selector, regex toggle, auto-expand on collapsed-cell match.~~ **Shipped 2026-05-19 as a sidebar WebviewView** (`llmnb.search`). The "floating above the editor" pixel placement is genuinely off the table — VS Code v1.92 has no overlay API and `vscode-jupyter` doesn't ship one either — but every other piece of FSP-002 §2.1 (input + scope + case/word/regex toggles + M-of-N counter + click-to-reveal + F70 invalid-regex tooltip) is present in the sidebar view. Auto-expand on collapsed-cell match is bypassed: cells aren't collapsed via the extension API in V1, so there's nothing to auto-expand. See §3.2 below for the implementation; the `match-finder.ts` pure module is unit-tested against 14 FSP-002 §3 scenarios.
 - WorkspaceState-backed bulk-collapse persistence (the engine handles its own collapse state via the per-cell chevron; we don't try to mirror it).
 
 The FSP-002 reference design stays normative for V2+; this slice just delivers the engine-native subset that's reachable today.
@@ -193,11 +196,12 @@ Expected count: 16 extension tests.
 
 ## §9. Definition of done — reduced-scope V1 (2026-05-19)
 
-- [x] All 17 new extension tests pass (the original PLAN budgeted 16; reduced scope delivered 10 badge tests + 7 wrapper-command tests).
+- [x] All 36 new extension tests pass (original budget 16): 10 badge tests + 7 wrapper-command tests + 14 match-finder tests + 5 SearchViewProvider tests. PLAN's FSP-002 §3 semantics (case-insensitive default, case/word/regex toggles, scope filters, F70 invalid-regex, snippet extraction) are all unit-pinned.
 - [x] Streaming-badge smoke: a cell with a `status: "running"` RunFrame in `metadata.rts.zone.run_frames.*` renders `◉ streaming` (right side); turns off when the frame transitions to a terminal status.
 - [x] Artifact-badge smoke: a cell with `metadata.rts.cell.kind === "artifact"` renders `◆ artifact` (right side); markup cells and non-artifact code cells render nothing.
 - [x] Bulk-collapse wrapper commands registered in `extension/package.json` and fan out to the engine builtins.
 - [x] Find-in-cells wrapper command registered; the operator can trigger the native notebook find from the command palette without remembering `actions.find`.
-- [ ] **Deferred** (V2+ pending API): floating search bar with M-of-N, scope selector, regex toggle; auto-expand on collapsed-cell match; WorkspaceState-backed collapse persistence; performance smoke against 1000-cell synthetic.
+- [x] Sidebar Find-in-cells view: type a substring, scope filter / case / whole-word / regex toggles all functional; M-of-N counter live-updates; Enter/Shift+Enter navigation; click a match → `llmnb.revealCell` reveals + flashes the cell; F70 invalid-regex shows a tooltip without crashing the view.
+- [ ] **Genuinely deferred to V2+** (`notebookCellDecoration` API exposure): per-cell gutter color, focus border, in-cell auto-expand on collapsed-cell match, WorkspaceState-backed collapse persistence. Performance smoke against 1000-cell synthetic still queued.
 - [x] BSP-005 changelog row updated to reflect V1 ship of the reduced scope. FSP-002 status updated to "V1 partial-ship (find + bulk collapse via engine builtins); full UX V2+".
 - [x] This plan flips to `**Status**: shipped (2026-05-19, reduced scope V1)` (slice 1 commit SHA filled at commit time).

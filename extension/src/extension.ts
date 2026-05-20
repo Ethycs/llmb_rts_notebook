@@ -98,6 +98,10 @@ import { AgentsTreeProvider } from './sidebar/agents-tree.js';
 import { ActivityTreeProvider } from './sidebar/activity-tree.js';
 import { ThreePaneBadgeStatusBarProvider } from './notebook/three-pane-badges.js';
 import { registerThreePaneCommands } from './notebook/three-pane-commands.js';
+import {
+  SearchViewProvider,
+  SEARCH_VIEW_ID
+} from './sidebar/search/search-view-provider.js';
 
 const NOTEBOOK_TYPE = 'llmnb';
 
@@ -124,6 +128,7 @@ let activeSidebarZones: ZonesTreeProvider | undefined;
 let activeSidebarAgents: AgentsTreeProvider | undefined;
 let activeSidebarActivity: ActivityTreeProvider | undefined;
 let activeThreePaneBadges: ThreePaneBadgeStatusBarProvider | undefined;
+let activeSearchView: SearchViewProvider | undefined;
 
 // Diagnostic ring buffers — populated only when LLMNB_E2E_VERBOSE === '1'.
 // Tests subscribe via the ExtensionApi accessors; production builds zero
@@ -545,6 +550,19 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
     context.subscriptions.push(d);
   }
 
+  // PLAN-S10 sidebar-search follow-on — WebviewView in the same `llmnb`
+  // activity-bar container as the three tree views. Delivers the full
+  // FSP-002 §2.1 UX (scope filter / case / whole-word / regex toggle +
+  // M-of-N counter + click-to-reveal) in the sidebar instead of as a
+  // floating bar above the editor (the floating affordance isn't
+  // exposed by VS Code v1.92; see PLAN-S10 "Reduced-scope note").
+  const searchView = new SearchViewProvider(context.extensionUri, NOTEBOOK_TYPE);
+  activeSearchView = searchView;
+  context.subscriptions.push({ dispose: () => searchView.dispose() });
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(SEARCH_VIEW_ID, searchView)
+  );
+
   // PLAN-S5.0.2 §3.2 — bridge renderer `command.invoke` postMessages into
   // VS Code commands. The provenance chip's click handler emits
   //   {type: "command.invoke", payload: {command, args}}
@@ -760,7 +778,8 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
     getSidebarZonesProvider: () => activeSidebarZones,
     getSidebarAgentsProvider: () => activeSidebarAgents,
     getSidebarActivityProvider: () => activeSidebarActivity,
-    getThreePaneBadgeProvider: () => activeThreePaneBadges
+    getThreePaneBadgeProvider: () => activeThreePaneBadges,
+    getSearchViewProvider: () => activeSearchView
   };
 }
 
@@ -880,6 +899,8 @@ export interface ExtensionApi {
   getSidebarActivityProvider(): ActivityTreeProvider | undefined;
   /** PLAN-S10 — Three-pane streaming/artifact badge provider. */
   getThreePaneBadgeProvider(): ThreePaneBadgeStatusBarProvider | undefined;
+  /** PLAN-S10 (sidebar-search follow-on) — Find-in-cells WebviewView provider. */
+  getSearchViewProvider(): SearchViewProvider | undefined;
 }
 
 /**
