@@ -1,6 +1,6 @@
 # Plan: S5.0.6 — Nvim driver (third-class operator UI)
 
-**Status**: queued — design locked, dispatch pending operator approval
+**Status**: deferred 2026-05-19 — design locked at `8639949`; implementation deferred pending nvim-operator dogfooding availability. V1 ships without this driver; the headless `llmnb execute --connect` CLI (commit `df95ad4`) covers file-level operation for nvim users in the interim. Implementation picks up when the operator's nvim usage justifies the per-cell affordance.
 **Audience**: an LLM (or operator) picking this up cold. Self-contained.
 **Goal**: ship a working Neovim plugin that lets an operator drive `.magic` / `.llmnb` notebooks against a running `llmnb serve` kernel from inside Neovim — per-cell run, inline output rendering, kernel status surface. Concretely realizes the "headless `llmnb` CLI, future Rust/Go drivers, remote orchestrators" use case [PLAN-S5.0.3 §3](PLAN-S5.0.3-driver-extraction-and-external-runnability.md) named by establishing the *first* non-extension, non-CLI operator UI on top of the kernel wire.
 **Time budget**: ~1-1.5 dispatcher-days. Two file-disjoint sub-slices: Python sidecar (~250 LoC) and Lua plugin (~300 LoC). Tests + docs ~100 LoC.
