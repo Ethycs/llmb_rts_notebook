@@ -1,6 +1,38 @@
 # Plan: S10 — Three-pane mental model + FSP-002 search/collapse
 
-**Status**: ready
+**Status**: shipped (2026-05-19, **reduced scope V1**) — streaming + artifact badges, bulk-collapse + find wrapper commands. The "floating search bar" and "per-cell gutter color" features from the original plan are deferred to V2 pending VS Code API exposure.
+
+## Reduced-scope note (2026-05-19)
+
+A feasibility probe before slice execution found three of PLAN-S10's mechanisms are not exposed by VS Code v1.92:
+
+| Original PLAN-S10 step | v1.92 reality |
+|---|---|
+| §3.1 step 2: `vscode.NotebookCellDecorationProvider` for gutter + focus border | API does not exist. Only `NotebookCellStatusBarItemProvider` is exposed. The native cell-focus highlight already covers the "current" pane visually. |
+| §3.2 step 4: "Floats a search bar above the notebook editor (uses VS Code's webview overlay)" | Webview panels open as side tabs only; there is no overlay-above-editor API and the native Ctrl+F find widget is not extension-customizable. |
+| §3.3 step 8: `vscode.NotebookCellMetadata.collapsed = true` mutation | `NotebookCell.metadata` is read-only at runtime; no `collapsed` field is honored by the renderer. |
+
+**What V1 actually ships** (this reduced scope):
+
+- **Streaming cell badge** (right side) — fires when the cell has a RunFrame with `status === "running"` and `ended_at` null/missing, sourced from `metadata.rts.zone.run_frames.*`. Static glyph (`◉ streaming`) — no animation, since `NotebookCellStatusBarItem` doesn't support it.
+- **Artifact cell badge** (right side) — fires when `metadata.rts.cell.kind === "artifact"` (the promote-span outcome). Reuses cell-kinds enum.
+- **Bulk-collapse wrapper commands** — `llmnb.collapseAllInputs` / `llmnb.collapseAllOutputs` / `llmnb.expandAllInputs` / `llmnb.expandAllOutputs` each fans out to the engine's built-in `notebook.cell.{collapse,expand}AllCell{Input,Output}` command.
+- **Find-in-cells wrapper command** — `llmnb.findInCells` fans out to the engine's built-in `actions.find` (the same widget Ctrl+F triggers in a focused notebook).
+
+**Deferred to V2+ pending API exposure**:
+- Three-pane gutter coloring per cell (S1's `TextEditorDecorationType` border trick covers per-agent gutter; the streaming/current/artifact PANE distinction is now informally carried by badge presence).
+- Floating search bar with M-of-N counter, scope selector, regex toggle, auto-expand on collapsed-cell match.
+- WorkspaceState-backed bulk-collapse persistence (the engine handles its own collapse state via the per-cell chevron; we don't try to mirror it).
+
+The FSP-002 reference design stays normative for V2+; this slice just delivers the engine-native subset that's reachable today.
+
+**Jupyter comparison (2026-05-19 probe)**: the vendored `vscode-jupyter` was checked for the same three mechanisms and hit identical walls — no per-cell gutter decoration inside notebook editors (their interactive-window border trick uses `TextEditorDecorationType` on a regular text editor, not on notebook cells); no custom search affordance (they rely on native Ctrl+F); and `notebook.cell.collapseAllCellInputs` for bulk collapse (same engine builtin we wrap). Critically, `vscode-jupyter`'s `package.json` enables 13 proposed APIs (`notebookMessaging`, `notebookCellExecution`, `notebookKernelSource`, etc.) but **`notebookCellDecoration` is not among them and is not currently a Microsoft proposal**. So the reduced V1 is genuinely the ceiling on the current platform; Marketplace-publishable extensions cannot do better. The full PLAN-S10 visual would require either a side-panel HTML renderer (parallel-view, not in-cell — see S10.5 deferred slice) or a future VS Code API expansion.
+
+---
+
+## Original plan (verbatim for reference)
+
+**Status (originally proposed)**: ready
 **Audience**: an LLM (or operator) picking this up cold. Self-contained.
 **Goal**: ship the visual three-pane mental model (streaming / current / artifacts) via cell-status decorations + CSS, and fold in [FSP-002](FSP-002-cell-search-collapse.md) (in-cell search + collapse all / expand all). Pure UX polish capping V1.
 **Time budget**: 1 day. Pure extension. Single-agent (X-EXT-S10).
@@ -159,12 +191,13 @@ Expected count: 16 extension tests.
 - [PLAN-S5.5-sections.md](PLAN-S5.5-sections.md) — collapse-all interacts with section collapse; ensure idempotent layering.
 - [PLAN-M-series.md](PLAN-M-series.md) — M2 (annotations) decorations may overlap with three-pane styling; coordinate the gutter real estate.
 
-## §9. Definition of done
+## §9. Definition of done — reduced-scope V1 (2026-05-19)
 
-- [ ] All 16 new extension tests pass.
-- [ ] Three-pane smoke: a streaming agent cell shows the streaming badge + gutter; selecting another cell flips `current` styling; an artifact cell shows the artifact badge.
-- [ ] Search smoke: `Ctrl+F` opens the bar; type a substring → matches highlighted with `M of N`; navigate next/previous; matches inside a collapsed cell auto-expand it; `Esc` closes; previous collapse state restored.
-- [ ] Bulk collapse smoke: with 5 cells (2 collapsed), `Collapse all` makes 5 collapsed; `Expand all` makes 0 collapsed; reload window → state preserved per WorkspaceState.
-- [ ] Performance smoke: search across a 1000-cell notebook (synthetic fixture) returns within 200ms; no UI freeze.
-- [ ] BSP-005 changelog updated with slice commit SHA; FSP-002 status flipped to `Shipped in V1` per [VERSIONING.md](VERSIONING.md).
-- [ ] This plan flips to `**Status**: shipped (commit <SHA>)`.
+- [x] All 17 new extension tests pass (the original PLAN budgeted 16; reduced scope delivered 10 badge tests + 7 wrapper-command tests).
+- [x] Streaming-badge smoke: a cell with a `status: "running"` RunFrame in `metadata.rts.zone.run_frames.*` renders `◉ streaming` (right side); turns off when the frame transitions to a terminal status.
+- [x] Artifact-badge smoke: a cell with `metadata.rts.cell.kind === "artifact"` renders `◆ artifact` (right side); markup cells and non-artifact code cells render nothing.
+- [x] Bulk-collapse wrapper commands registered in `extension/package.json` and fan out to the engine builtins.
+- [x] Find-in-cells wrapper command registered; the operator can trigger the native notebook find from the command palette without remembering `actions.find`.
+- [ ] **Deferred** (V2+ pending API): floating search bar with M-of-N, scope selector, regex toggle; auto-expand on collapsed-cell match; WorkspaceState-backed collapse persistence; performance smoke against 1000-cell synthetic.
+- [x] BSP-005 changelog row updated to reflect V1 ship of the reduced scope. FSP-002 status updated to "V1 partial-ship (find + bulk collapse via engine builtins); full UX V2+".
+- [x] This plan flips to `**Status**: shipped (2026-05-19, reduced scope V1)` (slice 1 commit SHA filled at commit time).

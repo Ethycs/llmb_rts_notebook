@@ -128,6 +128,31 @@
         "command": "llmnb.sidebar.activity.loadMore",
         "title": "LLMNB: Sidebar — load older activity entries",
         "category": "LLMNB"
+      },
+      {
+        "command": "llmnb.collapseAllInputs",
+        "title": "LLMNB: Collapse all cell inputs",
+        "category": "LLMNB"
+      },
+      {
+        "command": "llmnb.collapseAllOutputs",
+        "title": "LLMNB: Collapse all cell outputs",
+        "category": "LLMNB"
+      },
+      {
+        "command": "llmnb.expandAllInputs",
+        "title": "LLMNB: Expand all cell inputs",
+        "category": "LLMNB"
+      },
+      {
+        "command": "llmnb.expandAllOutputs",
+        "title": "LLMNB: Expand all cell outputs",
+        "category": "LLMNB"
+      },
+      {
+        "command": "llmnb.findInCells",
+        "title": "LLMNB: Find in cells",
+        "category": "LLMNB"
       }
     ],
     "viewsContainers": {

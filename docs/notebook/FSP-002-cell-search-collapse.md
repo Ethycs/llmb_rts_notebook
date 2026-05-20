@@ -1,7 +1,7 @@
 # FSP-002: In-cell search + collapse/expand all
 
-**Status**: Future Spec, Issue 1, 2026-04-27
-**Targeting**: V2 (UI/utility push) per VERSIONING.md
+**Status**: V1 partial-ship 2026-05-19 (find + bulk-collapse via engine builtins; floating bar + scope filter + regex toggle deferred to V2 pending VS Code API exposure)
+**Targeting**: V2 (full UX) per VERSIONING.md; V1 ships only the engine-native subset reachable in v1.92
 **Related**: BSP-002 (conversation graph — cell metadata cache §6), RFC-005 (`metadata.rts` zone format)
 
 ## 1. Scope
@@ -136,3 +136,4 @@ V2 ships option A first because it's pure extension work and validates the UX be
 ## Changelog
 
 - **Issue 1, 2026-04-27**: initial. Search semantics specified for V2.0; option A (Memento) chosen as V2.0 default; option B (`metadata.rts` cache) deferred to V2.5+. No V1 surface impact.
+- **2026-05-19** (V1 partial-ship via PLAN-S10 reduced scope): the engine-native subset of this FSP shipped as wrapper commands — `llmnb.findInCells` fans out to the built-in `actions.find` (same widget Ctrl+F triggers when a notebook editor is focused), and `llmnb.collapseAllInputs` / `llmnb.collapseAllOutputs` / `llmnb.expandAllInputs` / `llmnb.expandAllOutputs` fan out to the engine's `notebook.cell.{collapse,expand}AllCell{Input,Output}` builtins. The floating search bar (§2.1) with M-of-N counter, scope selector, regex toggle, and auto-expand-on-match remains V2 because VS Code v1.92 exposes no API to overlay a webview above the notebook editor or customize the native find widget. The bulk-collapse WorkspaceState persistence (§4 option A) also remains V2 because `NotebookCell.metadata` is read-only at runtime and the engine handles its own per-cell chevron state.

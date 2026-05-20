@@ -96,6 +96,8 @@ import {
 import { ZonesTreeProvider } from './sidebar/zones-tree.js';
 import { AgentsTreeProvider } from './sidebar/agents-tree.js';
 import { ActivityTreeProvider } from './sidebar/activity-tree.js';
+import { ThreePaneBadgeStatusBarProvider } from './notebook/three-pane-badges.js';
+import { registerThreePaneCommands } from './notebook/three-pane-commands.js';
 
 const NOTEBOOK_TYPE = 'llmnb';
 
@@ -121,6 +123,7 @@ let activeSidebarSource: SidebarMetadataSource | undefined;
 let activeSidebarZones: ZonesTreeProvider | undefined;
 let activeSidebarAgents: AgentsTreeProvider | undefined;
 let activeSidebarActivity: ActivityTreeProvider | undefined;
+let activeThreePaneBadges: ThreePaneBadgeStatusBarProvider | undefined;
 
 // Diagnostic ring buffers — populated only when LLMNB_E2E_VERBOSE === '1'.
 // Tests subscribe via the ExtensionApi accessors; production builds zero
@@ -526,6 +529,22 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
     })
   );
 
+  // PLAN-S10 (reduced) — three-pane streaming/artifact badges +
+  // bulk-collapse + find wrapper commands. The badge provider shares
+  // the SidebarMetadataSource so RunFrame state transitions re-fire
+  // both the sidebar trees and the per-cell badges from a single
+  // change signal; the command wrappers fan out to the engine's
+  // built-in notebook commands.
+  const threePaneBadges = new ThreePaneBadgeStatusBarProvider(sidebarSource);
+  activeThreePaneBadges = threePaneBadges;
+  context.subscriptions.push({ dispose: () => threePaneBadges.dispose() });
+  context.subscriptions.push(
+    vscode.notebooks.registerNotebookCellStatusBarItemProvider(NOTEBOOK_TYPE, threePaneBadges)
+  );
+  for (const d of registerThreePaneCommands()) {
+    context.subscriptions.push(d);
+  }
+
   // PLAN-S5.0.2 §3.2 — bridge renderer `command.invoke` postMessages into
   // VS Code commands. The provenance chip's click handler emits
   //   {type: "command.invoke", payload: {command, args}}
@@ -740,7 +759,8 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
     getSidebarMetadataSource: () => activeSidebarSource,
     getSidebarZonesProvider: () => activeSidebarZones,
     getSidebarAgentsProvider: () => activeSidebarAgents,
-    getSidebarActivityProvider: () => activeSidebarActivity
+    getSidebarActivityProvider: () => activeSidebarActivity,
+    getThreePaneBadgeProvider: () => activeThreePaneBadges
   };
 }
 
@@ -858,6 +878,8 @@ export interface ExtensionApi {
   getSidebarAgentsProvider(): AgentsTreeProvider | undefined;
   /** PLAN-S7 §3.4 — Activity tree provider. */
   getSidebarActivityProvider(): ActivityTreeProvider | undefined;
+  /** PLAN-S10 — Three-pane streaming/artifact badge provider. */
+  getThreePaneBadgeProvider(): ThreePaneBadgeStatusBarProvider | undefined;
 }
 
 /**
