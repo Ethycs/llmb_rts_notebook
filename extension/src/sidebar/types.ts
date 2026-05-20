@@ -142,7 +142,9 @@ export type ZonesNode =
 
 /** A node in the Agents tree (active notebook only). Roots are
  *  per-agent; expanding shows the session detail rows pulled from
- *  `agents[id].session.*`. */
+ *  `agents[id].session.*` plus a "Branches" subnode when the agent has
+ *  forked descendants (V2 branch-switching UX — lineage recovered from
+ *  `metadata.rts.zone.event_log[]` per `agent-lineage.ts`). */
 export type AgentsNode =
   | { kind: 'empty'; message: string }
   | { kind: 'agent'; agentId: string }
@@ -151,6 +153,14 @@ export type AgentsNode =
       agentId: string;
       label: string;
       value: string;
+    }
+  | { kind: 'branches-root'; parentAgentId: string }
+  | {
+      kind: 'branch-agent';
+      sourceAgentId: string;
+      branchAgentId: string;
+      atTurnId: string | null;
+      case: 'A' | 'B' | undefined;
     };
 
 // ----------------------------------------------------------------------

@@ -175,3 +175,210 @@ suite('contract: PLAN-S7 Agents tree', () => {
     assert.equal(firstTurnCellId([{ id: 't1', cell_id: '' }]), undefined);
   });
 });
+
+suite('contract: V2 branch-switching UX (agents tree lineage)', () => {
+  function forkEnvelope(opts: {
+    source: string;
+    branch: string;
+    at?: string | null;
+    case?: 'A' | 'B';
+    createdAt?: string;
+  }): RtsSnapshot {
+    return {
+      zone: {
+        event_log: [
+          {
+            message_type: 'operator.action',
+            created_at: opts.createdAt ?? '2026-05-19T12:00:00Z',
+            payload: {
+              action_type: 'zone_mutate',
+              parameters: {
+                intent_kind: 'fork_agent',
+                source_agent_id: opts.source,
+                new_agent_id: opts.branch,
+                at_turn_id: opts.at ?? null,
+                case: opts.case ?? 'A'
+              }
+            }
+          }
+        ]
+      }
+    };
+  }
+
+  test('agent with no forks does NOT render a Branches subnode', () => {
+    const src = new InMemorySidebarMetadataSource();
+    src.set([
+      activeWith({
+        zone: { agents: { alpha: { session: { runtime_status: 'idle' } } } }
+      })
+    ]);
+    const provider = new AgentsTreeProvider(src);
+    try {
+      const [agentNode] = provider.getChildren() as AgentsNode[];
+      const children = provider.getChildren(agentNode);
+      assert.ok(
+        children.every((c) => c.kind !== 'branches-root'),
+        'no branches-root should appear when no fork_agent envelopes exist'
+      );
+    } finally {
+      provider.dispose();
+      src.dispose();
+    }
+  });
+
+  test('agent with one fork renders a Branches subnode that expands to the branch row', () => {
+    const src = new InMemorySidebarMetadataSource();
+    src.set([
+      activeWith({
+        zone: {
+          agents: {
+            alpha: { session: { runtime_status: 'idle' } },
+            'alpha-fork-1': {
+              turns: [{ id: 't_X', cell_id: 'cell:fork-first' }],
+              session: { runtime_status: 'alive', head_turn_id: 't_X' }
+            }
+          },
+          event_log: forkEnvelope({
+            source: 'alpha',
+            branch: 'alpha-fork-1',
+            at: 't_ABCDE1234567',
+            case: 'B'
+          }).zone!.event_log!
+        }
+      })
+    ]);
+    const provider = new AgentsTreeProvider(src);
+    try {
+      const [agentNode] = provider.getChildren() as AgentsNode[];
+      const children = provider.getChildren(agentNode);
+      const branchesRoot = children.find((c) => c.kind === 'branches-root');
+      assert.ok(branchesRoot, 'alpha must expose a Branches subnode');
+      const branchRows = provider.getChildren(branchesRoot!);
+      assert.equal(branchRows.length, 1);
+      assert.equal(branchRows[0].kind, 'branch-agent');
+      const row = branchRows[0] as { kind: 'branch-agent'; branchAgentId: string; case?: string };
+      assert.equal(row.branchAgentId, 'alpha-fork-1');
+      assert.equal(row.case, 'B');
+    } finally {
+      provider.dispose();
+      src.dispose();
+    }
+  });
+
+  test('branch-agent row carries a llmnb.revealCell command with the branch first cell', () => {
+    const src = new InMemorySidebarMetadataSource();
+    src.set([
+      activeWith({
+        zone: {
+          agents: {
+            alpha: { session: { runtime_status: 'idle' } },
+            'alpha-fork-1': {
+              turns: [{ id: 't_X', cell_id: 'cell:branch-first-cell' }],
+              session: { runtime_status: 'alive' }
+            }
+          },
+          event_log: forkEnvelope({
+            source: 'alpha',
+            branch: 'alpha-fork-1'
+          }).zone!.event_log!
+        }
+      })
+    ]);
+    const provider = new AgentsTreeProvider(src);
+    try {
+      const [agentNode] = provider.getChildren() as AgentsNode[];
+      const branchesRoot = provider
+        .getChildren(agentNode)
+        .find((c) => c.kind === 'branches-root');
+      const [branchRow] = provider.getChildren(branchesRoot!);
+      const item = provider.getTreeItem(branchRow);
+      assert.ok(item.command);
+      assert.equal(item.command!.command, REVEAL_CELL_COMMAND_ID);
+      const args = item.command!.arguments?.[0] as { cell_id?: string };
+      assert.equal(args.cell_id, 'cell:branch-first-cell');
+    } finally {
+      provider.dispose();
+      src.dispose();
+    }
+  });
+
+  test('branch-agent row description includes the source agent id and case', () => {
+    const src = new InMemorySidebarMetadataSource();
+    src.set([
+      activeWith({
+        zone: {
+          agents: {
+            alpha: { session: { runtime_status: 'idle' } },
+            'alpha-b': { session: { runtime_status: 'idle' } }
+          },
+          event_log: forkEnvelope({
+            source: 'alpha',
+            branch: 'alpha-b',
+            at: 't_HEADXX99',
+            case: 'A'
+          }).zone!.event_log!
+        }
+      })
+    ]);
+    const provider = new AgentsTreeProvider(src);
+    try {
+      const [agentNode] = provider.getChildren() as AgentsNode[];
+      const branchesRoot = provider
+        .getChildren(agentNode)
+        .find((c) => c.kind === 'branches-root');
+      const [branchRow] = provider.getChildren(branchesRoot!);
+      const item = provider.getTreeItem(branchRow);
+      assert.ok(typeof item.description === 'string');
+      const desc = item.description as string;
+      assert.ok(desc.includes('alpha'), 'description should reference source agent');
+      assert.ok(desc.includes('[A]'), 'description should carry case tag');
+    } finally {
+      provider.dispose();
+      src.dispose();
+    }
+  });
+
+  test('multi-fork lineage: branches sort by capture time', () => {
+    const src = new InMemorySidebarMetadataSource();
+    src.set([
+      activeWith({
+        zone: {
+          agents: {
+            alpha: { session: { runtime_status: 'idle' } },
+            'fork-late':  { session: { runtime_status: 'idle' } },
+            'fork-early': { session: { runtime_status: 'idle' } }
+          },
+          event_log: [
+            ...forkEnvelope({
+              source: 'alpha',
+              branch: 'fork-late',
+              createdAt: '2026-05-19T13:00:00Z'
+            }).zone!.event_log!,
+            ...forkEnvelope({
+              source: 'alpha',
+              branch: 'fork-early',
+              createdAt: '2026-05-19T12:00:00Z'
+            }).zone!.event_log!
+          ]
+        }
+      })
+    ]);
+    const provider = new AgentsTreeProvider(src);
+    try {
+      const [agentNode] = provider.getChildren() as AgentsNode[];
+      const branchesRoot = provider
+        .getChildren(agentNode)
+        .find((c) => c.kind === 'branches-root');
+      const rows = provider.getChildren(branchesRoot!) as Array<{
+        kind: string;
+        branchAgentId?: string;
+      }>;
+      const order = rows.map((r) => r.branchAgentId);
+      assert.deepEqual(order, ['fork-early', 'fork-late']);
+    } finally {
+      provider.dispose();
+      src.dispose();
+    }
+  });
+});

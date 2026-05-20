@@ -66,8 +66,8 @@ The `provider` lives on each turn record (so the per-cell badge can render the c
 
 ## V1 vs V2+
 
-- **V1**: providers limited to `claude-code`; persistent lifecycle (spawn → stays alive → accepts turns via stdin → idle exit on timeout or `/stop`); idle resume via `--resume`; `/branch` and `/revert` data-model ratified; full UX for branch-switching deferred to V2+.
-- **V2+**: additional providers (`gpt-cli`, `gemini`, `ollama`); branch-switching UX (sidebar / picker for switching the rendered branch per [BSP-002 §11.2](../../notebook/BSP-002-conversation-graph.md#112-v2--graph-dag-with-branches)); richer Inspect-mode integration with the agent's session lineage.
+- **V1**: providers limited to `claude-code`; persistent lifecycle (spawn → stays alive → accepts turns via stdin → idle exit on timeout or `/stop`); idle resume via `--resume`; `/branch` and `/revert` data-model ratified.
+- **V2 (2026-05-20 partial-ship)**: branch-switching UX — the S7 Agents sidebar now renders a "Branches" subnode under any agent that has forked descendants (lineage recovered from `metadata.rts.zone.event_log[*]` `fork_agent` envelopes; see [PLAN-V2-branch-switching-ux](../../notebook/PLAN-V2-branch-switching-ux.md)). Clicking a branch row reveals that branch agent's first cell. Additional providers (`gpt-cli`, `gemini`, `ollama`) and richer Inspect-mode session lineage remain queued.
 
 ## See also
 

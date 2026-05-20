@@ -18,6 +18,11 @@ import type { SidebarMetadataSource } from './metadata-source.js';
 import { AGENTS_EMPTY } from './empty-states.js';
 import { getAgentStatusBadgeColor } from './badge-style.js';
 import { REVEAL_CELL_COMMAND_ID } from '../notebook/commands/reveal-cell.js';
+import {
+  buildAgentLineage,
+  type AgentLineage,
+  type ForkRecord
+} from './agent-lineage.js';
 
 export class AgentsTreeProvider
   implements vscode.TreeDataProvider<AgentsNode>, vscode.Disposable {
@@ -60,6 +65,22 @@ export class AgentsTreeProvider
         item.contextValue = 'llmnb.sidebar.agentDetail';
         return item;
       }
+      case 'branches-root': {
+        const active = this.source.getActiveZone();
+        const lineage = buildAgentLineage(active?.metadata);
+        const count = lineage.children.get(node.parentAgentId)?.length ?? 0;
+        const item = new vscode.TreeItem(
+          'Branches',
+          vscode.TreeItemCollapsibleState.Collapsed
+        );
+        item.description = count === 1 ? '1 branch' : `${count} branches`;
+        item.iconPath = new vscode.ThemeIcon('source-control');
+        item.contextValue = 'llmnb.sidebar.branchesRoot';
+        return item;
+      }
+      case 'branch-agent': {
+        return this.buildBranchAgentItem(node);
+      }
     }
   }
 
@@ -76,8 +97,30 @@ export class AgentsTreeProvider
     }
     if (node.kind === 'agent') {
       const active = this.source.getActiveZone();
-      const session = active?.metadata?.zone?.agents?.[node.agentId]?.session;
-      return this.buildSessionDetails(node.agentId, session);
+      const agents = active?.metadata?.zone?.agents;
+      const session = agents?.[node.agentId]?.session;
+      const lineage = buildAgentLineage(active?.metadata);
+      const rows = this.buildSessionDetails(node.agentId, session);
+      // Append a "Branches" subnode IF this agent has any forked
+      // descendants in the event_log lineage. Operators that haven't
+      // run /branch never see the extra row, so it doesn't clutter
+      // the simple single-agent case.
+      if ((lineage.children.get(node.agentId)?.length ?? 0) > 0) {
+        rows.push({ kind: 'branches-root', parentAgentId: node.agentId });
+      }
+      return rows;
+    }
+    if (node.kind === 'branches-root') {
+      const active = this.source.getActiveZone();
+      const lineage = buildAgentLineage(active?.metadata);
+      const records = lineage.children.get(node.parentAgentId) ?? [];
+      return records.map((rec): AgentsNode => ({
+        kind: 'branch-agent',
+        sourceAgentId: rec.sourceAgentId,
+        branchAgentId: rec.branchAgentId,
+        atTurnId: rec.atTurnId,
+        case: rec.case
+      }));
     }
     return [];
   }
@@ -137,6 +180,64 @@ export class AgentsTreeProvider
     }
     return rows;
   }
+
+  /** Build the TreeItem for a single forked agent under a "Branches"
+   *  subnode. The label is the branch agent id; the description carries
+   *  the operator-recognisable lineage ("← <source> @ <short turn>") +
+   *  the runtime_status from the active session map. Clicking the row
+   *  navigates to the branch agent's first cell (mirrors the top-level
+   *  `agent` row's reveal command). */
+  private buildBranchAgentItem(node: {
+    sourceAgentId: string;
+    branchAgentId: string;
+    atTurnId: string | null;
+    case: 'A' | 'B' | undefined;
+  }): vscode.TreeItem {
+    const active = this.source.getActiveZone();
+    const agent = active?.metadata?.zone?.agents?.[node.branchAgentId];
+    const status = agent?.session?.runtime_status ?? 'idle';
+    const item = new vscode.TreeItem(
+      node.branchAgentId,
+      vscode.TreeItemCollapsibleState.None
+    );
+    item.iconPath = new vscode.ThemeIcon('git-branch', getAgentStatusBadgeColor(status));
+    const lineage = formatLineageDescription(node);
+    item.description = `${lineage} · ${status}`;
+    item.tooltip =
+      `${node.branchAgentId} (forked from ${node.sourceAgentId}` +
+      `${node.atTurnId ? ` at ${shortTurnId(node.atTurnId)}` : ''}` +
+      `${node.case ? `, case ${node.case}` : ''})`;
+    item.contextValue = 'llmnb.sidebar.branchAgent';
+    const firstCellId = firstTurnCellId(agent?.turns);
+    if (firstCellId) {
+      item.command = {
+        command: REVEAL_CELL_COMMAND_ID,
+        title: 'Jump to branch first cell',
+        arguments: [{ cell_id: firstCellId }]
+      };
+    }
+    return item;
+  }
+}
+
+/** Format the branch row's lineage description. Reads `← <source>
+ *  @ <short turn>` so the relationship is visible without expanding
+ *  the row. */
+function formatLineageDescription(record: {
+  sourceAgentId: string;
+  atTurnId: string | null;
+  case: 'A' | 'B' | undefined;
+}): string {
+  const at = record.atTurnId ? ` @ ${shortTurnId(record.atTurnId)}` : '';
+  const caseTag = record.case ? ` [${record.case}]` : '';
+  return `← ${record.sourceAgentId}${at}${caseTag}`;
+}
+
+/** Short-form turn id for badge descriptions. Drops the `t_` prefix
+ *  if present and truncates to 8 chars. */
+function shortTurnId(turnId: string): string {
+  const trimmed = turnId.startsWith('t_') ? turnId.slice(2) : turnId;
+  return trimmed.length > 8 ? trimmed.slice(0, 8) : trimmed;
 }
 
 /** Pure helper — find the `cell_id` of the first turn an agent contributed.
