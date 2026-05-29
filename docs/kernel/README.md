@@ -43,11 +43,23 @@ extension contract rather than being carved into the core.
 | `extensions.md` | Extension authoring guide. The `Extension` protocol contract. PBX as the worked example. Versioning + prompt-marker conventions. | Planned — slice 4. |
 | `pbx.md` | PBX reference: telephone envelope shape, `dial` / `answer_call` semantics, area-code config, hop-count / TTL rules. Operator-facing. | Planned — slice 4. |
 
-The substrate trajectory that produced this folder is recorded in
-[`C:\Users\Qeyto\.claude\plans\let-s-sketch-this-out-deep-peacock.md`](../../). The four slices defended what is unique about
-the kernel (capture invariants, failure-mode discipline,
-wire-format separation, identity-model clarity) and treated every
-coordination model as a downstream consumer.
+The substrate trajectory that produced this folder is recorded as a
+Claude Code planning artifact at
+`~/.claude/plans/let-s-sketch-this-out-deep-peacock.md` (outside the
+repo). The four slices defended what is unique about the kernel
+(capture invariants, failure-mode discipline, wire-format separation,
+identity-model clarity) and treated every coordination model as a
+downstream consumer.
+
+## Planning artifacts
+
+Implementation-level plans for substrate work live alongside the
+reference docs here. They drove (or will drive) specific slices of
+the trajectory and are kept in the repo for traceability and review.
+
+| File | Scope | Status |
+|---|---|---|
+| [`PLAN-kernel-facade.md`](PLAN-kernel-facade.md) | Slice 2 — `Kernel` facade extraction. Hoists subsystem wiring into a public `Kernel` class so the kernel can be embedded as a Python object (`from llm_kernel import Kernel`). Includes design conversation summary, 8 pros / 8 cons, 10-commit decomposition, verification. | Drafted; not yet started. |
 
 ## Cross-references
 
