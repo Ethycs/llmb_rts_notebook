@@ -102,6 +102,7 @@ import {
   SearchViewProvider,
   SEARCH_VIEW_ID
 } from './sidebar/search/search-view-provider.js';
+import { OutputKindLensTreeProvider } from './sidebar/output-kind-lens/lens-tree.js';
 
 const NOTEBOOK_TYPE = 'llmnb';
 
@@ -129,6 +130,7 @@ let activeSidebarAgents: AgentsTreeProvider | undefined;
 let activeSidebarActivity: ActivityTreeProvider | undefined;
 let activeThreePaneBadges: ThreePaneBadgeStatusBarProvider | undefined;
 let activeSearchView: SearchViewProvider | undefined;
+let activeOutputKindLens: OutputKindLensTreeProvider | undefined;
 
 // Diagnostic ring buffers — populated only when LLMNB_E2E_VERBOSE === '1'.
 // Tests subscribe via the ExtensionApi accessors; production builds zero
@@ -563,6 +565,18 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
     vscode.window.registerWebviewViewProvider(SEARCH_VIEW_ID, searchView)
   );
 
+  // PLAN-V2-output-kind-lens — 5th sidebar view grouping every span
+  // tagged with `llmnb.output.kind` by kind. Pure read-side: walks
+  // each cell's vnd.rts.run+json outputs, filters by the OTLP
+  // attribute (V1 ships the tag; V2 ships the lens, per
+  // docs/atoms/concepts/output-kind.md V1-vs-V2+).
+  const lensProvider = new OutputKindLensTreeProvider(sidebarSource);
+  activeOutputKindLens = lensProvider;
+  context.subscriptions.push({ dispose: () => lensProvider.dispose() });
+  context.subscriptions.push(
+    vscode.window.createTreeView('llmnb.outputKinds', { treeDataProvider: lensProvider })
+  );
+
   // PLAN-S5.0.2 §3.2 — bridge renderer `command.invoke` postMessages into
   // VS Code commands. The provenance chip's click handler emits
   //   {type: "command.invoke", payload: {command, args}}
@@ -779,7 +793,8 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
     getSidebarAgentsProvider: () => activeSidebarAgents,
     getSidebarActivityProvider: () => activeSidebarActivity,
     getThreePaneBadgeProvider: () => activeThreePaneBadges,
-    getSearchViewProvider: () => activeSearchView
+    getSearchViewProvider: () => activeSearchView,
+    getOutputKindLensProvider: () => activeOutputKindLens
   };
 }
 
@@ -901,6 +916,8 @@ export interface ExtensionApi {
   getThreePaneBadgeProvider(): ThreePaneBadgeStatusBarProvider | undefined;
   /** PLAN-S10 (sidebar-search follow-on) — Find-in-cells WebviewView provider. */
   getSearchViewProvider(): SearchViewProvider | undefined;
+  /** PLAN-V2-output-kind-lens — Output-kind lens TreeDataProvider. */
+  getOutputKindLensProvider(): OutputKindLensTreeProvider | undefined;
 }
 
 /**

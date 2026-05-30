@@ -182,6 +182,10 @@
           "id": "llmnb.search",
           "name": "Find in cells",
           "type": "webview"
+        },
+        {
+          "id": "llmnb.outputKinds",
+          "name": "Output kinds"
         }
       ]
     },
