@@ -369,7 +369,23 @@ Don't pace to the "days" budget — pace to the slice ordering + dependency grap
 
 > **Magic vocabulary note**: §2 above references the legacy `/spawn` and `@<id>:` directive shapes. The current canonical syntax is the `@@<kind>` cell-magic + `@<flag>` line-magic vocabulary; see [PLAN-S5.0-cell-magic-vocabulary.md](PLAN-S5.0-cell-magic-vocabulary.md) and [magic atom](../atoms/concepts/magic.md). The slice ladder itself is syntax-agnostic.
 
+## §6.6 V2 lane (post-V1-feature-complete)
+
+V1 UX feature-complete 2026-05-19. The V2 lane opens for slices that build on V1's persisted data with pure read-side surface, plus the substantive scope expansions (multi-provider, gutter decoration when the API exposes) that V1 explicitly deferred.
+
+| Slice | BSP-005 cross-ref | Status (as of 2026-05-30) |
+|---|---|---|
+| **V2 branch-switching UX** — sidebar Branches subnode per agent with forked descendants; lineage recovered from `event_log[*]` `fork_agent` envelopes | extends §S7 agents tree; consumes data from §S5a `/branch` | ✅ shipped 2026-05-20 (`667dd68`) — [PLAN-V2-branch-switching-ux](PLAN-V2-branch-switching-ux.md) |
+| **V2 output-kind lens UI (sidebar grouping)** — 5th sidebar view grouping every span tagged with `llmnb.output.kind` by kind; high-attention kinds first; forward-compat `<other>` bucket | consumes the V1 OTLP tag stream per [output-kind atom](../atoms/concepts/output-kind.md) | ✅ shipped 2026-05-29 (`85bd5e4`) — [PLAN-V2-output-kind-lens](PLAN-V2-output-kind-lens.md) |
+| V2 output-kind lens — per-cell decoration (dim cells whose outputs don't match the active kind) | same atom; same V1 tag stream | 🔵 queued — blocked on `notebookCellDecoration` API exposure (not a Microsoft proposal; the same ceiling that blocks the V1 three-pane gutter) |
+| FSP-002 collapse state promotion (option B: `metadata.rts.cells[<id>].metadata.rts.cell.collapsed`) — bulk-collapse persists to the file | extends §S10 collapse; promotes from Memento per [FSP-002 §4](FSP-002-cell-search-collapse.md) | 🔵 queued — touches BSP-003 writer registry (`set_cell_metadata_bulk` intent) + extension promotion |
+| Inspect mode session lineage — show which `claude_session_id` produced each turn across `/branch` and `/revert` | extends §S6 Inspect mode | 🔵 queued — pure read-side; session ids already persisted |
+| FSP-001 OpenUI button — cells as clickable UI affordances | originally §S11 (deferred to V2 per BSP-005 §S11) | 🔵 queued — needs renderer + new cell-kind work |
+| Multi-provider campaign (`gpt-cli` / `gemini` / `ollama`) — agents beyond `claude-code` | extends [agent atom](../atoms/concepts/agent.md) V1-vs-V2+ "V2+ providers" | 🔵 design doc not yet authored; multi-session campaign — `AgentSupervisor` Provider abstraction + per-provider drivers |
+| S5.0.6 Nvim driver | §S5.0.6 — see V1 changelog row | 🟡 deferred 2026-05-19 (pending nvim-operator dogfooding) |
+
 ## Changelog
 
+- **2026-05-30 (V1-feature-complete + V2 lane opened)**: §6.6 V2 lane section added enumerating slices shipped (V2 branch-switching `667dd68`; V2 output-kind lens `85bd5e4`) and queued (per-cell decoration, FSP-002 collapse promotion, Inspect lineage, FSP-001 OpenUI, multi-provider campaign, deferred S5.0.6). §6.5 changelog table updated to reflect all V1 UX slices shipped 2026-05-02 → 2026-05-19 and S5.0.6 deferred 2026-05-19. Two genuine API ceilings (`notebookCellDecoration`, floating-search overlay) explicitly noted as not on Microsoft's proposal list — see PLAN-S10 reduced-scope note for the Jupyter probe.
 - **2026-04-28 (atom-refactor Phase 4)**: per-slice "Atoms touched" lines added; definitions now live in `docs/atoms/`. Issue 2 amendment §6 ratifies S0.5 (cell kinds), S3.5 (ContextPacker walker), S5.5 (sections), and S6's RunFrame minimal expansion per [KB-notebook-target.md §0.10](KB-notebook-target.md#010-bsp-005-issue-2-amendment). Slice-ladder totals updated to ~17-18 days V1 UX runway. No behavioral or wire-format changes; the slice ordering, ownership, and dependency graph are normative in this BSP.
 - **Issue 1, 2026-04-28**: initial. 10 slices in dependency order from cell badges (S1) through three-pane mental model + search (S10), plus S11 deferred to V2. Cross-cutting concerns flagged in §4. ~10 working days to V1 UX ship-ready (superseded by Issue 2 totals above).

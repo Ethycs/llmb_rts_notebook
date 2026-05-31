@@ -19,9 +19,10 @@ implementation plans.
 
 **For "what does this thing do today?":**
 1. [`README.md`](../README.md) at repo root — Status section + slice
-   ladder.
-2. [`notebook/BSP-005-cell-roadmap.md §6.5`](notebook/BSP-005-cell-roadmap.md#65-slice-ladder-totals-after-issue-2--and-observed-velocity-2026-05-02-update) — current shipped/queued status per slice.
-3. [`atoms/README.md`](atoms/README.md) — the canonical definitions
+   ladder. **V1 UX feature-complete 2026-05-19; V2 lane opened 2026-05-20** (branch-switching UX + output-kind lens shipped).
+2. [`notebook/BSP-005-cell-roadmap.md §6.5`](notebook/BSP-005-cell-roadmap.md#65-slice-ladder-totals-after-issue-2--and-observed-velocity-2026-05-02-update) — V1 ladder shipped/deferred status. [§6.6](notebook/BSP-005-cell-roadmap.md#66-v2-lane-post-v1-feature-complete) enumerates the V2 lane.
+3. [`notebook/PLAN-v1-roadmap.md §5`](notebook/PLAN-v1-roadmap.md) — the 14-row V1 ship-ready checklist; rows 1-11 (operator-visible UX) are feature-complete.
+4. [`atoms/README.md`](atoms/README.md) — the canonical definitions
    layer; browse `concepts/`, `operations/`, etc.
 
 **For someone implementing a slice:**

@@ -10,11 +10,24 @@ The repo started life as a 1.1 MB design conversation
 (`chat-export-2026-04-26T04-22-39.md`) — that conversation is the
 historical source of truth for the original architectural choices.
 The current normative reference is the doc tree under [`docs/`](docs/),
-with [`docs/atoms/`](docs/atoms/) holding canonical definitions and
+with [`docs/atoms/`](docs/atoms/) holding canonical definitions,
 [`docs/notebook/`](docs/notebook/) + [`docs/rfcs/`](docs/rfcs/)
-holding behavioral and wire-format specs.
+holding behavioral and wire-format specs, and
+[`docs/kernel/`](docs/kernel/) holding substrate-level documentation
+for the embeddable LLMKernel (capture invariants, identity model,
+deployment surfaces, per-slice implementation plans).
 
-## Status — Cell↔file magic matrix symmetric + Tier-2 CLI attach shipped (2026-05-16)
+## Status — V1 UX feature-complete; V2 lane opened (2026-05-30)
+
+V1 UX is feature-complete on the public VS Code extension API. All BSP-005 ladder slices either shipped or are formally deferred. Two V2 slices have landed; the rest are queued or genuinely blocked on VS Code API exposure.
+
+**V1 UX feature-complete:** S5.5 sections (full collapse via native markdown fold), S7 sidebar trees (zones / agents / activity), S10 reduced V1 (streaming/artifact badges + bulk-collapse / find wrappers), S10 follow-on (sidebar Find-in-cells WebviewView with the full FSP-002 §2.1 search UX). S5.0.6 (nvim driver) deferred to whenever the nvim operator's dogfooding pressure justifies the per-cell affordance — the headless `llmnb execute --connect` CLI (`df95ad4`) covers file-level operation for nvim users in the interim.
+
+**V2 lane opened:** branch-switching UX (sidebar Branches subnode under each agent that has forked descendants — lineage recovered from `metadata.rts.zone.event_log[*]` `fork_agent` envelopes) and output-kind lens UI (5th sidebar view grouping every tagged span across the active notebook). Both are pure read-side — no kernel changes, no wire changes.
+
+**Genuinely blocked on VS Code API:** per-cell gutter color decoration (`notebookCellDecoration` is not even a Microsoft API proposal, per a probe against the vendored `vscode-jupyter`'s `enabledApiProposals`). The literal "floating search bar above the editor" is the same ceiling — no overlay-above-editor API. Both surface UX is now in the sidebar instead.
+
+## Earlier status — Cell↔file magic matrix symmetric + Tier-2 CLI attach (2026-05-16)
 
 V1 cell-side substrate is shipped end-to-end. Operator `@@spawn` /
 `@@agent` / `@<flag>` cell-magic dispatches; agent processes spawn and
@@ -81,9 +94,13 @@ text via the `@@` cell-magic + `@` line-magic vocabulary
   removed (74 files); platforms expanded to `win-64`+`linux-64`+`osx-arm64`;
   ESLint 9 flat config landed for the active extension.
 
-Test surface: **857 kernel tests + 225 stub contract tests + 109
-outer driver tests** all green (2026-05-16); full kernel suite runs
-in ~20s under xdist.
+Test surface: **857 kernel tests + 374+ stub contract tests + 109
+outer driver tests** all green at last verified run (kernel + driver:
+2026-05-16; stub: 2026-05-29 pre-output-kind-lens). The stub tier
+grew ~50 tests during the V1-UX-feature-complete sweep and V2 lane
+opening; the final V2 output-kind-lens slice (`85bd5e4`) added 20
+more whose verification is pending a Windows VS Code installer
+mutex release. Full kernel suite runs in ~20s under xdist.
 
 Shipped slices (per [BSP-005 §6.5](docs/notebook/BSP-005-cell-roadmap.md#65-slice-ladder-totals-after-issue-2--and-observed-velocity-2026-05-02-update)):
 
@@ -106,8 +123,25 @@ Shipped slices (per [BSP-005 §6.5](docs/notebook/BSP-005-cell-roadmap.md#65-sli
 | ✅ | S5.0.4 privileged magic emission (`emit_magic_cell` + promotion chip) | `838aa85` + submodule `987b7ef` |
 | ✅ | S5.0.5 Phase 1 — multi-format `@@import` (`.magic` / `.ipynb`) + `notebook_format` public module | `ce214ba` + submodule `7139a3f` |
 | ✅ | S5.0.5 Phase 2 — `@@export` cell-magic + K3M/K3N/K3O | `1c9e81f` + submodule `02fb2d3` |
-| 🔵 | PLAN-S5.0.6 Nvim driver V1 — design locked, implementation queued | `8639949` (PLAN doc only) |
-| ⬜ | S5.5 sections, S7 sidebar trees, History mode panel, S10 three-pane + search | queued |
+| ✅ | **S5.5 sections** — overlay-based section CRUD; cell `kind: "section"`; Phase 5 ships native markdown-fold collapse | `645e23a` + `8251a5a` |
+| ✅ | **S7 sidebar trees** — `onLastAcceptedVersion` event + 3-view activity-bar (zones / agents / activity) | `03976c7` + `8aaa3e3` + `2260ce0` |
+| ✅ | **S10 reduced V1** — streaming + artifact cell badges + `llmnb.collapseAll*` / `llmnb.expandAll*` / `llmnb.findInCells` wrappers fanning out to engine builtins | `b07e6f9` |
+| ✅ | **S10 follow-on** — sidebar `Find in cells` WebviewView with full FSP-002 §2.1 search UX (scope filter / case / whole-word / regex / M-of-N / click-to-reveal) | `426051f` |
+| ⏸ | PLAN-S5.0.6 Nvim driver V1 — design locked, implementation deferred 2026-05-19 (`llmnb execute --connect` covers file-level in interim) | `8639949` (PLAN doc) + `b7e50cc` (deferral) |
+| 🚫 | Per-cell gutter color decoration (the "three-pane" colored gutter) — `notebookCellDecoration` API not exposed and not a Microsoft proposal | blocked |
+| 🚫 | Floating search bar literally above the notebook editor — no overlay API on v1.92 | blocked |
+
+V2 lane (shipped this session, both pure read-side):
+
+| | Slice | Commit |
+|---|---|---|
+| ✅ | **V2 branch-switching UX** — sidebar `Branches` subnode under each agent with forked descendants; lineage recovered from `metadata.rts.zone.event_log[*]` `fork_agent` envelopes | `667dd68` |
+| ✅ | **V2 output-kind lens UI** — 5th sidebar view grouping every span tagged with `llmnb.output.kind` by kind; high-attention kinds first; forward-compat `<other>` bucket | `85bd5e4` |
+| 🔵 | V2 output-kind lens — per-cell decoration (dim non-matching cells) | queued (same `notebookCellDecoration` ceiling) |
+| 🔵 | FSP-002 collapse state promotion (option B: `metadata.rts.cells[<id>].metadata.rts.cell.collapsed`) | queued |
+| 🔵 | Inspect mode session lineage (which `claude_session_id` produced each turn across `/branch` / `/revert`) | queued |
+| 🔵 | FSP-001 OpenUI button (cells as clickable UI affordances) | queued |
+| 🔵 | Multi-provider campaign (`gpt-cli` / `gemini` / `ollama`) | design doc not yet authored |
 
 Observed velocity is roughly 10× the BSP-005 "working day" budget
 (which was sized for one mega-round agent in series); see [BSP-005 §6.5](docs/notebook/BSP-005-cell-roadmap.md#65-slice-ladder-totals-after-issue-2--and-observed-velocity-2026-05-02-update).

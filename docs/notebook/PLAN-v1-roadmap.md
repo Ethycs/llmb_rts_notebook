@@ -1,6 +1,6 @@
 # Plan: V1 roadmap conductor
 
-**Status**: ready
+**Status**: V1 UX feature-complete 2026-05-19 (S5.0.6 nvim driver formally deferred 2026-05-19; V2 lane opened 2026-05-20). The conductor stays open as a forward reference until the V1 release SHA + V2 milestone are stamped; per-slice DoDs roll up as the boxes below.
 **Audience**: an LLM (or operator) opening this folder cold and trying to find the right next-slice plan to dispatch. Self-contained.
 **Goal**: name the three V1 tracks (cell roadmap, kernel gap closure, atom hygiene), point at the BSP-005 slice ladder for cell-track sequencing, and enumerate the eleven sibling PLAN docs that brief individual workstreams.
 **Time budget**: this doc is the conductor; budgets live on the children. Aggregate ~17–18 working days sequential, ~10 days with three parallel agents (per [BSP-005 §6.5](BSP-005-cell-roadmap.md#65-slice-ladder-totals-after-issue-2)).
@@ -81,22 +81,22 @@ Hard dependencies (these are the only ones; everything else is parallelizable wi
 
 V1 is ship-ready when EVERY row below is checked. This is the master DoD that the 11 sibling plans' individual DoDs roll up to.
 
-| # | Criterion | Owning PLAN |
-|---|---|---|
-| 1 | Operator types `/spawn`, sees an agent badge with `kind`, `agent_id`, `provider`, `runtime_status` | PLAN-S0.5, PLAN-S1 (shipped) |
-| 2 | Closing and reopening the notebook restores conversations (idle agents resume via `--resume`) | PLAN-S2 (shipped) |
-| 3 | `@<agent>: <message>` produces a follow-up turn without re-spawn | PLAN-S3 (shipped) |
-| 4 | ContextPacker assembles a deterministic, persisted manifest per cell run | PLAN-S3.5 |
-| 5 | Cross-agent handoff replays missed turns to the addressed agent's session | PLAN-S4 |
-| 6 | `/branch`, `/revert`, `/stop` directives work end-to-end and persist | PLAN-S5 |
-| 7 | Operator can group cells into named sections; `section.status` interruptibility lock fires | PLAN-S5.5 |
-| 8 | Cells re-render correctly after notebook close → reopen via the cell→turn binding | PLAN-S6 |
-| 9 | RunFrames are written for every run; Inspect mode resolves manifest + RunFrame pair | PLAN-S6 |
-| 10 | Sidebar trees render zones / agents / event log; clicking jumps to the source cell | PLAN-S7 |
-| 11 | Three-pane visual model + FSP-002 search works | PLAN-S10 |
-| 12 | M1-M4 (comments, annotations, promoted cells, per-agent panel) ship the lightweight variants | PLAN-M-series |
-| 13 | All 8 substrate gaps closed (intent kinds, ContextPacker, OverlayApplier, CellManager, MCP `validate_tool_input`, …) | PLAN-substrate-gap-closure |
-| 14 | `docs/atoms/` drift detector run is clean | PLAN-atom-hygiene |
+| # | Criterion | Owning PLAN | Status |
+|---|---|---|---|
+| 1 | Operator types `/spawn`, sees an agent badge with `kind`, `agent_id`, `provider`, `runtime_status` | PLAN-S0.5, PLAN-S1 | ✅ shipped |
+| 2 | Closing and reopening the notebook restores conversations (idle agents resume via `--resume`) | PLAN-S2 | ✅ shipped |
+| 3 | `@<agent>: <message>` produces a follow-up turn without re-spawn | PLAN-S3 | ✅ shipped |
+| 4 | ContextPacker assembles a deterministic, persisted manifest per cell run | PLAN-S3.5 | ✅ shipped (`64a34d4`) |
+| 5 | Cross-agent handoff replays missed turns to the addressed agent's session | PLAN-S4 | ✅ shipped (`fe2121a`) |
+| 6 | `/branch`, `/revert`, `/stop` directives work end-to-end and persist | PLAN-S5 | ✅ shipped (S5a `5b5533e`, S5b-revert submodule `d85c3f4`, S5c-stop submodule `4461794`) |
+| 7 | Operator can group cells into named sections; `section.status` interruptibility lock fires | PLAN-S5.5 | ✅ shipped — Phase 5 collapse via native markdown fold (`8251a5a` + earlier section CRUD + state-machine landings) |
+| 8 | Cells re-render correctly after notebook close → reopen via the cell→turn binding | PLAN-S6 | ✅ shipped (BSP-007 / BSP-008 `3a430cb`) |
+| 9 | RunFrames are written for every run; Inspect mode resolves manifest + RunFrame pair | PLAN-S6 | ✅ shipped (Inspect V1 `92c7412`) |
+| 10 | Sidebar trees render zones / agents / event log; clicking jumps to the source cell | PLAN-S7 | ✅ shipped — `onLastAcceptedVersion` event prep (`03976c7`) + 3-view impl (`8aaa3e3` + `2260ce0`) |
+| 11 | Three-pane visual model + FSP-002 search works | PLAN-S10 | ✅ shipped in reduced V1 form — engine-native badges + bulk-collapse + find wrappers (`b07e6f9`) + sidebar Find-in-cells WebviewView delivering the full FSP-002 §2.1 search UX (`426051f`). Per-cell gutter coloring + literal floating-bar-above-editor remain V2+ — genuinely blocked on VS Code API exposure (`notebookCellDecoration` is not a Microsoft proposal; the vendored `vscode-jupyter` doesn't have it either). |
+| 12 | M1-M4 (comments, annotations, promoted cells, per-agent panel) ship the lightweight variants | PLAN-M-series | partial — see PLAN-M-series for per-row state; not a V1-UX blocker since the bulk of the operator surface ships through S0.5-S10 above |
+| 13 | All 8 substrate gaps closed (intent kinds, ContextPacker, OverlayApplier, CellManager, MCP `validate_tool_input`, …) | PLAN-substrate-gap-closure | ✅ shipped — BSP-007 overlay applier + BSP-008 RunFrames + S5.0.x intent path all green; verify against PLAN-substrate-gap-closure §3 for any straggler before V1 SHA stamp |
+| 14 | `docs/atoms/` drift detector run is clean | PLAN-atom-hygiene | running — agent.md / output-kind.md / PLAN-S7 / FSP-002 hygiene updates landed during the V1 UX sweep (`03976c7` + `426051f` + `85bd5e4` + `667dd68`); a full drift-detector pass remains before V1 SHA stamp |
 
 ## §6. Smokes
 
@@ -130,6 +130,16 @@ The V1 smoke suite at ship time MUST pass these end-to-end paths:
 
 ## §9. Definition of done
 
-This conductor is done when every ship-ready row in §5 has a green checkbox AND the per-PLAN DoDs all pass. Until then, the conductor stays "ready" — slices that land flip individual rows; the conductor itself does not flip until V1 ships.
+This conductor is done when every ship-ready row in §5 has a green checkbox AND the per-PLAN DoDs all pass. As of 2026-05-30:
 
-Once V1 ships, this doc moves to `**Status: shipped**` with the V1 release commit SHA in its frontmatter, and the 11 sibling plans flip to `**Status: shipped**` independently.
+- **Operator-visible V1 UX (rows 1-11)**: ✅ feature-complete. Every notebook surface the operator touches in V1 ships.
+- **Row 12 (M-series lightweight variants)**: partial; not a V1-UX blocker — the bulk of the operator surface ships via S0.5-S10.
+- **Row 13 (substrate gaps)**: ✅ shipped through BSP-007 / BSP-008 / S5.0.x; one focused verification pass against [PLAN-substrate-gap-closure §3](PLAN-substrate-gap-closure.md) remains before the V1 SHA stamp.
+- **Row 14 (atom drift)**: in progress — sweep landed for agent.md / output-kind.md / PLAN-S7 / FSP-002 during the V1-UX-feature-complete commits; a full drift-detector run is queued.
+
+What's NOT in this checklist (intentional):
+
+- **PLAN-S5.0.6 nvim driver** — formally deferred 2026-05-19. V1 ships without the per-cell nvim affordance; the headless `llmnb execute --connect` CLI (`df95ad4`) covers file-level operation for nvim users in the interim.
+- **`notebookCellDecoration`-dependent features** (per-cell gutter color, floating search bar literally above the editor) — genuinely blocked on a VS Code API that isn't a Microsoft proposal. The vendored `vscode-jupyter`'s `enabledApiProposals` confirms no internal escape hatch either. The operator-visible UX these features were supposed to deliver ships in the sidebar instead (S10 reduced + S10 follow-on).
+
+Once V1 ships, this doc moves to `**Status: shipped**` with the V1 release commit SHA in its frontmatter, and the 11 sibling plans flip to `**Status: shipped**` independently. **V2 lane queue:** see [BSP-005 §6.6](BSP-005-cell-roadmap.md#66-v2-lane-post-v1-feature-complete) for the V2 slice ledger (branch-switching UX + output-kind lens shipped; per-cell decoration, FSP-002 collapse promotion, Inspect lineage, FSP-001 OpenUI, multi-provider campaign queued).

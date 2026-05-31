@@ -5,12 +5,18 @@ of [`vendor/vscode-jupyter`](../vendor/vscode-jupyter/) per
 [DR-0011](../docs/decisions/0011-subtractive-fork-vscode-jupyter.md)
 and [chapter 07](../docs/dev-guide/07-subtractive-fork-and-storage.md).
 
-## Status — operationally functional + Inspect mode V1 (2026-05-07)
+## Status — V1 UX feature-complete; V2 lane opened (2026-05-30)
 
-V1 substrate is shipped. Extension registers a single
-`NotebookController` for `.llmnb`, dispatches via the cell-magic
-vocabulary (`@@spawn`, `@@agent`, `@<flag>` line-magic), and rides
-RFC-006 v2.1.0 wire format on the kernel side.
+V1 UX is feature-complete on the public VS Code extension API. All
+BSP-005 ladder slices either shipped or are formally deferred. Two V2
+slices have landed; the rest are queued or genuinely blocked on VS
+Code API exposure (see "Blocked" below).
+
+Extension registers a single `NotebookController` for `.llmnb`,
+dispatches via the cell-magic vocabulary (`@@spawn`, `@@agent`,
+`@@section`, `@@import`, `@@export`, `@<flag>` line-magic), and rides
+RFC-006 v2.1.0 wire format on the kernel side. Nineteen
+`llmnb.*` commands registered in `package.json`.
 
 Shipped extension surfaces:
 
@@ -27,9 +33,37 @@ Shipped extension surfaces:
   ([discipline/certified-magic-emitter](../docs/atoms/discipline/certified-magic-emitter.md)). Talks to LLMKernel over
   TCP transport ([RFC-008 v1.0.1](../docs/rfcs/RFC-008-kernel-host-integration.md)) with the v2.1.0 wire-handshake envelope
   ([protocols/wire-handshake](../docs/atoms/protocols/wire-handshake.md)).
+- **S5.0.4 privileged magic emission** (commit `838aa85`) — promotion
+  chip + grant/revoke toolbar + privilege header. Privileged agents
+  can emit structural cells via `emit_magic_cell`; unprivileged stream
+  emissions stay sanitized. See [PLAN-S5.0.4](../docs/notebook/PLAN-S5.0.4-privileged-magic-emission.md).
+- **S5.5 sections** (commits `4c8e8a7` → `8251a5a`) — full state
+  machine with dual-rep invariant and auto-flip on the kernel side;
+  extension ships section operator commands (`llmnb.section.create` /
+  `.rename` / `.delete` / `.setStatus` / `.openActions`), section-header
+  decoration, `@@section` recognition, and native VS Code markdown-fold
+  collapse so sections behave like Jupyter cell groups without a custom
+  panel. See [PLAN-S5.5](../docs/notebook/PLAN-S5.5-sections.md).
+- **S7 sidebar activity-bar trees** (commit `8aaa3e3`) — zones tree,
+  agents tree, recent-activity tree as
+  `vscode.TreeDataProvider`s consuming `metadata.rts.{zone.agents,
+  layout, event_log.runs}`. Activity tree paginates via the
+  `llmnb.sidebar.activity.loadMore` command. Code under
+  [src/sidebar/](src/sidebar/). See [PLAN-S7](../docs/notebook/PLAN-S7-sidebar-trees.md).
 - **S8** partial inline `vscode.diff` for `propose_edit` spans
   (production code; contract tests pending).
 - **S9** cell-toolbar interrupt button (SIGINT to agent process).
+- **S10 (reduced V1)** (commit `b07e6f9`) — streaming/artifact cell
+  badges, bulk-collapse cell toolbar buttons
+  (`llmnb.collapseAllInputs` / `.collapseAllOutputs` /
+  `.expandAllInputs` / `.expandAllOutputs`), find-in-cells wrapper
+  command (`llmnb.findInCells`).
+- **S10 follow-on** (commit `426051f`) — sidebar
+  Find-in-cells WebviewView delivering the full FSP-002 §2.1 search
+  UX (search box + result tree + scroll-into-view) since the literal
+  "floating search bar above the editor" is blocked on VS Code API.
+  See [FSP-002](../docs/notebook/FSP-002-cell-search-collapse.md) and
+  [PLAN-S10](../docs/notebook/PLAN-S10-three-pane-search.md).
 - **Inspect mode V1** (commit `92c7412`) — read-only per-cell view of
   the latest RunFrame + ContextManifest produced by the kernel's
   BSP-008 substrate ([atoms/concepts/run-frame.md](../docs/atoms/concepts/run-frame.md),
@@ -41,10 +75,29 @@ Shipped extension surfaces:
   in V1; no mutation paths. Code under [src/inspect/](src/inspect/);
   33 unit + 6 contract tests at [test/unit/inspect/](test/unit/inspect/)
   and [test/contract/inspect-cell-status.test.ts](test/contract/inspect-cell-status.test.ts).
+- **V2 — branch-switching UX** (commit `667dd68`) — sidebar Branches
+  subnode under each agent that has forked descendants. Lineage
+  recovered from `metadata.rts.zone.event_log[*]` `fork_agent`
+  envelopes (no kernel changes). See [PLAN-V2-branch-switching-ux](../docs/notebook/PLAN-V2-branch-switching-ux.md).
+- **V2 — output-kind lens UI** (commit `85bd5e4`) — 5th sidebar view
+  grouping every tagged span across the active notebook by `output_kind`.
+  Pure read-side. Code under [src/sidebar/output-kind-lens/](src/sidebar/output-kind-lens/).
+  See [PLAN-V2-output-kind-lens](../docs/notebook/PLAN-V2-output-kind-lens.md).
 
-Queued: S5.5 sections, History mode (overlay-commit timeline panel),
-S7 sidebar trees, S8 finishing, S10 three-pane mental model +
-FSP-002 search/collapse.
+**Deferred:** S5.0.6 (nvim driver) deferred to whenever nvim operator
+dogfooding pressure justifies the per-cell affordance — the headless
+`llmnb execute --connect` CLI (commit `df95ad4`) covers file-level
+operation for nvim users in the interim.
+
+**Blocked on VS Code API:**
+
+- Per-cell gutter color decoration — `notebookCellDecoration` is not
+  even a Microsoft API proposal, per a probe against the vendored
+  `vscode-jupyter`'s `enabledApiProposals`. S1 identity badges are
+  surfaced via status-bar + kind-label fallback.
+- The literal "floating search bar above the editor" is the same
+  ceiling — no overlay-above-editor API. FSP-002 search UX shipped
+  as a sidebar WebviewView instead.
 
 See [docs/notebook/BSP-005-cell-roadmap.md §6.5](../docs/notebook/BSP-005-cell-roadmap.md#65-slice-ladder-totals-after-issue-2--and-observed-velocity-2026-05-02-update) for the
 full slice ladder + observed velocity.
