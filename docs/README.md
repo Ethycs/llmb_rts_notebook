@@ -10,7 +10,10 @@ channel between operator and agent.
 
 The doc tree has three normative layers (definitions, contracts,
 substrate) plus historical context (the original design ADRs and the
-design-conversation dev guide).
+design-conversation dev guide). Substrate-level kernel documentation
+lives under [`kernel/`](kernel/) — capture invariants, identity model,
+the embeddable Kernel facade, deployment surfaces, and per-slice
+implementation plans.
 
 ## Where to start
 
@@ -69,10 +72,24 @@ docs/
 ├── dev-guide/                 ← 8 chapters from the design conversation
 │   ├── 00-overview.md         ← chapter index
 │   └── 01-…md … 08-…md
-└── decisions/                 ← 16 original design ADRs (MADR-lite)
-    ├── README.md
-    └── 0001-…md … 0016-…md
+├── decisions/                 ← 16 original design ADRs (MADR-lite)
+│   ├── README.md
+│   └── 0001-…md … 0016-…md
+└── kernel/                    ← substrate-level docs for LLMKernel
+    ├── README.md              ← index
+    ├── identity-model.md      ← every kernel identifier in one place
+    ├── capture-invariants.md  ← the "what to defend" charter
+    ├── architecture.md        ← Kernel facade, Transport, Extension contracts
+    ├── embedding.md           ← `from llm_kernel import Kernel` guide
+    ├── deployment.md          ← the three surfaces; auth; session resumption
+    ├── external-mcp-reference.md ← external MCP tool / resource / notification catalogs
+    ├── extensions.md          ← extension authoring guide
+    ├── pbx.md                 ← PBX reference
+    └── PLAN-*.md              ← per-slice implementation plans
 ```
+
+Several `kernel/` files above are planned but not yet written — see
+[`kernel/README.md`](kernel/README.md) for which are present.
 
 ## Two decision namespaces
 
@@ -121,6 +138,17 @@ atom-layer decisions pin the implementation.
    that surfaced post-conversation.
 3. [notebook/PLAN-atom-refactor.md](notebook/PLAN-atom-refactor.md) —
    the executed plan that produced the atom layer.
+
+**For substrate / kernel work (embedding, transports, extensions):**
+1. [kernel/README.md](kernel/README.md) — index for the substrate doc
+   tree.
+2. [kernel/capture-invariants.md](kernel/capture-invariants.md) — the
+   "what to defend" charter (planned; see kernel/README.md for status).
+3. [kernel/identity-model.md](kernel/identity-model.md) — every kernel
+   identifier in one reference (planned).
+4. [kernel/PLAN-kernel-facade.md](kernel/PLAN-kernel-facade.md) —
+   implementation plan for the embeddable `Kernel` facade (slice 2 of
+   the substrate trajectory).
 
 ## How this was built
 
