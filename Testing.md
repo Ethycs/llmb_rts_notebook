@@ -98,7 +98,7 @@ cd extension && pixi run -e kernel npm run test:contract -- --grep "parseCellDir
 
 The `--ignore` list excludes upstream LLMKernel tests that depend on `ipywidgets` (not in our Pixi env). Keep this list updated as upstream churns; cf. Engineering Guide §9.2.
 
-Expected (as of 2026-05-07): **795 passed + 2 skipped + 0 errors** in <30s. Plus **100 passed** in the outer driver tests (`pixi run -e kernel python -m pytest tests/`).
+Expected (as of 2026-05-30): **901 passed + 2 skipped + 0 errors** in <30s (+~100 tests since the 2026-05-07 mark, from S5.0.4/5/6, S5.5, S7, S10, V2 work). Plus **114 passed** in the outer driver tests (`pixi run -e kernel python -m pytest tests/`).
 
 #### Extension contract suite (includes integration smoke + Layer 1 e2e)
 
@@ -106,7 +106,9 @@ Expected (as of 2026-05-07): **795 passed + 2 skipped + 0 errors** in <30s. Plus
 cd extension && pixi run -e kernel npm run test:contract
 ```
 
-Expected (as of 2026-05-07): **225 passing + 1 pending** in the stub tier (`npm run test:stub`). Plus **33 unit tests** under `test/unit/` (`npm run test:unit`) including the Inspect mode tests added with the BSP-008 §11 ship.
+Expected (as of 2026-05-30): **225+ passing** in the stub tier (`npm run test:stub`) — count grows as S5.5 sections / S7 sidebar / S10 sidebar-find contract tests land. Plus **33+ unit tests** under `test/unit/` (`npm run test:unit`) including the Inspect mode tests added with the BSP-008 §11 ship.
+
+If `test:stub` fails with `Code is currently being updated. Please wait for the update to complete before launching.`, that's a VS Code auto-updater mutex collision (not a test regression). Close any open VS Code windows, wait ~30s for the in-progress update to finalize, and retry.
 
 ### Tier 3 — kernel smokes
 
