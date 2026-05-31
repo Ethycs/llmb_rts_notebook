@@ -2,7 +2,7 @@
 
 This document captures the engineering philosophy and process the project follows. It is descriptive rather than prescriptive: every pattern below is one that has produced load-bearing artifacts in this repository (RFC-001 through RFC-008, sixteen ADRs, two implementation refactors, a working VS Code extension and Python kernel, an end-to-end live smoke). The patterns are documented here so future contributors can extend them without re-deriving them.
 
-The discipline is informally called **Bell System engineering** in the docket — a reference to the AT&T pre-divestiture engineering culture that combined numbered protocol specs, formal compatibility analysis, fault-tree thinking, and layered abstractions with stable interfaces. [DR-0016](docs/decisions/0016-rfc-standards-discipline.md) and [chapter 08 §"Bell System–inspired standards discipline"](docs/dev-guide/08-blockers-mediator-standards.md) are the originating source.
+The discipline is informally called **Bell System engineering** in the docket — a reference to the AT&T pre-divestiture engineering culture that combined numbered protocol specs, formal compatibility analysis, fault-tree thinking, and layered abstractions with stable interfaces. [DR-0016](docs/02%20-%20Implementation/decisions/0016-rfc-standards-discipline.md) and [chapter 08 §"Bell System–inspired standards discipline"](docs/01%20-%20Design/dev-guide/08-blockers-mediator-standards.md) are the originating source.
 
 ---
 
@@ -28,7 +28,7 @@ The project has three kinds of normative documents:
 
 ### 2.1 Decision Records (ADRs)
 
-Located under [docs/decisions/](docs/decisions/). Each ADR captures one load-bearing commitment: what forced the decision, what was chosen, what was given up, what alternatives were considered. Format is **MADR-lite**:
+Located under [docs/decisions/](docs/02%20-%20Implementation/decisions/). Each ADR captures one load-bearing commitment: what forced the decision, what was chosen, what was given up, what alternatives were considered. Format is **MADR-lite**:
 
 1. Title and metadata (status, date, tag)
 2. Context — what forced the decision
@@ -43,7 +43,7 @@ ADRs preserve context that the dev guide flattens away. The dev guide states the
 
 ### 2.2 Request for Comments (RFCs)
 
-Located under [docs/rfcs/](docs/rfcs/). Each RFC specifies one protocol or format normatively. Implementations conform to the RFC; deviations require an RFC update, not a code workaround.
+Located under [docs/rfcs/](docs/05%20-%20Standards/rfcs/). Each RFC specifies one protocol or format normatively. Implementations conform to the RFC; deviations require an RFC update, not a code workaround.
 
 The docket as of V1:
 
@@ -60,7 +60,7 @@ The docket as of V1:
 
 ### 2.3 Dev Guide chapters
 
-Located under [docs/dev-guide/](docs/dev-guide/). Each chapter is the *imperative description* of a coherent slice of the design at the end of the design phase, with reversals flagged but not narrated. Chapters are self-contained; they describe state, not journey.
+Located under [docs/dev-guide/](docs/01%20-%20Design/dev-guide/). Each chapter is the *imperative description* of a coherent slice of the design at the end of the design phase, with reversals flagged but not narrated. Chapters are self-contained; they describe state, not journey.
 
 Three different artifacts for three different jobs: ADRs for "why this was chosen," RFCs for "how this works on the wire," dev guide for "what the design looks like as one document."
 
@@ -70,7 +70,7 @@ Three different artifacts for three different jobs: ADRs for "why this was chose
 
 ### 3.1 Section layout
 
-Every RFC under [docs/rfcs/](docs/rfcs/) follows the same section order:
+Every RFC under [docs/rfcs/](docs/05%20-%20Standards/rfcs/) follows the same section order:
 
 1. **Status** — Draft / Accepted / Queued / Superseded by RFC-NNN; date; semver version string (e.g., `1.0.0`).
 2. **Context** — what forces the spec, citing the relevant ADRs and prior RFCs.
@@ -137,7 +137,7 @@ Disposition is concrete: `V1.5: introduce X`, `V2: switch to Y`, `Held until V1 
 
 ### 4.1 MADR-lite layout
 
-Six sections per ADR (see [docs/decisions/0001-rts-as-agent-orchestrator.md](docs/decisions/0001-rts-as-agent-orchestrator.md) for an example):
+Six sections per ADR (see [docs/decisions/0001-rts-as-agent-orchestrator.md](docs/02%20-%20Implementation/decisions/0001-rts-as-agent-orchestrator.md) for an example):
 
 1. Title + metadata (status, date, tag)
 2. Context
@@ -148,7 +148,7 @@ Six sections per ADR (see [docs/decisions/0001-rts-as-agent-orchestrator.md](doc
 
 ### 4.2 Refinement over rewrite
 
-When a decision evolves but its core stands, add a **Refinement** section to the existing ADR rather than writing a new one. Example: [DR-0010](docs/decisions/0010-force-tool-use-suppress-text.md) was refined when RFC-005's `agent_emit` introduced — the original "suppress text" intent was preserved (renderers visually de-emphasize raw output) but the silent-drop hole was closed (raw output is now captured as `agent_emit` spans).
+When a decision evolves but its core stands, add a **Refinement** section to the existing ADR rather than writing a new one. Example: [DR-0010](docs/02%20-%20Implementation/decisions/0010-force-tool-use-suppress-text.md) was refined when RFC-005's `agent_emit` introduced — the original "suppress text" intent was preserved (renderers visually de-emphasize raw output) but the silent-drop hole was closed (raw output is now captured as `agent_emit` spans).
 
 A refinement section names:
 - The version / RFC era of the change
@@ -567,7 +567,7 @@ The reference is not decorative. The following Bell System practices are explici
 
 | Bell System practice | Project equivalent |
 |---|---|
-| Numbered RFCs preceding implementation | RFC-001 through RFC-008 in [docs/rfcs/](docs/rfcs/) |
+| Numbered RFCs preceding implementation | RFC-001 through RFC-008 in [docs/rfcs/](docs/05%20-%20Standards/rfcs/) |
 | Backward-compatibility analysis as a first-class concern | Three classes (additive / deprecating / breaking) in every RFC's §"Backward-compatibility analysis" |
 | Fault-tree analysis | Fault tables in RFC-002, RFC-005, RFC-006, RFC-008 |
 | Layered abstractions with stable interfaces | LiteLLM as TCP/IP-stack-layer; OTel as observability-stack-layer; MCP as tool-call-layer; each presents one shape upward |
@@ -591,11 +591,11 @@ The discipline is calibrated to project scale: full RFC + worked-example + fault
 
 For convenience, the load-bearing artifacts:
 
-**ADRs** (16 total, [docs/decisions/README.md](docs/decisions/README.md) is the index):
+**ADRs** (16 total, [docs/decisions/README.md](docs/02%20-%20Implementation/decisions/README.md) is the index):
 
 DR-0001 through DR-0016. Three pivots, ten lock-ins, three scope cuts. DR-0010 has a "Refinement (RFC-005/006 era)" section.
 
-**RFCs** ([docs/rfcs/README.md](docs/rfcs/README.md) is the index):
+**RFCs** ([docs/rfcs/README.md](docs/05%20-%20Standards/rfcs/README.md) is the index):
 
 | # | Title | Status | Implementation status |
 |---|---|---|---|
@@ -608,7 +608,7 @@ DR-0001 through DR-0016. Three pivots, ten lock-ins, three scope cuts. DR-0010 h
 | 007 | `.tape` files (OTLP/JSON Logs) | Queued | Stub spec; implementation deferred |
 | 008 | Kernel host integration (PTY + socket) | Draft | Implementation in flight |
 
-**Dev-guide chapters** (8 total, [docs/dev-guide/00-overview.md](docs/dev-guide/00-overview.md) is the entry point):
+**Dev-guide chapters** (8 total, [docs/dev-guide/00-overview.md](docs/01%20-%20Design/dev-guide/00-overview.md) is the entry point):
 
 Chapters 01–08 cover the design history. Chapter 08 names the four originating RFCs (001–004); RFCs 005–008 followed during V1 implementation.
 
@@ -621,14 +621,14 @@ Chapters 01–08 cover the design history. Chapter 08 names the four originating
 For a new contributor:
 
 1. Read this file end-to-end (~15 min).
-2. Read [docs/dev-guide/00-overview.md](docs/dev-guide/00-overview.md) for the design at a glance.
-3. Read [docs/rfcs/README.md](docs/rfcs/README.md) and skim the active RFCs.
+2. Read [docs/dev-guide/00-overview.md](docs/01%20-%20Design/dev-guide/00-overview.md) for the design at a glance.
+3. Read [docs/rfcs/README.md](docs/05%20-%20Standards/rfcs/README.md) and skim the active RFCs.
 4. Read the RFC for the layer you're about to touch.
 5. When implementing, conform to the RFC; flag any contradictions you find.
 
 For a reviewer:
 
-1. Walk [docs/decisions/README.md](docs/decisions/README.md) — the audit trail.
+1. Walk [docs/decisions/README.md](docs/02%20-%20Implementation/decisions/README.md) — the audit trail.
 2. For each ADR being reviewed, follow its `Source` link to the raw conversation turns.
 3. Cross-reference against the relevant RFCs and dev-guide chapters.
 

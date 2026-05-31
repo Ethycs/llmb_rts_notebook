@@ -10,10 +10,10 @@ The repo started life as a 1.1 MB design conversation
 (`chat-export-2026-04-26T04-22-39.md`) — that conversation is the
 historical source of truth for the original architectural choices.
 The current normative reference is the doc tree under [`docs/`](docs/),
-with [`docs/atoms/`](docs/atoms/) holding canonical definitions,
-[`docs/notebook/`](docs/notebook/) + [`docs/rfcs/`](docs/rfcs/)
+with [`docs/atoms/`](docs/04%20-%20Reference/atoms/) holding canonical definitions,
+[`docs/notebook/`](docs/03%20-%20Blueprint/) + [`docs/rfcs/`](docs/05%20-%20Standards/rfcs/)
 holding behavioral and wire-format specs, and
-[`docs/kernel/`](docs/kernel/) holding substrate-level documentation
+[`docs/kernel/`](docs/04%20-%20Reference/kernel/) holding substrate-level documentation
 for the embeddable LLMKernel (capture invariants, identity model,
 deployment surfaces, per-slice implementation plans).
 
@@ -35,7 +35,7 @@ persist via `--resume`; multi-turn cells, cross-agent context handoff,
 and the headless executor all work. The cell schema collapsed in S5.0
 to `{text, outputs, bound_agent_id}` with kind/flags parse-derived from
 text via the `@@` cell-magic + `@` line-magic vocabulary
-([magic atom](docs/atoms/concepts/magic.md)).
+([magic atom](docs/04%20-%20Reference/atoms/concepts/magic.md)).
 
 **V1.6+ shipped since 2026-05-02 (most recent first):**
 
@@ -48,7 +48,7 @@ text via the `@@` cell-magic + `@` line-magic vocabulary
   changes. Three new K-classes (K3M path-outside-workspace, K3N
   overwrite-refused, K3O bundled I/O failure with `cause` sub-code). The
   cell↔file matrix is now symmetric in all four quadrants.
-  ([PLAN-S5.0.5](docs/notebook/PLAN-S5.0.5-magic-file-encode-decode.md))
+  ([PLAN-S5.0.5](docs/07%20-%20Status%20Reports/PLAN-S5.0.5-magic-file-encode-decode.md))
 - **PLAN-S5.0.4 — privileged magic emission** (extension `838aa85`;
   kernel `2306aef` / `bc24720` / `987b7ef`). `emit_magic_cell` MCP tool
   + `magic_emit_privileges[]` store + `promote_stream_magic` operator
@@ -64,11 +64,11 @@ text via the `@@` cell-magic + `@` line-magic vocabulary
 - **BSP-007 overlay graph** — operator-side, git-style commits over
   the agent turn DAG. `apply_commit` / `revert_to_commit` / `diff` /
   `branch` primitives; 17 V1 op kinds; §6 cell-merge correctness
-  validators; K90-K95 failure modes. ([commit `3a430cb`](docs/notebook/BSP-007-overlay-git-semantics.md))
+  validators; K90-K95 failure modes. ([commit `3a430cb`](docs/03%20-%20Blueprint/BSP-007-overlay-git-semantics.md))
 - **BSP-008 RunFrames + ContextPacker integration** — every agent
   turn now persists a `record_context_manifest` + start/terminal
   `record_run_frame` trail through the BSP-003 intent path.
-  ([commit `3a430cb`](docs/notebook/BSP-008-contextpacker-runframes.md))
+  ([commit `3a430cb`](docs/03%20-%20Blueprint/BSP-008-contextpacker-runframes.md))
 - **PLAN-S6.0 in-tree event log + hydrate-replay safety** — the
   event log lives in `metadata.rts.event_log[]`; `EventLogReplayer`
   asserts `dispatcher.is_writable() == False` at the boundary to
@@ -80,7 +80,7 @@ text via the `@@` cell-magic + `@` line-magic vocabulary
 - **Standalone TCP server** — `python -m llm_kernel serve` with
   bearer-token auth lets external drivers (CLI, future Rust/Go
   orchestrators) attach over TCP. Validation task filed at
-  [`docs/ops/validate-serve-mode.md`](docs/ops/validate-serve-mode.md).
+  [`docs/ops/validate-serve-mode.md`](docs/02%20-%20Implementation/ops/validate-serve-mode.md).
 - **Tier-3 live OAuth+mitm smoke green** — 6 Anthropic API calls
   intercepted; notify + report_completion emitted by the agent.
   Three latent harness bugs surfaced and fixed in `28c3658`
@@ -102,7 +102,7 @@ opening; the final V2 output-kind-lens slice (`85bd5e4`) added 20
 more whose verification is pending a Windows VS Code installer
 mutex release. Full kernel suite runs in ~20s under xdist.
 
-Shipped slices (per [BSP-005 §6.5](docs/notebook/BSP-005-cell-roadmap.md#65-slice-ladder-totals-after-issue-2--and-observed-velocity-2026-05-02-update)):
+Shipped slices (per [BSP-005 §6.5](docs/03%20-%20Blueprint/BSP-005-cell-roadmap.md#65-slice-ladder-totals-after-issue-2--and-observed-velocity-2026-05-02-update)):
 
 | | Slice | Commit |
 |---|---|---|
@@ -144,45 +144,45 @@ V2 lane (shipped this session, both pure read-side):
 | 🔵 | Multi-provider campaign (`gpt-cli` / `gemini` / `ollama`) | design doc not yet authored |
 
 Observed velocity is roughly 10× the BSP-005 "working day" budget
-(which was sized for one mega-round agent in series); see [BSP-005 §6.5](docs/notebook/BSP-005-cell-roadmap.md#65-slice-ladder-totals-after-issue-2--and-observed-velocity-2026-05-02-update).
+(which was sized for one mega-round agent in series); see [BSP-005 §6.5](docs/03%20-%20Blueprint/BSP-005-cell-roadmap.md#65-slice-ladder-totals-after-issue-2--and-observed-velocity-2026-05-02-update).
 
 ## Where definitions live
 
 The doc tree has three normative layers:
 
-- **[`docs/atoms/`](docs/atoms/)** — canonical definitions for every reusable
+- **[`docs/atoms/`](docs/04%20-%20Reference/atoms/)** — canonical definitions for every reusable
   noun, verb, rule, decision, and anti-pattern. ~91 atoms across 7 subdirectories
   (`concepts`, `operations`, `discipline`, `decisions`, `anti-patterns`,
   `protocols`, `contracts`). When an atom and a longer spec disagree on what a
   thing IS, the atom wins.
-- **[`docs/rfcs/`](docs/rfcs/)** — public boundary contracts (wire format, file
+- **[`docs/rfcs/`](docs/05%20-%20Standards/rfcs/)** — public boundary contracts (wire format, file
   format, transport, failure surface). Normative for behavior + wire shape.
-- **[`docs/notebook/`](docs/notebook/)** — BSPs (build sequence proposals),
+- **[`docs/notebook/`](docs/03%20-%20Blueprint/)** — BSPs (build sequence proposals),
   FSPs (feature spec proposals), PLAN-S* slice plans. Normative for substrate
   behavior + slice sequencing.
 
-[`docs/decisions/`](docs/decisions/) holds the original 16 design ADRs
+[`docs/decisions/`](docs/02%20-%20Implementation/decisions/) holds the original 16 design ADRs
 (MADR-lite format, design-conversation provenance). The newer
-[`docs/atoms/decisions/`](docs/atoms/decisions/) holds the V1/V2 implementation
+[`docs/atoms/decisions/`](docs/04%20-%20Reference/atoms/decisions/) holds the V1/V2 implementation
 decisions (PLAN-§4 row IDs like D1-D8 / S1-S6 / etc.) — distinct namespace.
 
 ## RFCs (V1)
 
 | # | Title | Status |
 |---|---|---|
-| [001](docs/rfcs/RFC-001-mcp-tool-taxonomy.md) | V1 MCP tool taxonomy | Draft; implemented (13 tools) |
-| [002](docs/rfcs/RFC-002-claude-code-provisioning.md) | Claude Code provisioning procedure | Draft v1.0.1; implemented |
-| [003](docs/rfcs/RFC-003-custom-message-format.md) | Custom Jupyter message format | **Superseded by RFC-006** |
-| [004](docs/rfcs/RFC-004-failure-modes.md) | Failure-mode analysis + fault-injection harness | Draft; implemented |
-| [005](docs/rfcs/RFC-005-llmnb-file-format.md) | `.llmnb` file format | Draft v1.0.2; implemented |
-| [006](docs/rfcs/RFC-006-kernel-extension-wire-format.md) | Kernel↔extension wire format | Draft v2.1.0; implemented |
-| [007](docs/rfcs/RFC-007-tape-otlp-logs.md) | `.tape` files (OTLP/JSON Logs) | Queued; stub spec |
-| [008](docs/rfcs/RFC-008-kernel-host-integration.md) | Kernel host integration (PTY + socket + TCP) | Draft v1.0.1; implemented |
-| [009](docs/rfcs/RFC-009-zone-control-and-config.md) | Zone control + config precedence | Draft; implemented |
+| [001](docs/05%20-%20Standards/rfcs/RFC-001-mcp-tool-taxonomy.md) | V1 MCP tool taxonomy | Draft; implemented (13 tools) |
+| [002](docs/05%20-%20Standards/rfcs/RFC-002-claude-code-provisioning.md) | Claude Code provisioning procedure | Draft v1.0.1; implemented |
+| [003](docs/05%20-%20Standards/rfcs/RFC-003-custom-message-format.md) | Custom Jupyter message format | **Superseded by RFC-006** |
+| [004](docs/05%20-%20Standards/rfcs/RFC-004-failure-modes.md) | Failure-mode analysis + fault-injection harness | Draft; implemented |
+| [005](docs/05%20-%20Standards/rfcs/RFC-005-llmnb-file-format.md) | `.llmnb` file format | Draft v1.0.2; implemented |
+| [006](docs/05%20-%20Standards/rfcs/RFC-006-kernel-extension-wire-format.md) | Kernel↔extension wire format | Draft v2.1.0; implemented |
+| [007](docs/05%20-%20Standards/rfcs/RFC-007-tape-otlp-logs.md) | `.tape` files (OTLP/JSON Logs) | Queued; stub spec |
+| [008](docs/05%20-%20Standards/rfcs/RFC-008-kernel-host-integration.md) | Kernel host integration (PTY + socket + TCP) | Draft v1.0.1; implemented |
+| [009](docs/05%20-%20Standards/rfcs/RFC-009-zone-control-and-config.md) | Zone control + config precedence | Draft; implemented |
 
 ## BSPs / FSPs / PLAN-S* slice plans
 
-[`docs/notebook/`](docs/notebook/) holds:
+[`docs/notebook/`](docs/03%20-%20Blueprint/) holds:
 
 - **BSP-002** — conversation graph (turns + agents-as-refs)
 - **BSP-003** — writer / intent registry (canonical mutation path)

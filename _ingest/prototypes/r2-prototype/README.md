@@ -1,6 +1,6 @@
 # R2-prototype harness
 
-A self-contained smoke test that verifies the [RFC-002](../../../docs/rfcs/)
+A self-contained smoke test that verifies the [RFC-002](../../../docs/05%20-%20Standards/rfcs/)
 Claude Code provisioning recipe end-to-end on the operator's machine, before
 Track B implements the real LLMKernel-side hardening. The harness wires up the
 two minimum-viable RFC-001 tools (`notify` and `report_completion`) through a

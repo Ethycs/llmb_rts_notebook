@@ -40,7 +40,7 @@ On FAIL, paste the actual log line(s) that establish the failure.
 ## Deviations from RFC-002
 
 List every observed behavior that contradicts the recipe in
-[`docs/dev-guide/08-blockers-mediator-standards.md`](../../docs/dev-guide/08-blockers-mediator-standards.md)
+[`docs/dev-guide/08-blockers-mediator-standards.md`](../../docs/01%20-%20Design/dev-guide/08-blockers-mediator-standards.md)
 ("RFC-002 — Claude Code provisioning procedure" subsection). For each
 deviation, flag whether RFC-002 should be amended (the spec was wrong) or
 whether the implementation should change (the spec was right but the
