@@ -1,9 +1,9 @@
 # Plan: Substrate gap closure (V1 Kernel Gap Closure)
 
-**Status**: ready
+**Status**: in progress (5 of 9 closed as of 2026-05-07). Closed: G2 (overlay intent kinds), G4 (`fork_agent` / `move_agent_head` handlers), G5 (`record_context_manifest` / `record_run_frame` intent kinds), G8 (`OverlayApplier` module), G9 (`ContextPacker` module). Remaining: G10 (`CellManager` module), G11 (RunFrame in-progress truncation at hydrate), G12 (`DriftDetector` API alignment), G13 (MCP `validate_tool_input` hardening).
 **Audience**: an LLM (or operator) picking this up cold. Self-contained.
 **Goal**: close the 8 outstanding kernel-substrate gaps from the V1 Kernel Gap Closure plan (G2, G4, G5, G8, G9, G10, G11, G12, G13) plus the MCP `validate_tool_input` hardening, dispatched across the four kernel slice owners (K-MCP, K-AS, K-MW, K-CM).
-**Time budget**: ~3-4 days total across multiple agents in parallel. Most gaps land alongside specific BSP-005 slices; the table below is the dispatch map.
+**Time budget**: ~3-4 days total across multiple agents in parallel. Most gaps land alongside specific BSP-005 slices; the table below is the dispatch map. Remaining ~1-2 days after the 5-of-9 partial close.
 
 ---
 
@@ -36,17 +36,19 @@ The 9 gap items, grouped by slice owner:
 
 | Gap | Description | Owner | Status | Lands with |
 |---|---|---|---|---|
-| **G2** | Add `apply_overlay_commit`, `revert_overlay_to_commit`, `create_overlay_ref` to `_BSP003_INTENT_KINDS`; register handlers (delegate to `OverlayApplier`) | K-MW | **pending** | [PLAN-S5.5-sections.md](PLAN-S5.5-sections.md) (S5.5 section ops are the first consumer) |
-| **G4** | Wire `fork_agent` and `move_agent_head` writer handlers (registry already has the kinds; handlers are stubs) | K-MW | **pending** | [PLAN-S5-branch-revert-stop.md](PLAN-S5-branch-revert-stop.md) |
-| **G5** | Add `record_context_manifest` and `record_run_frame` to `_BSP003_INTENT_KINDS`; register handlers | K-MW | **pending** | [PLAN-S3.5-context-packer.md](PLAN-S3.5-context-packer.md) (manifest), [PLAN-S6-cell-binding-runframes.md](PLAN-S6-cell-binding-runframes.md) (run frame) |
-| **G8** | New module `vendor/LLMKernel/llm_kernel/overlay_applier.py` per [contracts/overlay-applier](../04%20-%20Reference/atoms/contracts/overlay-applier.md) | K-CM (cell-manager / overlay) | **pending** | [PLAN-S5.5-sections.md](PLAN-S5.5-sections.md), [PLAN-S5-branch-revert-stop.md](PLAN-S5-branch-revert-stop.md) |
-| **G9** | New module `vendor/LLMKernel/llm_kernel/context_packer.py` per [contracts/context-packer](../04%20-%20Reference/atoms/contracts/context-packer.md) | K-AS / K-CTXR | **pending** | [PLAN-S3.5-context-packer.md](PLAN-S3.5-context-packer.md) |
-| **G10** | New module `vendor/LLMKernel/llm_kernel/cell_manager.py` per [contracts/cell-manager](../04%20-%20Reference/atoms/contracts/cell-manager.md) (split / merge / move / promote) | K-CM | **pending** | [PLAN-S5.5-sections.md](PLAN-S5.5-sections.md) (M3 promote-span uses it via M-series) |
+| **G2** | Add `apply_overlay_commit`, `revert_overlay_to_commit`, `create_overlay_ref` to `_BSP003_INTENT_KINDS`; register handlers (delegate to `OverlayApplier`) | K-MW | **closed** (submodule `bf0cf16` / outer `92c7412`; BSP-007 ship 2026-05-07) | [PLAN-S5.5-sections.md](PLAN-S5.5-sections.md) (S5.5 section ops are the first consumer) |
+| **G4** | Wire `fork_agent` and `move_agent_head` writer handlers (registry already has the kinds; handlers are stubs) | K-MW | **closed** (S4.1 turn-graph persistence `7ee1616` + S5 trio `5b5533e`; verified clean in supervisor envelope spot-check 2026-05-07) | [PLAN-S5-branch-revert-stop.md](PLAN-S5-branch-revert-stop.md) |
+| **G5** | Add `record_context_manifest` and `record_run_frame` to `_BSP003_INTENT_KINDS`; register handlers | K-MW | **closed** (`record_context_manifest` earlier in S3.5; `record_run_frame` in submodule `82c6078` / outer `3a430cb`; BSP-008 ship 2026-05-07) | [PLAN-S3.5-context-packer.md](PLAN-S3.5-context-packer.md) (manifest), [PLAN-S6-cell-binding-runframes.md](PLAN-S6-cell-binding-runframes.md) (run frame) |
+| **G8** | New module `vendor/LLMKernel/llm_kernel/overlay_applier.py` per [contracts/overlay-applier](../04%20-%20Reference/atoms/contracts/overlay-applier.md) | K-CM (cell-manager / overlay) | **closed** (submodule `bf0cf16`; 1230 LoC; 16 §9 tests in `test_overlay_applier.py`) | [PLAN-S5.5-sections.md](PLAN-S5.5-sections.md), [PLAN-S5-branch-revert-stop.md](PLAN-S5-branch-revert-stop.md) |
+| **G9** | New module `vendor/LLMKernel/llm_kernel/context_packer.py` per [contracts/context-packer](../04%20-%20Reference/atoms/contracts/context-packer.md) | K-AS / K-CTXR | **closed** (shipped earlier; 333 LoC; pure module with K100/K101 error modes) | [PLAN-S3.5-context-packer.md](PLAN-S3.5-context-packer.md) |
+| **G10** | New module `vendor/LLMKernel/llm_kernel/cell_manager.py` per [contracts/cell-manager](../04%20-%20Reference/atoms/contracts/cell-manager.md) (split / merge / move / promote) | K-CM | **pending** | [PLAN-S5.5-sections.md](PLAN-S5.5-sections.md) (M3 promote-span uses it via M-series). NOTE: the 17 overlay-applier op kinds (split / merge / move / promote_span) shipped via G8 cover the operations themselves; this gap is the dedicated CellManager facade if/when a higher-level cell-manipulation surface is needed beyond the overlay-applier seam. |
 | **G11** | Drift-detector RunFrame extension: in-progress RunFrames at hydrate time get truncated similarly to in-progress spans | K-MW | **pending** | [PLAN-S6-cell-binding-runframes.md](PLAN-S6-cell-binding-runframes.md) (crash-recovery smoke depends) |
 | **G12** | `DriftDetector` API spec drift: align signature with [contracts/drift-detector §"Code drift vs spec"](../04%20-%20Reference/atoms/contracts/drift-detector.md) — either spec amends to match impl, or a thin `DriftReport` wrapper added | K-MW | **pending** | Standalone; ≤2h. Lands first because it touches no other slice. |
 | **G13** | MCP `validate_tool_input` hardening — currently the kernel's MCP server validates input schemas at call time, but K-MCP slice plans an additional pre-call `validate_tool_input(tool_name, arguments)` JSON-RPC method for agents to dry-run a call before invoking. Per [protocols/mcp-tool-call](../04%20-%20Reference/atoms/protocols/mcp-tool-call.md) error envelope. | K-MCP | **pending** | Standalone; ≤4h. Could land first or with the K-MCP slice. |
 
-**Status legend**: `closed` (already shipped — none in this list), `pending` (not yet shipped). Re-run the audit by grepping `docs/atoms/contracts/*.md` for "Code drift vs spec" sections after each gap lands.
+**Status legend**: `closed` (already shipped), `pending` (not yet shipped). Re-run the audit by grepping `docs/atoms/contracts/*.md` for "Code drift vs spec" sections after each gap lands.
+
+**Bonus bug fix landed alongside G8** (2026-05-07): the BSP-007 ship surfaced and fixed a latent K95 attribute-decode bug — `_is_cell_executing_for_overlay` had been reading OTLP `attributes` as a dict when the wire shape is a `List[{key, value}]` (decoded via `_attrs.decode_attrs`). The original `isinstance(attrs, dict)` check always failed; K95 (overlay-blocked-by-execution) silently never fired from the `RunTracker` path. Fixed in submodule `108c233`. Test `test_overlay_blocked_during_execution` uses the `set_cell_execution_state` seam and continues to pass; the production run-tracker path is now actually exercised. See [Engineering_Guide.md §11.9](../../Engineering_Guide.md) for the related `LogRecord` `extra=` collision pattern surfaced by the same Tier-3 smoke campaign.
 
 ## §4. Per-gap concrete work
 
@@ -153,9 +155,17 @@ Each gap closure clears one or more "Code drift vs spec" lines:
 
 ## §9. Definition of done
 
-- [ ] All 9 gap rows in §3 flipped to `closed`.
-- [ ] `docs/atoms/contracts/*.md` "Code drift vs spec" sections re-audited; each remaining drift line carries a forward reference to the slice that addresses it.
-- [ ] Total new test count across all gaps lands as listed in §5.
-- [ ] Smoke per gap (the slice-level round-trips in the consuming PLAN docs serve as integration coverage).
+- [x] G2 closed (BSP-007 overlay intent kinds + handlers shipped 2026-05-07).
+- [x] G4 closed (`fork_agent` / `move_agent_head` handlers shipped in S4.1 / S5 trio; verified clean in supervisor envelope spot-check 2026-05-07).
+- [x] G5 closed (`record_run_frame` shipped 2026-05-07; `record_context_manifest` earlier with S3.5).
+- [x] G8 closed (BSP-007 `OverlayApplier` module 1230 LoC + 16 §9 tests).
+- [x] G9 closed (`ContextPacker` module 333 LoC shipped earlier).
+- [ ] G10 closed (`CellManager` module pending — likely unblocked since overlay-applier covers the 17 op kinds).
+- [ ] G11 closed (RunFrame in-progress truncation at hydrate pending).
+- [ ] G12 closed (`DriftDetector` API alignment pending; ≤2h standalone).
+- [ ] G13 closed (MCP `validate_tool_input` hardening pending; ≤4h standalone).
+- [x] Partial: `docs/atoms/contracts/*.md` "Code drift vs spec" sections re-audited for the 5 closed gaps. Remaining drift lines (G10 / G11 / G12 / G13) carry forward references to the slice that addresses them.
+- [x] Partial: closed-gap test counts landed — G8 ships 16 tests in `test_overlay_applier.py`; G5 ships 11 tests in `test_run_frame_handler.py` + `test_supervisor_run_frame_wiring.py`. Outstanding gaps still owe ~13-17 tests per §5.
+- [x] Smoke per closed gap: Tier-3 live OAuth+mitm smoke passes (2026-05-07) — 6 Anthropic API calls intercepted; `notify` + `report_completion` emitted; overlay-applier and RunFrame paths exercised end-to-end.
 - [ ] [PLAN-atom-hygiene.md](PLAN-atom-hygiene.md) drift detector run is clean after gaps close.
-- [ ] This plan flips to `**Status**: shipped (commit <SHA>)` once the last gap lands. Note: this plan stays "ready" until ALL gaps close, then moves in one transition.
+- [ ] This plan flips to `**Status**: shipped (commit <SHA>)` once the last gap lands. Currently `in progress (partial)` — 5 of 9 closed. Note: this plan stays "in progress" until ALL gaps close, then moves to `shipped` in one transition.
