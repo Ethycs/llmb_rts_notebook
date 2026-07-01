@@ -78,10 +78,11 @@ class CellManager:
 - The extension's notebook controller and the operator-facing UI route every "split this cell," "merge these," "move to section X" operator gesture into one of these methods, indirectly via the [submit-intent envelope](../protocols/submit-intent-envelope.md) carrying an `apply_overlay_commit` payload. The kernel-side CellManager is what unwraps the intent.
 - Future kernel-internal callers: `AgentSupervisor` may emit a `split` overlay commit when a cell directive parses to a fork (TBD).
 
-## Code drift vs spec
+## Design notes (post-G10 ratification 2026-06-30)
 
-- **Module does not exist.** `vendor/LLMKernel/llm_kernel/cell_manager.py` is absent. The discipline atom ratifies the design but no slice has landed yet — partial wiring will arrive with K-OVERLAY (BSP-007 §11) and BSP-005 S5/S5.5/S6.
-- **`edit_with_overlay_commit`** is the future-proofing slot for V1.5+ structured cell edits. V1 ships only `set_cell_metadata` (via writer's intent registry) for cell-metadata changes; full text-edit-as-overlay is V1.5+.
+- **Module shipped**: `vendor/LLMKernel/llm_kernel/cell_manager.py` (~33 KB) with the primitive text-mutation surface (insert `@@break` markers, prepend `@<line_magic>` lines, replace `@@<kind>` declarations) that the `@@` cell-magic vocabulary needs to round-trip. K3C/K3D/K3E/K3F preconditions (S5.0.1c submodule `ac25656`) + `insert_cells_with_provenance` for the `@@template` / `@@expand` / `@@import` generators (S5.0.2 submodule `8581fab`) are wired.
+- **Public façade coverage vs. the split/merge/move/promote ops** — the overlay-applier seam covers these operations directly via its 17 op-kind registry (BSP-007 §7). The `CellManager` shipped as the **text-mutation primitives** the parser + magic vocabulary depend on; the higher-level split/merge/move/promote-span *façade* isn't a separate module because the overlay applier already exposes them by op kind. No dedicated `CellManager.split_cell()` method exists — callers issue `apply_overlay_commit` with the appropriate op. This is the post-G8 seam that PLAN-substrate-gap-closure §3 flagged (G10 "the dedicated CellManager façade if/when a higher-level cell-manipulation surface is needed beyond the overlay-applier seam"); today no consumer needs it, so no dedicated façade ships.
+- **`edit_with_overlay_commit`** is the future-proofing slot for V1.5+ structured cell edits. V1 ships `set_cell_metadata` (via writer's intent registry) for cell-metadata changes + the text-mutation primitives above; full text-edit-as-overlay is V1.5+.
 
 ## See also
 

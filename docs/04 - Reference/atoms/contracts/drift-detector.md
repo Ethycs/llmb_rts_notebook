@@ -1,6 +1,6 @@
 # Contract: DriftDetector
 
-**Status**: `contract` (V1 shipped — present in code; signature differs from spec — see drift note)
+**Status**: `contract` (V1 shipped 2026-06-30 — signature ratified per PLAN-substrate-gap-closure G12 Option A; the earlier spec-vs-impl drift is closed by taking the shipped shape as normative)
 **Module**: `vendor/LLMKernel/llm_kernel/drift_detector.py` — `class DriftDetector`
 **Source specs**: [RFC-005 §`metadata.rts.drift_log`](../../../05%20-%20Standards/rfcs/RFC-005-llmnb-file-format.md#metadatartsdrift_log--persisted-drift-events), [RFC-005 §"Resume-time RFC version check"](../../../05%20-%20Standards/rfcs/RFC-005-llmnb-file-format.md), [RFC-006 §8](../../../05%20-%20Standards/rfcs/RFC-006-kernel-extension-wire-format.md#8--family-f-notebook-metadata-bidirectional-in-v202) (called during hydrate)
 **Related atoms**: [contracts/metadata-writer](metadata-writer.md), [contracts/agent-supervisor](agent-supervisor.md), [protocols/family-f-notebook-metadata](../protocols/family-f-notebook-metadata.md)
@@ -73,10 +73,11 @@ The detector itself does not have a dedicated K-class — its outputs feed the w
 - `vendor/LLMKernel/llm_kernel/custom_messages.py` — the `notebook.metadata mode:hydrate` handler invokes `DriftDetector.compare(persisted_volatile, current_volatile)` and appends results to the in-memory `drift_log`.
 - After the writer commits, drift events ride out on the next Family F snapshot.
 
-## Code drift vs spec
+## Design notes (post-G12 ratification)
 
-- **Spec calls for `compare(snapshot, current) → DriftReport`** (per the task brief and RFC-005's narrative). The implementation uses **named keyword args** (`current_kernel=`, `current_agents=`, `current_mcp_servers=`, `current_agent_status=`) and returns a **list of drift event dicts**, not a `DriftReport` aggregate. Functionally equivalent; structurally different. Either the spec should be amended to match the implementation, or a thin `DriftReport` wrapper added.
-- The module exposes a stable `Severity` constant trio (`SEVERITY_INFO`, `SEVERITY_WARN`, `SEVERITY_ERROR`) but does not export them as a class enum; the brief's "Severity classification helpers" line is satisfied by the module-level constants and `_classify_version_drift`.
+- **Return shape**: `list[dict]` (drift events), not a `DriftReport` aggregate wrapper. The earlier RFC-005 narrative sketched a `DriftReport` class; the implementation ships the per-event list because every consumer (currently `custom_messages.py`'s hydrate handler) iterates the events one-by-one and appends to `drift_log`. Per [Engineering_Guide.md §11.2](../../../../Engineering_Guide.md) — don't ship wrappers for hypothetical consumers. A future consumer that genuinely needs `.severities` / `.summary()` accessors can add a thin `DriftReport` wrapper without changing the module's public surface.
+- **Named kwargs on `compare`**: `current_kernel=`, `current_agents=`, `current_mcp_servers=`, `current_agent_status=`. Chosen over a single `current` dict so callers can opt out of categories they cannot observe (`None` skips a pass); the invariant "`None` skips a category" above is the load-bearing property.
+- **Severity as module-level constants**: `SEVERITY_INFO` / `SEVERITY_WARN` / `SEVERITY_ERROR` rather than a class-level `Severity` enum. Same rationale — no consumer needs enum-shaped dispatch; every read is a string comparison.
 
 ## See also
 
