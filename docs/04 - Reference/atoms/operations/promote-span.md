@@ -1,6 +1,6 @@
 # Operation: promote-span
 
-**Status**: V1 spec'd (lands with overlay-commit infrastructure)
+**Status**: V1 spec'd (ships with [PLAN-M-series.md](../../../07%20-%20Status%20Reports/PLAN-M-series.md); the underlying overlay-applier + `insert_cells_with_provenance` seam is available today — see G10 in [PLAN-substrate-gap-closure.md](../../../07%20-%20Status%20Reports/PLAN-substrate-gap-closure.md))
 **Source specs**: [BSP-007 §3.4](../../../03%20-%20Blueprint/BSP-007-overlay-git-semantics.md#34-promote--checkpoint-new-per-kb-target-5-13) (operation), [KB-notebook-target.md §5](../../../03%20-%20Blueprint/KB-notebook-target.md#5-what-we-do-especially-well-split-and-merge) (refactoring calculus), [KB-notebook-target.md §16](../../../03%20-%20Blueprint/KB-notebook-target.md#16-artifact-streaming) (artifact lensing), [PLAN-atom-refactor.md §4 row D7](../../../07%20-%20Status%20Reports/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms)
 **Related atoms**: [span](../concepts/span.md), [cell](../concepts/cell.md), [cell-kinds](../concepts/cell-kinds.md), [artifact-ref](../concepts/artifact-ref.md), [overlay-commit](../concepts/overlay-commit.md)
 

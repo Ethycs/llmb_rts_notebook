@@ -1,6 +1,6 @@
 # Operation: move-cell
 
-**Status**: V1 spec'd (lands with BSP-005 S5.5)
+**Status**: V1 shipped — the `move_cell` op kind ships as one of the overlay-applier's 17 op kinds ([PLAN-substrate-gap-closure G8](../../../07%20-%20Status%20Reports/PLAN-substrate-gap-closure.md), submodule `bf0cf16`); consumers dispatch via `apply_overlay_commit` with `op.kind == "move_cell"`. Section-scoped moves ship as part of [PLAN-S5.5-sections.md](../../../07%20-%20Status%20Reports/PLAN-S5.5-sections.md) V1 feature-complete.
 **Source specs**: [BSP-007 §3.2](../../../03%20-%20Blueprint/BSP-007-overlay-git-semantics.md#32-cell-structural-new-in-this-bsp) (operation), [BSP-007 §6](../../../03%20-%20Blueprint/BSP-007-overlay-git-semantics.md#6-merge-correctness-rules-cell-merge) (boundary rules), [KB-notebook-target.md §22.1](../../../03%20-%20Blueprint/KB-notebook-target.md#221-splitmerge-invariants) (provenance boundaries), [PLAN-atom-refactor.md §4 rows M1-M3](../../../07%20-%20Status%20Reports/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms)
 **Related atoms**: [cell](../concepts/cell.md), [section](../concepts/section.md), [overlay-commit](../concepts/overlay-commit.md), [merge-cells](merge-cells.md), [discipline/cell-manager-owns-structure](../discipline/cell-manager-owns-structure.md)
 

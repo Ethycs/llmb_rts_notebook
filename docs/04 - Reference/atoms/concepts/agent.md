@@ -63,6 +63,8 @@ The `provider` lives on each turn record (so the per-cell badge can render the c
 - **Cell-as-agent-identity.** A [cell](cell.md) of `kind: "agent"` carries `bound_agent_id`; the cell renders a decoration showing `agent_id` + `provider` + `runtime_status` ([BSP-002 §6](../../../03%20-%20Blueprint/BSP-002-conversation-graph.md#6-cell--turn-binding-and-cell-as-agent-identity)). The notebook itself is the attribution surface — handoff messages are NOT text-tagged because the operator can SEE which cells produced which turns.
 - **Idle agents survive notebook close → reopen.** `runtime_status: "idle"` + `claude_session_id` round-trip through `metadata.rts`. Re-engaging spawns `claude --resume <session>`.
 - **Provider is sticky** ([BSP-002 §10](../../../03%20-%20Blueprint/BSP-002-conversation-graph.md#10-open-questions) Q5 recommendation). `/spawn beta provider:<other>` creates a separate agent; switching mid-conversation is a footgun.
+- **Hydrated agents default to `runtime_status: "idle"`.** When `MetadataWriter.hydrate(...)` restores an agent record on file open, the runtime status is forced to `"idle"` regardless of what was persisted; the supervisor's post-hydrate respawn discipline (see [decisions/no-rebind-popen](../decisions/no-rebind-popen.md)) decides whether to resume the process or leave it dormant. This is why a `.llmnb` saved with `runtime_status: "alive"` still opens cold — the process didn't survive the file close.
+- **`provider` defaults to `"claude-code"` when omitted.** V1 supports only `claude-code`; envelope omission on the wire is treated as the default rather than a wire failure. V2+ callers passing an unknown `provider` value get K-class rejection at the supervisor rather than silent coercion.
 
 ## V1 vs V2+
 

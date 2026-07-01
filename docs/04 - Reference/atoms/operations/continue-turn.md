@@ -50,7 +50,7 @@ Kernel envelope:
     action_type: "agent_continue",
     parameters: {
       agent_id: "alpha",
-      message: "<body>",
+      text: "<body>",
       cell_id: "<cell-uri>"
     }
   }
@@ -61,7 +61,7 @@ Kernel envelope:
 
 - `agent_id` MUST resolve to an existing agent in the zone, else **K20** (`cell_directive_unknown_agent`).
 - A plain-text cell with no prior agent in the zone raises **K25** (`cell_directive_no_agent_in_zone`); use [spawn-agent](spawn-agent.md) first.
-- The handoff rule (BSP-002 §4.6): for every turn `t` where `t` is after `agent.last_seen_turn_id` on the notebook's mainline, the kernel feeds `t` to the agent's claude session as a synthesized prefix message before sending the new operator `<message>`. The handoff messages are **not separate turns in the DAG** — they are transient context injection. Replay is deterministic.
+- The handoff rule (BSP-002 §4.6): for every turn `t` where `t` is after `agent.last_seen_turn_id` on the notebook's mainline, the kernel feeds `t` to the agent's claude session as a synthesized prefix message before sending the new operator `<text>`. The handoff messages are **not separate turns in the DAG** — they are transient context injection. Replay is deterministic.
 - If the agent's process is `idle`, the kernel re-spawns it via `claude --resume <claude_session_id>` first. If `exited`, full transcript replay rebuilds the session.
 - After commit: agent's `head_turn_id = last_seen_turn_id =` the new response turn id.
 - Handoff messages are NOT text-tagged (BSP-002 §6 Issue 3 resolution). The cell-as-agent-identity decoration is the attribution surface.

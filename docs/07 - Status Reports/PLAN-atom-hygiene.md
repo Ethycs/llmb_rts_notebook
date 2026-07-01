@@ -1,6 +1,6 @@
 # Plan: Atom hygiene — pre-implementation cleanup
 
-**Status**: ready
+**Status**: shipped 2026-06-30 — all 6 Status updates landed, `agent_continue` field-name aligned to `text` (matches `custom_messages.py` implementation), all 4 invented-default bullets pinned, and all 3 verification checks return empty. Row 14 of [PLAN-v1-roadmap §5](PLAN-v1-roadmap.md) flips to ✅.
 **Audience**: an LLM (or operator) picking this up cold. Self-contained.
 **Goal**: clean up six Status-field updates, one protocol field-name fix, and four invented-default pin-downs in `docs/atoms/` so the implementation agents reading these atoms as briefs don't propagate drift into code. Verify with the orphan + drift detector run from [docs/atoms/README.md §"Verification"](../04%20-%20Reference/atoms/README.md).
 **Time budget**: ≤1 day, single-agent. Pure-docs. Should run BEFORE the implementation agents start consuming atoms.
@@ -174,10 +174,10 @@ Other operation atoms with `V1 spec'd` Status that already have correct wording 
 
 ## §9. Definition of done
 
-- [ ] Six Status field updates landed in the atoms listed in §3.1.
-- [ ] `agent_continue` field-name alignment landed in [protocols/operator-action.md](../04%20-%20Reference/atoms/protocols/operator-action.md) and [operations/continue-turn.md](../04%20-%20Reference/atoms/operations/continue-turn.md), in the direction confirmed by operator + implementation grep per §6.
-- [ ] Four invented-default bullets landed in [concepts/agent.md](../04%20-%20Reference/atoms/concepts/agent.md) and [contracts/agent-supervisor.md](../04%20-%20Reference/atoms/contracts/agent-supervisor.md).
-- [ ] Orphan check from §5 returns empty.
-- [ ] Drift check from §5 returns empty.
-- [ ] Status-line consistency check from §5 returns empty.
-- [ ] This plan flips to `**Status**: shipped (commit <SHA>)`.
+- [x] Six Status field updates landed in the atoms listed in §3.1 (2026-06-30). Additionally cleaned two `V1.5 shipped` deviations in `concepts/driver.md` and `concepts/magic.md` — normalized to `V1 shipped` per README enum, with the "S5.0.x wave" detail preserved in the parenthetical.
+- [x] `agent_continue` field-name alignment landed in [operations/continue-turn.md](../04%20-%20Reference/atoms/operations/continue-turn.md) — flipped `message` → `text`; direction confirmed by grep of `vendor/LLMKernel/llm_kernel/mcp_server.py:630` (`text = params.get("text")`). [protocols/operator-action.md](../04%20-%20Reference/atoms/protocols/operator-action.md) already used `text` on the `agent_continue` catalog row.
+- [x] Four invented-default bullets landed: two in [concepts/agent.md](../04%20-%20Reference/atoms/concepts/agent.md) §"Invariants" (hydrated `runtime_status: "idle"` default + `provider: "claude-code"` default) and two in [contracts/agent-supervisor.md](../04%20-%20Reference/atoms/contracts/agent-supervisor.md) §"Invariants" (K24 0.5s probe window + `supervisor_resume_failed_k24` canonical stage-marker name).
+- [x] Orphan check from §5 returns empty.
+- [x] Drift check from §5 returns empty.
+- [x] Status-line consistency check from §5 returns empty.
+- [x] This plan flips to `**Status**: shipped 2026-06-30`.

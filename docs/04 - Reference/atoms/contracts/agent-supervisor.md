@@ -86,6 +86,8 @@ Spec'd but not yet present (BSP-002 §9 K-AS / V2 work):
 - **Per-agent isolation in `respawn_from_config`.** One bad entry MUST NOT block the rest; each spawn is wrapped in its own try-block. Returned status is `"spawned"` | `"skipped"` (already alive) | `"failed"`.
 - **Silence watchdog.** Agents that emit no stdout for `agent_silence_threshold_seconds` get SIGTERM; the regular crash-restart machinery picks up the resulting exit. RFC-002 §"Failure modes" Hang row.
 - **`PYTHONPATH` is absolutized before passing to the MCP server subprocess** (the agent's `cwd=work_dir`, so relative entries would resolve wrong). See [anti-patterns/path-propagation](../anti-patterns/path-propagation.md).
+- **K24 0.5-second probe window.** A `claude --resume <session_id>` invocation that exits within 500 ms of spawn raises K24 (`resume_failed`); successful resumes always survive the probe window. Callers relying on `spawn(...)` returning a live handle can assume "if it's still running after 500 ms, resume worked" — the supervisor doesn't wait for the first turn's response.
+- **`supervisor_resume_failed_k24` is the canonical stage-marker name** used in the supervisor's restart-window state machine to record a probe-window resume failure. Test fixtures and log-grep queries depend on this exact spelling — grepping for the marker is how integration tests correlate a supervisor-side K24 with a wire-side K24 emission.
 
 ## K-class error modes (BSP-002 §7)
 

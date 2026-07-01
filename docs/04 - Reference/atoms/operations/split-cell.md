@@ -1,6 +1,6 @@
 # Operation: split-cell
 
-**Status**: V1 spec'd (lands with overlay-commit infrastructure in BSP-005 S5.5+)
+**Status**: V1 shipped — the `split_cell` op kind ships as one of the overlay-applier's 17 op kinds ([PLAN-substrate-gap-closure G8](../../../07%20-%20Status%20Reports/PLAN-substrate-gap-closure.md), submodule `bf0cf16`); consumers dispatch via `apply_overlay_commit` with `op.kind == "split_cell"`
 **Source specs**: [BSP-007 §3](../../../03%20-%20Blueprint/BSP-007-overlay-git-semantics.md) (overlay operation enumeration), [KB-notebook-target.md §22.1](../../../03%20-%20Blueprint/KB-notebook-target.md#221-splitmerge-invariants) (split/merge invariants), [BSP-002 §13.3.3](../../../03%20-%20Blueprint/BSP-002-conversation-graph.md#1333-splitting-back) (split as merge inverse), [PLAN-atom-refactor.md §4 rows S1-S6](../../../07%20-%20Status%20Reports/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms)
 **Related atoms**: [cell](../concepts/cell.md), [span](../concepts/span.md), [sub-turn](../concepts/sub-turn.md), [overlay-commit](../concepts/overlay-commit.md), [merge-cells](merge-cells.md)
 

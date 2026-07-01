@@ -96,7 +96,7 @@ V1 is ship-ready when EVERY row below is checked. This is the master DoD that th
 | 11 | Three-pane visual model + FSP-002 search works | PLAN-S10 | ✅ shipped in reduced V1 form — engine-native badges + bulk-collapse + find wrappers (`b07e6f9`) + sidebar Find-in-cells WebviewView delivering the full FSP-002 §2.1 search UX (`426051f`). Per-cell gutter coloring + literal floating-bar-above-editor remain V2+ — genuinely blocked on VS Code API exposure (`notebookCellDecoration` is not a Microsoft proposal; the vendored `vscode-jupyter` doesn't have it either). |
 | 12 | M1-M4 (comments, annotations, promoted cells, per-agent panel) ship the lightweight variants | PLAN-M-series | partial — see PLAN-M-series for per-row state; not a V1-UX blocker since the bulk of the operator surface ships through S0.5-S10 above |
 | 13 | All 8 substrate gaps closed (intent kinds, ContextPacker, OverlayApplier, CellManager, MCP `validate_tool_input`, …) | PLAN-substrate-gap-closure | ✅ shipped 2026-06-30 — all 9 gaps closed (G2/G4/G5/G8/G9 earlier; G10 was already shipped, atom drift cleaned; G11 RunFrame truncation new + 4 tests; G12 DriftDetector API ratified per Option A; G13 `validate_tool_input` meta-tool + 4 tests). Full kernel suite 908/908 green. |
-| 14 | `docs/atoms/` drift detector run is clean | PLAN-atom-hygiene | running — agent.md / output-kind.md / PLAN-S7 / FSP-002 hygiene updates landed during the V1 UX sweep (`03976c7` + `426051f` + `85bd5e4` + `667dd68`); a full drift-detector pass remains before V1 SHA stamp |
+| 14 | `docs/atoms/` drift detector run is clean | PLAN-atom-hygiene | ✅ shipped 2026-06-30 — full [PLAN-atom-hygiene](PLAN-atom-hygiene.md) sweep landed: 6 Status normalizations (+ 2 `V1.5` cleanups), `agent_continue` field-name aligned to `text` (matches impl at `mcp_server.py:630`), 4 invented defaults pinned in `agent.md` + `agent-supervisor.md` Invariants. All 3 verification checks (orphan / drift / Status-line consistency) return empty. |
 
 ## §6. Smokes
 
@@ -130,12 +130,14 @@ The V1 smoke suite at ship time MUST pass these end-to-end paths:
 
 ## §9. Definition of done
 
-This conductor is done when every ship-ready row in §5 has a green checkbox AND the per-PLAN DoDs all pass. As of 2026-05-30:
+This conductor is done when every ship-ready row in §5 has a green checkbox AND the per-PLAN DoDs all pass. As of 2026-06-30:
 
 - **Operator-visible V1 UX (rows 1-11)**: ✅ feature-complete. Every notebook surface the operator touches in V1 ships.
 - **Row 12 (M-series lightweight variants)**: partial; not a V1-UX blocker — the bulk of the operator surface ships via S0.5-S10.
 - **Row 13 (substrate gaps)**: ✅ all 9 gaps closed 2026-06-30 — verification pass complete. Full kernel test suite (908/908) green.
-- **Row 14 (atom drift)**: in progress — sweep landed for agent.md / output-kind.md / PLAN-S7 / FSP-002 during the V1-UX-feature-complete commits; a full drift-detector run is queued.
+- **Row 14 (atom drift)**: ✅ shipped 2026-06-30 — full PLAN-atom-hygiene sweep landed; all 3 verification checks return empty.
+
+**All 14 rows ✅**. V1 is SHA-ready pending operator sign-off.
 
 What's NOT in this checklist (intentional):
 

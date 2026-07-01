@@ -1,6 +1,6 @@
 # Driver
 
-**Status**: V1.5 shipped (PLAN-S5.0.3e landed 2026-04-29; outer commit pin `b493ee5`; submodule pin `2c090a4`; live-mode functional as of PLAN-S5.0.3.1 / outer commit `27c0fcc`, 2026-04-30)
+**Status**: V1 shipped (S5.0.x wave — PLAN-S5.0.3e landed 2026-04-29; outer commit pin `b493ee5`; submodule pin `2c090a4`; live-mode functional as of PLAN-S5.0.3.1 / outer commit `27c0fcc`, 2026-04-30)
 **Source specs**: [PLAN-S5.0.3 §3](../../../07%20-%20Status%20Reports/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#3-reorg-shape) (package layout), [PLAN-S5.0.3 §6](../../../07%20-%20Status%20Reports/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#6-cli-surface) (executor CLI), [PLAN-S5.0.3 §9](../../../07%20-%20Status%20Reports/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#9-interface-contracts-locked-before-dispatch) (driver interface contracts), [RFC-008 §"Transport boundary"](../../../05%20-%20Standards/rfcs/RFC-008-pty-transport.md)
 **Related atoms**: [agent](agent.md), [transport-mode](transport-mode.md), [discipline/wire-as-public-api](../discipline/wire-as-public-api.md), [contracts/kernel-client](../contracts/kernel-client.md), [protocols/wire-handshake](../protocols/wire-handshake.md)
 

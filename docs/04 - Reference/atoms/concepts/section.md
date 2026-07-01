@@ -1,6 +1,6 @@
 # Section
 
-**Status**: V1 partial-ship — schema + create/rename/delete/move_cells operations shipped via BSP-007 overlay applier (submodule `3a430cb`); status state-machine (`set_section_status`, K95 transitions, AgentSupervisor auto-flip) + extension renderer queued as PLAN-S5.5 Phase 1b
+**Status**: V1 shipped — full [PLAN-S5.5-sections.md](../../../07%20-%20Status%20Reports/PLAN-S5.5-sections.md) feature-complete 2026-05-19. Schema + create/rename/delete/move_cells + status state-machine (`set_section_status`, K95 transitions, AgentSupervisor auto-flip) all shipped via BSP-007 overlay applier (submodule `3a430cb`); dual-rep invariant; extension renderer with section-header decoration + Command Palette actions; Phase 5 native markdown-fold collapse (`8251a5a`) so sections behave like Jupyter cell groups without a custom panel.
 **Source specs**: [BSP-002 §13.1](../../../03%20-%20Blueprint/BSP-002-conversation-graph.md#131-section-as-overlay-graph-concept), [KB-notebook-target.md §6](../../../03%20-%20Blueprint/KB-notebook-target.md#6-sections-and-zones), [KB-notebook-target.md §0.1](../../../03%20-%20Blueprint/KB-notebook-target.md#01-naming-reconciliation) (the zone→section rename)
 **Related atoms**: [cell](cell.md), [zone](zone.md), [overlay-commit](overlay-commit.md), [context-manifest](context-manifest.md)
 
