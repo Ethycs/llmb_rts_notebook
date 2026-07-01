@@ -20,7 +20,7 @@ substrate `kernel/` docs). See [Layout](#layout) for the map.
 
 **For "what does this thing do today?":**
 1. [`README.md`](../README.md) at repo root — Status section + slice
-   ladder. **V1 UX feature-complete 2026-05-19; V2 lane opened 2026-05-20** (branch-switching UX + output-kind lens shipped).
+   ladder. **V1 SHA-ready 2026-06-30 — all 14 PLAN-v1-roadmap §5 rows ✅**. V1 UX feature-complete 2026-05-19; substrate gaps closed + atom drift resolved 2026-06-30; V2 lane opened 2026-05-20 (branch-switching UX + output-kind lens shipped).
 2. [`notebook/BSP-005-cell-roadmap.md §6.5`](03%20-%20Blueprint/BSP-005-cell-roadmap.md#65-slice-ladder-totals-after-issue-2--and-observed-velocity-2026-05-02-update) — V1 ladder shipped/deferred status. [§6.6](03%20-%20Blueprint/BSP-005-cell-roadmap.md#66-v2-lane-post-v1-feature-complete) enumerates the V2 lane.
 3. [`notebook/PLAN-v1-roadmap.md §5`](07%20-%20Status%20Reports/PLAN-v1-roadmap.md) — the 14-row V1 ship-ready checklist; rows 1-11 (operator-visible UX) are feature-complete.
 4. [`atoms/README.md`](04%20-%20Reference/atoms/README.md) — the canonical definitions

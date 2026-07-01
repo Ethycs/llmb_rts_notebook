@@ -100,4 +100,4 @@ No wire changes. Pure read-side from `metadata.rts.zone.event_log[]` per [PLAN-S
 - [x] Branch row description includes source agent id + short turn id + case tag.
 - [x] Branch row click reveals the branch's first cell.
 - [x] agent.md V2+ section updated.
-- [ ] BSP-005 changelog (V2 lane) reflects the slice — TODO when V2 lane is added.
+- [x] BSP-005 changelog (V2 lane) reflects the slice — [BSP-005 §6.6](../03%20-%20Blueprint/BSP-005-cell-roadmap.md#66-v2-lane-post-v1-feature-complete) V2 lane section added 2026-05-30 with the branch-switching row (`667dd68`).

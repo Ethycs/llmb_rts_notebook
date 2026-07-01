@@ -17,13 +17,16 @@ holding behavioral and wire-format specs, and
 for the embeddable LLMKernel (capture invariants, identity model,
 deployment surfaces, per-slice implementation plans).
 
-## Status — V1 UX feature-complete; V2 lane opened (2026-05-30)
+## Status — V1 SHA-ready (2026-06-30); all 14 ship-ready rows ✅
 
-V1 UX is feature-complete on the public VS Code extension API. All BSP-005 ladder slices either shipped or are formally deferred. Two V2 slices have landed; the rest are queued or genuinely blocked on VS Code API exposure.
+V1 is SHA-ready pending operator sign-off. Every row of the [PLAN-v1-roadmap §5 ship-ready checklist](docs/07%20-%20Status%20Reports/PLAN-v1-roadmap.md) is ✅ green as of 2026-06-30. Rows 1-11 (operator-visible UX) shipped 2026-05-02 → 2026-05-19; the last two rows closed this cycle:
 
-**V1 UX feature-complete:** S5.5 sections (full collapse via native markdown fold), S7 sidebar trees (zones / agents / activity), S10 reduced V1 (streaming/artifact badges + bulk-collapse / find wrappers), S10 follow-on (sidebar Find-in-cells WebviewView with the full FSP-002 §2.1 search UX). S5.0.6 (nvim driver) deferred to whenever the nvim operator's dogfooding pressure justifies the per-cell affordance — the headless `llmnb execute --connect` CLI (`df95ad4`) covers file-level operation for nvim users in the interim.
+- **Row 13 (substrate gaps)** — all 9 gaps closed 2026-06-30 via [PLAN-substrate-gap-closure](docs/07%20-%20Status%20Reports/PLAN-substrate-gap-closure.md). Kernel test suite: **908/908 green.**
+- **Row 14 (atom drift)** — full [PLAN-atom-hygiene](docs/07%20-%20Status%20Reports/PLAN-atom-hygiene.md) sweep landed 2026-06-30. All 3 verification checks (orphan / drift / Status-line consistency) return empty.
 
-**V2 lane opened:** branch-switching UX (sidebar Branches subnode under each agent that has forked descendants — lineage recovered from `metadata.rts.zone.event_log[*]` `fork_agent` envelopes) and output-kind lens UI (5th sidebar view grouping every tagged span across the active notebook). Both are pure read-side — no kernel changes, no wire changes.
+**Operator-visible V1 UX (feature-complete since 2026-05-19):** S5.5 sections (full collapse via native markdown fold), S7 sidebar trees (zones / agents / activity), S10 reduced V1 (streaming/artifact badges + bulk-collapse / find wrappers), S10 follow-on (sidebar Find-in-cells WebviewView with the full FSP-002 §2.1 search UX). S5.0.6 (nvim driver) deferred to whenever the nvim operator's dogfooding pressure justifies the per-cell affordance — the headless `llmnb execute --connect` CLI (`df95ad4`) covers file-level operation for nvim users in the interim.
+
+**V2 lane opened 2026-05-20:** branch-switching UX (sidebar Branches subnode under each agent that has forked descendants — lineage recovered from `metadata.rts.zone.event_log[*]` `fork_agent` envelopes) and output-kind lens UI (5th sidebar view grouping every tagged span across the active notebook). Both are pure read-side — no kernel changes, no wire changes. See [docs/06 - Roadmaps/ROADMAP.md](docs/06%20-%20Roadmaps/ROADMAP.md) for the V2 short/long-horizon queue.
 
 **Genuinely blocked on VS Code API:** per-cell gutter color decoration (`notebookCellDecoration` is not even a Microsoft API proposal, per a probe against the vendored `vscode-jupyter`'s `enabledApiProposals`). The literal "floating search bar above the editor" is the same ceiling — no overlay-above-editor API. Both surface UX is now in the sidebar instead.
 
