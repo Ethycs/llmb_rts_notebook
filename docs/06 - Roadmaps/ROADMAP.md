@@ -1,6 +1,6 @@
 # Roadmap
 
-**Status:** V1 SHA-ready (2026-06-30) — all 14 rows of the [PLAN-v1-roadmap §5](../07%20-%20Status%20Reports/PLAN-v1-roadmap.md) ship-ready checklist are ✅. V1 UX feature-complete 2026-05-19; V2 lane open with two slices shipped (2026-05-20 + 2026-05-29); substrate gap closure + atom hygiene sweeps landed 2026-06-30.
+**Status:** **V1 shipped — `v1.0.0` tagged 2026-06-30.** All 14 rows of the [PLAN-v1-roadmap §5](../07%20-%20Status%20Reports/PLAN-v1-roadmap.md) ship-ready checklist ✅. Historical milestones: V1 UX feature-complete 2026-05-19; V2 lane open with two slices shipped (2026-05-20 + 2026-05-29); substrate gap closure + atom hygiene sweeps landed 2026-06-30. V2 campaign continues in §2.
 **Owners:** project lead + future you.
 **Cadence:** updated when a campaign closes, when a ceiling is discovered, or when an honest deferral changes the queue.
 
@@ -16,7 +16,7 @@ The forward-looking strategic bets live here.
 
 ## 1. Where we are (2026-06-30)
 
-The V1 operator-supervision UX ships on the public VS Code extension API surface. Every BSP-005 ladder slice from S0.5 through S10 either landed or is formally deferred with a documented reason. **Row 13 (substrate gaps)** and **Row 14 (atom drift)** of the V1 ship-ready checklist both closed 2026-06-30 — the kernel test suite is 908/908 green and all three atom-hygiene verification checks return empty. **V1 is SHA-ready pending operator sign-off.**
+**V1 shipped — `v1.0.0` tagged 2026-06-30.** The operator-supervision UX ships on the public VS Code extension API surface. Every BSP-005 ladder slice from S0.5 through S10 either landed or is formally deferred with a documented reason. Row 13 (substrate gaps) and Row 14 (atom drift) of the V1 ship-ready checklist both closed 2026-06-30 — the kernel test suite is 908/908 green and all three atom-hygiene verification checks return empty.
 
 The repo's headline shape:
 

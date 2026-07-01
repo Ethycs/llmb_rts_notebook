@@ -17,9 +17,9 @@ holding behavioral and wire-format specs, and
 for the embeddable LLMKernel (capture invariants, identity model,
 deployment surfaces, per-slice implementation plans).
 
-## Status — V1 SHA-ready (2026-06-30); all 14 ship-ready rows ✅
+## Status — **V1 shipped (v1.0.0, 2026-06-30)**; all 14 ship-ready rows ✅
 
-V1 is SHA-ready pending operator sign-off. Every row of the [PLAN-v1-roadmap §5 ship-ready checklist](docs/07%20-%20Status%20Reports/PLAN-v1-roadmap.md) is ✅ green as of 2026-06-30. Rows 1-11 (operator-visible UX) shipped 2026-05-02 → 2026-05-19; the last two rows closed this cycle:
+V1 is shipped — tagged `v1.0.0` on 2026-06-30. Every row of the [PLAN-v1-roadmap §5 ship-ready checklist](docs/07%20-%20Status%20Reports/PLAN-v1-roadmap.md) is ✅ green. Rows 1-11 (operator-visible UX) shipped 2026-05-02 → 2026-05-19; the last two rows closed this cycle:
 
 - **Row 13 (substrate gaps)** — all 9 gaps closed 2026-06-30 via [PLAN-substrate-gap-closure](docs/07%20-%20Status%20Reports/PLAN-substrate-gap-closure.md). Kernel test suite: **908/908 green.**
 - **Row 14 (atom drift)** — full [PLAN-atom-hygiene](docs/07%20-%20Status%20Reports/PLAN-atom-hygiene.md) sweep landed 2026-06-30. All 3 verification checks (orphan / drift / Status-line consistency) return empty.

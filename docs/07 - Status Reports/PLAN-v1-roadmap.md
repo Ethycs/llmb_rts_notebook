@@ -1,6 +1,6 @@
 # Plan: V1 roadmap conductor
 
-**Status**: V1 UX feature-complete 2026-05-19 (S5.0.6 nvim driver formally deferred 2026-05-19; V2 lane opened 2026-05-20). The conductor stays open as a forward reference until the V1 release SHA + V2 milestone are stamped; per-slice DoDs roll up as the boxes below.
+**Status**: shipped 2026-06-30 — **v1.0.0 tag stamped**. All 14 §5 ship-ready rows ✅; kernel 908/908 green; atom-hygiene verification checks empty. Historical milestones: V1 UX feature-complete 2026-05-19 (S5.0.6 nvim driver formally deferred 2026-05-19); V2 lane opened 2026-05-20; substrate gaps closed + atom drift resolved 2026-06-30. V2 campaign continues per [BSP-005 §6.6](../03%20-%20Blueprint/BSP-005-cell-roadmap.md#66-v2-lane-post-v1-feature-complete) and [ROADMAP.md](../06%20-%20Roadmaps/ROADMAP.md).
 **Audience**: an LLM (or operator) opening this folder cold and trying to find the right next-slice plan to dispatch. Self-contained.
 **Goal**: name the three V1 tracks (cell roadmap, kernel gap closure, atom hygiene), point at the BSP-005 slice ladder for cell-track sequencing, and enumerate the eleven sibling PLAN docs that brief individual workstreams.
 **Time budget**: this doc is the conductor; budgets live on the children. Aggregate ~17–18 working days sequential, ~10 days with three parallel agents (per [BSP-005 §6.5](../03%20-%20Blueprint/BSP-005-cell-roadmap.md#65-slice-ladder-totals-after-issue-2)).
