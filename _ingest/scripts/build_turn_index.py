@@ -1,6 +1,6 @@
 """Stage 0: Build turn index for the chat export.
 
-Reads chat-export-2026-04-26T04-22-39.md from the repo root and emits:
+Reads _ingest/chat-export-2026-04-26T04-22-39.md and emits:
   - _ingest/manifests/source.sha256
   - _ingest/manifests/turns.json
 
@@ -18,7 +18,7 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SOURCE = REPO_ROOT / "chat-export-2026-04-26T04-22-39.md"
+SOURCE = REPO_ROOT / "_ingest" / "chat-export-2026-04-26T04-22-39.md"
 MANIFEST_DIR = REPO_ROOT / "_ingest" / "manifests"
 
 DELIM_RE = re.compile(r"^---\s*$", re.MULTILINE)

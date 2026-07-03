@@ -129,8 +129,8 @@ or `SCOPE-CUT` (V1 simplification).
 
 ## Source
 
-- The original conversation is preserved verbatim at the repo
-  root as `chat-export-2026-04-26T04-22-39.md`.
+- The original conversation is preserved verbatim at
+  [`_ingest/chat-export-2026-04-26T04-22-39.md`](../../../_ingest/chat-export-2026-04-26T04-22-39.md).
 - Per-turn slices with frontmatter live under
   [`_ingest/raw/`](../../../_ingest/raw/).
 - The decomposition manifests (`turns.json`, `phases.json`,

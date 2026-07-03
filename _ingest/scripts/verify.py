@@ -23,7 +23,7 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-SOURCE = REPO / "chat-export-2026-04-26T04-22-39.md"
+SOURCE = REPO / "_ingest" / "chat-export-2026-04-26T04-22-39.md"
 M = REPO / "_ingest" / "manifests"
 RAW = REPO / "_ingest" / "raw"
 DEV = REPO / "docs" / "dev-guide"

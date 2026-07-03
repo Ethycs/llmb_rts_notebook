@@ -4,7 +4,7 @@ Reads:
   _ingest/manifests/turns.json      (sub-turns + merged-turn map)
   _ingest/manifests/phases.json     (canonical phase manifest)
   _ingest/manifests/decisions.json  (canonical decision manifest)
-  chat-export-2026-04-26T04-22-39.md (source-of-truth, never mutated)
+  _ingest/chat-export-2026-04-26T04-22-39.md (source-of-truth, never mutated)
 
 Writes:
   _ingest/raw/phase-NN-<slug>/00-overview.md
@@ -20,7 +20,7 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SOURCE = REPO_ROOT / "chat-export-2026-04-26T04-22-39.md"
+SOURCE = REPO_ROOT / "_ingest" / "chat-export-2026-04-26T04-22-39.md"
 MANIFEST_DIR = REPO_ROOT / "_ingest" / "manifests"
 RAW_DIR = REPO_ROOT / "_ingest" / "raw"
 

@@ -148,7 +148,7 @@ atom-layer decisions pin the implementation.
 ## How this was built
 
 The conversation was 1.1 MB of raw markdown
-([`chat-export-2026-04-26T04-22-39.md`](../chat-export-2026-04-26T04-22-39.md)). The pipeline that
+([`_ingest/chat-export-2026-04-26T04-22-39.md`](../_ingest/chat-export-2026-04-26T04-22-39.md)). The pipeline that
 produced the original dev-guide + ADRs is described in
 [`_ingest/ARCHITECTURE.md`](../_ingest/ARCHITECTURE.md). The original
 plan is preserved in [`_ingest/PROCEDURE.md`](../_ingest/PROCEDURE.md).

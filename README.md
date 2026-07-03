@@ -7,8 +7,8 @@ and uses bidirectional MCP as the structured communication channel
 between operator and agent.
 
 The repo started life as a 1.1 MB design conversation
-(`chat-export-2026-04-26T04-22-39.md`) — that conversation is the
-historical source of truth for the original architectural choices.
+([`_ingest/chat-export-2026-04-26T04-22-39.md`](_ingest/chat-export-2026-04-26T04-22-39.md))
+— that conversation is the historical source of truth for the original architectural choices.
 The current normative reference is the doc tree under [`docs/`](docs/),
 with [`docs/atoms/`](docs/04%20-%20Reference/atoms/) holding canonical definitions,
 [`docs/notebook/`](docs/03%20-%20Blueprint/) + [`docs/rfcs/`](docs/05%20-%20Standards/rfcs/)
@@ -209,8 +209,8 @@ llmb_rts_notebook/
 ├── CLAUDE.md                            ← Claude Code project guidance
 ├── pixi_guide.md                        ← Pixi CLI quick reference
 ├── pyproject.toml / pixi.lock           ← Pixi workspace
-├── chat-export-2026-04-26T04-22-39.md   ← historical source of truth
 ├── Engineering_Guide.md                 ← project-level engineering practices
+├── Testing.md                           ← test architecture reference
 ├── docs/                                ← normative documentation
 │   ├── README.md
 │   ├── atoms/                           ← canonical definitions (~91 atoms, 7 subdirs)
@@ -219,6 +219,9 @@ llmb_rts_notebook/
 │   ├── decisions/                       ← 16 original design ADRs (MADR-lite)
 │   └── dev-guide/                       ← 8 chapters from the design conversation
 ├── extension/                           ← VS Code extension (subtractive fork output)
+├── llm_client/                          ← Python CLI + executor + transport (`llmnb`)
+├── tests/                               ← Python driver/CLI test suite
+├── tools/                               ← one-off maintenance scripts
 ├── vendor/
 │   ├── LLMKernel/                       ← submodule, our kernel fork
 │   └── vscode-jupyter/                  ← submodule, microsoft/vscode-jupyter (read-only baseline)
