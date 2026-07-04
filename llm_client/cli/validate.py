@@ -14,7 +14,7 @@ import json
 import sys
 from pathlib import Path
 
-from llm_kernel.cell_text import (  # type: ignore[import-not-found]
+from llm_kernel.text.cell_text import (  # type: ignore[import-not-found]
     CellParseError,
     parse_cell,
     split_at_breaks,

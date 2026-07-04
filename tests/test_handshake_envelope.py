@@ -1,7 +1,7 @@
 """tests/test_handshake_envelope.py — handshake envelope validation (S5.0.3d).
 
 Exercises the kernel-side handshake validator in
-``llm_kernel.serve_mode._validate_handshake`` directly (no socket plumbing).
+``llm_kernel.transports.serve_mode._validate_handshake`` directly (no socket plumbing).
 This keeps the unit tests fast; full TCP boot is in
 ``test_tcp_transport.py``.
 
@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import pytest
 
-from llm_kernel.serve_mode import _validate_handshake
+from llm_kernel.transports.serve_mode import _validate_handshake
 from llm_kernel.wire import WIRE_MAJOR, WIRE_VERSION
 
 

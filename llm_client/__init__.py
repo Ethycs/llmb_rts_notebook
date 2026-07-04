@@ -10,7 +10,7 @@ Public API:
 Lint contract (PLAN-S5.0.3 §3.3 + S5.0.3c amendment):
     llm_client/** may only import the kernel-public surface:
         * llm_kernel.wire     — envelope schemas, tool catalog, version constants
-        * llm_kernel.cell_text — pure parser (S5.0.3c amendment; see header
+        * llm_kernel.text.cell_text — pure parser (S5.0.3c amendment; see header
           of llm_client/notebook.py for justification)
     All other llm_kernel imports are forbidden and CI-enforced by
     tests/test_lint_boundary.py.

@@ -178,10 +178,10 @@ def boot_minimal_kernel(
     # NOTE: these imports violate the lint boundary; boot.py is the
     # designated crossing point. They are isolated here so that _no other_
     # llm_client module needs to reach into llm_kernel internals.
-    from llm_kernel import litellm_proxy as _proxy_mod
-    from llm_kernel import anthropic_passthrough as _pt_mod
-    from llm_kernel.custom_messages import CustomMessageDispatcher
-    from llm_kernel.run_tracker import RunTracker
+    from llm_kernel.providers import litellm_proxy as _proxy_mod
+    from llm_kernel.providers import anthropic_passthrough as _pt_mod
+    from llm_kernel.capture.custom_messages import CustomMessageDispatcher
+    from llm_kernel.capture.run_tracker import RunTracker
 
     if transport == "tcp":
         # Out-of-process external-driver path: boot_minimal_kernel

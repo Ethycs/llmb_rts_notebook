@@ -24,7 +24,7 @@ Three execution modes per PLAN §6.2:
     pass unattended=True to acknowledge that all approvals will be
     auto-rejected.
 
-Lint contract: only llm_kernel.wire and llm_kernel.cell_text imports.
+Lint contract: only llm_kernel.wire and llm_kernel.text.cell_text imports.
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ from pathlib import Path
 from typing import Any, Iterable, Literal, Optional
 
 from llm_kernel.wire import WIRE_VERSION  # noqa: F401  (re-exported in result)
-from llm_kernel.cell_text import parse_cell  # PLAN-S5.5 Phase 4 — @@section
+from llm_kernel.text.cell_text import parse_cell  # PLAN-S5.5 Phase 4 — @@section
 
 from llm_client.notebook import (
     detect_format,
