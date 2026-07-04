@@ -1,7 +1,7 @@
 # Discipline: Magic injection defense
 
 **Status**: V1 shipped (PLAN-S5.0.1a/b/c; submodule pins `360b658` foundation, `94d1c39` parser+auth, `dbad5ee` injection-acceptance, `ac25656` precondition gates; outer pin `5aee2dc`; submodule HEAD `264b69c`)
-**Source specs**: [PLAN-S5.0.1 §1–§3.4, §3.10, §3.11](../../../07%20-%20Status%20Reports/PLAN-S5.0.1-cell-magic-injection-defense.md), [PLAN-S5.0 §3](../../../07%20-%20Status%20Reports/PLAN-S5.0-cell-magic-vocabulary.md) (the vocabulary defended)
+**Source specs**: [PLAN-S5.0.1 §1–§3.4, §3.10, §3.11](../../../06%20-%20Roadmaps/PLAN-S5.0.1-cell-magic-injection-defense.md), [PLAN-S5.0 §3](../../../06%20-%20Roadmaps/PLAN-S5.0-cell-magic-vocabulary.md) (the vocabulary defended)
 **Related atoms**: [discipline/certified-magic-emitter](certified-magic-emitter.md) (the structural dual), [discipline/text-as-canonical](text-as-canonical.md), [discipline/zachtronics](zachtronics.md), [discipline/cell-manager-owns-structure](cell-manager-owns-structure.md), [concepts/magic](../concepts/magic.md), [concepts/magic-code-generator](../concepts/magic-code-generator.md), [operations/parse-cell](../operations/parse-cell.md)
 
 ## The discipline
@@ -115,4 +115,4 @@ All seven registered in `vendor/LLMKernel/llm_kernel/wire/tools.py` `K_CLASS_REG
 - [concepts/magic](../concepts/magic.md) — the vocabulary defended
 - [discipline/cell-manager-owns-structure](cell-manager-owns-structure.md) — clause 2 of certified emission; the structural-write surface generators use
 - [operations/parse-cell](../operations/parse-cell.md) — the privileged dispatch path that motivates the entire defense
-- [PLAN-S5.0.1](../../../07%20-%20Status%20Reports/PLAN-S5.0.1-cell-magic-injection-defense.md) — full specification (§3.1 HMAC primitive, §3.2 contamination detector, §3.3 sanitizer, §3.4 strip, §3.10 precondition gates, §3.11 verbatim acceptance)
+- [PLAN-S5.0.1](../../../06%20-%20Roadmaps/PLAN-S5.0.1-cell-magic-injection-defense.md) — full specification (§3.1 HMAC primitive, §3.2 contamination detector, §3.3 sanitizer, §3.4 strip, §3.10 precondition gates, §3.11 verbatim acceptance)

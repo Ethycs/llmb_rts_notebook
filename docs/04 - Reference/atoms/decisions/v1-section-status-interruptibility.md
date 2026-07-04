@@ -1,7 +1,7 @@
 # Decision: section.status is the V1 interruptibility lock (supersedes D1)
 
 **Status**: decision (V1 lock-in, 2026-04-29; supersedes PLAN §4 row D1)
-**Source specs**: [PLAN-atom-refactor.md §4 row D1](../../../07%20-%20Status%20Reports/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms) (the row this supersedes), [BSP-002 §13.1](../../../03%20-%20Blueprint/BSP-002-conversation-graph.md#131-section-as-overlay-graph-concept), [KB-notebook-target.md §22.7](../../../03%20-%20Blueprint/KB-notebook-target.md#227-conflict-resolution) (cell-level execution gate this aggregates from), [KB-notebook-target.md §22.1](../../../03%20-%20Blueprint/KB-notebook-target.md#221-splitmerge-invariants) (provenance boundaries)
+**Source specs**: [PLAN-atom-refactor.md §4 row D1](../../../06%20-%20Roadmaps/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms) (the row this supersedes), [BSP-002 §13.1](../../../03%20-%20Blueprint/BSP-002-conversation-graph.md#131-section-as-overlay-graph-concept), [KB-notebook-target.md §22.7](../../../03%20-%20Blueprint/KB-notebook-target.md#227-conflict-resolution) (cell-level execution gate this aggregates from), [KB-notebook-target.md §22.1](../../../03%20-%20Blueprint/KB-notebook-target.md#221-splitmerge-invariants) (provenance boundaries)
 **Related atoms**: [section](../concepts/section.md), [operations/set-section-status](../operations/set-section-status.md), [decisions/v1-flat-sections](v1-flat-sections.md)
 
 ## The decision
@@ -17,7 +17,7 @@ This **supersedes PLAN §4 row D1** ("Drop the enum in V1; ship `collapsed: bool
 | `open` | Default. Fully editable. | Nothing blocked. |
 | `in_progress` | A run is active inside this section. | All structural ops on member cells: [split-cell](../operations/split-cell.md), [merge-cells](../operations/merge-cells.md), [move-cell](../operations/move-cell.md), [promote-span](../operations/promote-span.md), [delete-section](../operations/delete-section.md). Aggregates the cell-level rules from [KB-target §22.7](../../../03%20-%20Blueprint/KB-notebook-target.md#227-conflict-resolution) one level up. |
 | `complete` | Operator-marked done. Editable but with confirmation. | Soft block — overlay commits prompt "this section is marked complete, proceed?" The kernel records an `operator_confirmed: true` flag on the commit. |
-| `frozen` | Hard lock. | All structural ops on member cells. Only [set-section-status](../operations/set-section-status.md) (transition to `open`) lifts it. Pairs naturally with the post-checkpoint cell freeze ([CK2 from PLAN §4](../../../07%20-%20Status%20Reports/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms)). |
+| `frozen` | Hard lock. | All structural ops on member cells. Only [set-section-status](../operations/set-section-status.md) (transition to `open`) lifts it. Pairs naturally with the post-checkpoint cell freeze ([CK2 from PLAN §4](../../../06%20-%20Roadmaps/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms)). |
 
 ## Why interruptibility (not workflow labels)
 
@@ -27,7 +27,7 @@ The interruptibility reading is different: `status` is a **boundary condition** 
 
 - [KB-target §22.7](../../../03%20-%20Blueprint/KB-notebook-target.md#227-conflict-resolution) already specifies cell-level "no merge during execution / no split during execution / no checkpointing a running cell." `status: "in_progress"` is the section-scoped aggregate of that rule — when a run begins inside section S, the section flips to `in_progress` and the rule auto-extends to every cell in S without per-cell bookkeeping.
 - [KB-target §22.1](../../../03%20-%20Blueprint/KB-notebook-target.md#221-splitmerge-invariants) already lists checkpoints as unmergeable boundaries. `status: "frozen"` extends that to operator-declared boundaries: a section the operator has signed off on can't be quietly restructured later.
-- [decision CK2 from PLAN §4](../../../07%20-%20Status%20Reports/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms) requires post-checkpoint cells to be overlay-frozen; setting the enclosing section's status to `frozen` is the natural mechanism.
+- [decision CK2 from PLAN §4](../../../06%20-%20Roadmaps/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms) requires post-checkpoint cells to be overlay-frozen; setting the enclosing section's status to `frozen` is the natural mechanism.
 
 ## Operational consequences
 

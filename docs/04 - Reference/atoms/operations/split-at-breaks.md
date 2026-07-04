@@ -1,7 +1,7 @@
 # Operation: split-at-breaks
 
 **Status**: V1 shipped (`vendor/LLMKernel/llm_kernel/cell_text.py:split_at_breaks`, S5.0 commit `336a6c7` / submodule `e6620db`)
-**Source specs**: [BSP-005 §S5.0](../../../03%20-%20Blueprint/BSP-005-cell-roadmap.md), [PLAN-S5.0-cell-magic-vocabulary.md §3.1](../../../07%20-%20Status%20Reports/PLAN-S5.0-cell-magic-vocabulary.md#31-splitter--vendorllmkernelllm_kernelcell_textpy-new-30-loc), [PLAN-S5.0-cell-magic-vocabulary.md §3.8](../../../07%20-%20Status%20Reports/PLAN-S5.0-cell-magic-vocabulary.md#38-cell-manager-text-operations--vendorllmkernelllm_kernelcell_managerpy-new-80-loc)
+**Source specs**: [BSP-005 §S5.0](../../../03%20-%20Blueprint/BSP-005-cell-roadmap.md), [PLAN-S5.0-cell-magic-vocabulary.md §3.1](../../../06%20-%20Roadmaps/PLAN-S5.0-cell-magic-vocabulary.md#31-splitter--vendorllmkernelllm_kernelcell_textpy-new-30-loc), [PLAN-S5.0-cell-magic-vocabulary.md §3.8](../../../06%20-%20Roadmaps/PLAN-S5.0-cell-magic-vocabulary.md#38-cell-manager-text-operations--vendorllmkernelllm_kernelcell_managerpy-new-80-loc)
 **Related atoms**: [operations/parse-cell](parse-cell.md), [concepts/magic](../concepts/magic.md), [discipline/cell-manager-owns-structure](../discipline/cell-manager-owns-structure.md), [discipline/text-as-canonical](../discipline/text-as-canonical.md)
 
 ## Definition

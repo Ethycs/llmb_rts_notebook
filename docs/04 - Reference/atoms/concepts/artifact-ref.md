@@ -33,7 +33,7 @@ An **ArtifactRef** is the V1 shape of a content-addressed reference to a large o
 - **Convertibility-safe.** Per [BSP-002 §8.1](../../../03%20-%20Blueprint/BSP-002-conversation-graph.md#81-convertibility-invariant), the JSON layout flattens to a directory: `blobs/<hash>/{body, meta.json, artifact.json}`. `body` lives in its own file so directory diffs don't re-emit large bodies.
 - **Five top-level fields are normative.** `id`, `kind`, `size`, `content_hash`, `body` are the V1 ArtifactRef contract. `meta` is preserved unchanged from Issue 1 with its existing children.
 - **Cell-side references stay stable across V1→V2.** A cell pointing at `sha256-abc123...` resolves to the same artifact whether the body is inline (V1) or externalized (V2). Only the body-loading path changes.
-- **Mirrored in [RFC-005](../../../05%20-%20Standards/rfcs/RFC-005-llmnb-file-format.md).** Op-3 of [the atom-refactor plan](../../../07%20-%20Status%20Reports/PLAN-atom-refactor.md#7-operator-follow-ups-landing-in-this-refactor) calls for RFC-005 to link to this atom; the wire shape and storage shape stay aligned.
+- **Mirrored in [RFC-005](../../../05%20-%20Standards/rfcs/RFC-005-llmnb-file-format.md).** Op-3 of [the atom-refactor plan](../../../06%20-%20Roadmaps/PLAN-atom-refactor.md#7-operator-follow-ups-landing-in-this-refactor) calls for RFC-005 to link to this atom; the wire shape and storage shape stay aligned.
 
 ## V1 vs V2+
 

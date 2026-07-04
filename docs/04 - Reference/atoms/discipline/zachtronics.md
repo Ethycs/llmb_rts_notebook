@@ -1,7 +1,7 @@
 # Discipline: Zachtronics — tiles not assembly; visible order
 
 **Status**: discipline (V1 invariant + design ethos)
-**Source specs**: [KB-notebook-target.md §13](../../../03%20-%20Blueprint/KB-notebook-target.md#13-cell-discipline-zachtronics-not-general-asm) (cell discipline), [KB-notebook-target.md §13.5](../../../03%20-%20Blueprint/KB-notebook-target.md#135-no-super-complex-configuration-in-v1) (no super-complex config in V1), [KB-notebook-target.md §17](../../../03%20-%20Blueprint/KB-notebook-target.md#17-source-layer-and-performing-layer) (source/performing layers), [PLAN-atom-refactor.md §1](../../../07%20-%20Status%20Reports/PLAN-atom-refactor.md#1-why-this-work-exists) (project ethos)
+**Source specs**: [KB-notebook-target.md §13](../../../03%20-%20Blueprint/KB-notebook-target.md#13-cell-discipline-zachtronics-not-general-asm) (cell discipline), [KB-notebook-target.md §13.5](../../../03%20-%20Blueprint/KB-notebook-target.md#135-no-super-complex-configuration-in-v1) (no super-complex config in V1), [KB-notebook-target.md §17](../../../03%20-%20Blueprint/KB-notebook-target.md#17-source-layer-and-performing-layer) (source/performing layers), [PLAN-atom-refactor.md §1](../../../06%20-%20Roadmaps/PLAN-atom-refactor.md#1-why-this-work-exists) (project ethos)
 **Related atoms**: [discipline/scratch-beats-config](scratch-beats-config.md), [discipline/one-cell-one-role](one-cell-one-role.md), [discipline/save-is-git-style](save-is-git-style.md), [cell-kinds](../concepts/cell-kinds.md)
 
 ## The rule

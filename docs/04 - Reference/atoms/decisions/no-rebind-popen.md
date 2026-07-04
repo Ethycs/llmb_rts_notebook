@@ -1,7 +1,7 @@
 # Decision: respawn_from_config does not rebind to live PIDs
 
 **Status**: decision (V1 lock-in, 2026-04-28)
-**Source specs**: [BSP-002 §4 (idle exit + resume)](../../../03%20-%20Blueprint/BSP-002-conversation-graph.md#43-idle-exit), [BSP-002 §2.2 (agent ref schema)](../../../03%20-%20Blueprint/BSP-002-conversation-graph.md#22-agent), [PLAN-atom-refactor.md §4](../../../07%20-%20Status%20Reports/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms)
+**Source specs**: [BSP-002 §4 (idle exit + resume)](../../../03%20-%20Blueprint/BSP-002-conversation-graph.md#43-idle-exit), [BSP-002 §2.2 (agent ref schema)](../../../03%20-%20Blueprint/BSP-002-conversation-graph.md#22-agent), [PLAN-atom-refactor.md §4](../../../06%20-%20Roadmaps/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms)
 **Related atoms**: [concepts/agent](../concepts/agent.md), [operations/spawn-agent](../operations/spawn-agent.md), [operations/continue-turn](../operations/continue-turn.md)
 
 ## The decision
@@ -56,4 +56,4 @@ PIDs are volatile across kernel restarts. Sessions are durable.
 - [BSP-002 §4](../../../03%20-%20Blueprint/BSP-002-conversation-graph.md#4-persistent-agent-lifecycle) — idle-exit + resume mechanics.
 - [BSP-002 §7](../../../03%20-%20Blueprint/BSP-002-conversation-graph.md#7-failure-modes-k-class-numbering-continued-from-bsp-001-k11k13) — K23, K24 failure modes.
 - [Engineering Guide §6](../../../../Engineering_Guide.md#6-recoverable-vs-volatile-state) — recoverable vs volatile state principle.
-- [PLAN-atom-refactor.md §4](../../../07%20-%20Status%20Reports/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms) — the 24-row decision table.
+- [PLAN-atom-refactor.md §4](../../../06%20-%20Roadmaps/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms) — the 24-row decision table.

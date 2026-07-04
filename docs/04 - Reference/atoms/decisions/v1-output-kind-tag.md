@@ -1,7 +1,7 @@
 # Decision: V1 ships the output-kind tag; V2 ships lenses
 
 **Status**: decision (V1 lock-in, 2026-04-28)
-**Source specs**: [KB-notebook-target.md §0.8](../../../03%20-%20Blueprint/KB-notebook-target.md#08-typed-outputs--v1-ships-the-tag-v2-ships-lenses), [BSP-002 §13.5.2](../../../03%20-%20Blueprint/BSP-002-conversation-graph.md#1352-otlp-attribute-llmnboutputkind-kb-target-08--v1-tag-v2-lenses), [PLAN-atom-refactor.md §4](../../../07%20-%20Status%20Reports/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms)
+**Source specs**: [KB-notebook-target.md §0.8](../../../03%20-%20Blueprint/KB-notebook-target.md#08-typed-outputs--v1-ships-the-tag-v2-ships-lenses), [BSP-002 §13.5.2](../../../03%20-%20Blueprint/BSP-002-conversation-graph.md#1352-otlp-attribute-llmnboutputkind-kb-target-08--v1-tag-v2-lenses), [PLAN-atom-refactor.md §4](../../../06%20-%20Roadmaps/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms)
 **Related atoms**: [concepts/output-kind](../concepts/output-kind.md), [concepts/span](../concepts/span.md)
 
 ## The decision
@@ -68,4 +68,4 @@ V1 producers SHOULD emit it; V1 consumers MUST tolerate its absence (treat as un
 - [concepts/span](../concepts/span.md) — the OTLP span this attribute attaches to.
 - [BSP-002 §13.5.2](../../../03%20-%20Blueprint/BSP-002-conversation-graph.md#1352-otlp-attribute-llmnboutputkind-kb-target-08--v1-tag-v2-lenses) — the wire amendment.
 - [KB-target §15](../../../03%20-%20Blueprint/KB-notebook-target.md#15-typed-outputs) — the lens motivation.
-- [PLAN-atom-refactor.md §4](../../../07%20-%20Status%20Reports/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms) — the 24-row decision table.
+- [PLAN-atom-refactor.md §4](../../../06%20-%20Roadmaps/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms) — the 24-row decision table.

@@ -51,7 +51,7 @@ Jupyter ships 5 ZMQ sockets defined by a connection file:
 | Jupyter | LLMKernel |
 |---|---|
 | Client writes `connection_file.json` with 5 ports + transport + signature key | [contracts/kernel-client](../contracts/kernel-client.md) launches via PTY+socket per [RFC-008](../../../05%20-%20Standards/rfcs/RFC-008-kernel-host-integration.md); our "connection file" is the PTY pair + the data-plane socket pair |
-| HMAC signing on every message | [PLAN-S5.0.1](../../../07%20-%20Status%20Reports/PLAN-S5.0-cell-magic-vocabulary.md) HMAC for cell-magic dispatch (commit `88ffb15`); broader message HMAC is **not** in the wire today |
+| HMAC signing on every message | [PLAN-S5.0.1](../../../06%20-%20Roadmaps/PLAN-S5.0-cell-magic-vocabulary.md) HMAC for cell-magic dispatch (commit `88ffb15`); broader message HMAC is **not** in the wire today |
 | Kernel binary launched with `-f <connection_file>` | LLMKernel launched via `python -m llmkernel` per pixi env discovery ([RFC-009 §4.2](../../../05%20-%20Standards/rfcs/RFC-009-zone-control-and-config.md)) |
 
 ## What LLMKernel adds that Jupyter doesn't have

@@ -20,7 +20,7 @@ lock-in.
 The newer [`docs/atoms/decisions/`](../../04%20-%20Reference/atoms/decisions/) directory holds
 **V1/V2 implementation decisions** that surfaced during execution
 (referenced as D1-D8 / S1-S6 / M1-M3 / SD1-SD3 / CK1-CK3 / F1 in
-[`docs/notebook/PLAN-atom-refactor.md §4`](../../07%20-%20Status%20Reports/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms)). Distinct from the formal ADRs here — operational
+[`docs/notebook/PLAN-atom-refactor.md §4`](../../06%20-%20Roadmaps/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms)). Distinct from the formal ADRs here — operational
 pins, not architectural lock-ins.
 
 Don't confuse the two. New formal ADRs (DR-0017+) get added here only

@@ -1,14 +1,14 @@
 # Roadmap
 
-**Status:** **V1 shipped — `v1.0.0` tagged 2026-06-30.** All 14 rows of the [PLAN-v1-roadmap §5](../07%20-%20Status%20Reports/PLAN-v1-roadmap.md) ship-ready checklist ✅. Historical milestones: V1 UX feature-complete 2026-05-19; V2 lane open with two slices shipped (2026-05-20 + 2026-05-29); substrate gap closure + atom hygiene sweeps landed 2026-06-30. V2 campaign continues in §2.
+**Status:** **V1 shipped — `v1.0.0` tagged 2026-06-30.** All 14 rows of the [PLAN-v1-roadmap §5](PLAN-v1-roadmap.md) ship-ready checklist ✅. Historical milestones: V1 UX feature-complete 2026-05-19; V2 lane open with two slices shipped (2026-05-20 + 2026-05-29); substrate gap closure + atom hygiene sweeps landed 2026-06-30. V2 campaign continues in §2.
 **Owners:** project lead + future you.
 **Cadence:** updated when a campaign closes, when a ceiling is discovered, or when an honest deferral changes the queue.
 
 This is the strategic narrative — *where the project is going and why*. The operational analogs:
 
-- **What's done?** → [`../07 - Status Reports/PLAN-v1-roadmap.md §5`](../07%20-%20Status%20Reports/PLAN-v1-roadmap.md) — the 14-row V1 ship-ready checklist.
+- **What's done?** → [`PLAN-v1-roadmap.md §5`](PLAN-v1-roadmap.md) — the 14-row V1 ship-ready checklist.
 - **What's the next slice?** → [`../03 - Blueprint/BSP-005-cell-roadmap.md`](../03%20-%20Blueprint/BSP-005-cell-roadmap.md) — V1 slice ladder (§6.5) and V2 lane queue (§6.6).
-- **How do I implement it?** → individual `PLAN-S*.md` / `PLAN-V2-*.md` slice plans under [`../07 - Status Reports/`](../07%20-%20Status%20Reports/).
+- **How do I implement it?** → individual `PLAN-S*.md` / `PLAN-V2-*.md` slice plans in this folder, alongside `ROADMAP.md`.
 
 The forward-looking strategic bets live here.
 
@@ -90,7 +90,7 @@ What we will *not* build, so we don't have to re-justify it every session:
 
 These are queued for the next strategic check-in:
 
-1. **When does V1 stamp a release SHA?** — Rows 1-11 of [PLAN-v1-roadmap §5](../07%20-%20Status%20Reports/PLAN-v1-roadmap.md) are ✅; row 13 (substrate gaps) verification ran 2026-05-07 against [`PLAN-substrate-gap-closure §3`](../07%20-%20Status%20Reports/PLAN-substrate-gap-closure.md) — **5 of 9 closed** (G2 / G4 / G5 / G8 / G9 confirmed shipped via BSP-007 + BSP-008 + S4.1 + S5 + S3.5 commits). Remaining substrate-gap blockers before V1 SHA: **G10 (CellManager module — likely unblocked since the overlay-applier covers the 17 op kinds), G11 (RunFrame in-progress truncation at hydrate), G12 (DriftDetector API alignment, ≤2h), G13 (MCP `validate_tool_input` hardening, ≤4h)**. Row 14 (atom drift) still needs a full detector run. Once G10-G13 close and the atom drift run is clean, the V1 SHA is justified.
+1. **When does V1 stamp a release SHA?** — Rows 1-11 of [PLAN-v1-roadmap §5](PLAN-v1-roadmap.md) are ✅; row 13 (substrate gaps) verification ran 2026-05-07 against [`PLAN-substrate-gap-closure §3`](PLAN-substrate-gap-closure.md) — **5 of 9 closed** (G2 / G4 / G5 / G8 / G9 confirmed shipped via BSP-007 + BSP-008 + S4.1 + S5 + S3.5 commits). Remaining substrate-gap blockers before V1 SHA: **G10 (CellManager module — likely unblocked since the overlay-applier covers the 17 op kinds), G11 (RunFrame in-progress truncation at hydrate), G12 (DriftDetector API alignment, ≤2h), G13 (MCP `validate_tool_input` hardening, ≤4h)**. Row 14 (atom drift) still needs a full detector run. Once G10-G13 close and the atom drift run is clean, the V1 SHA is justified.
 2. **What's the multi-provider order?** — `gpt-cli` first (OpenAI API is best-documented), `gemini` second, `ollama` last (local-LLM concerns differ). Or alphabetical for deterministic pick? Author `PLAN-V2-multi-provider.md` to decide.
 3. **Should we ship a side-loaded VSIX track** alongside the main Marketplace build? Only justified if a feature ever genuinely needs proposed APIs. Not today.
 4. **Nvim driver revival** — PLAN-S5.0.6 is deferred pending nvim-operator dogfooding pressure. When does it return to the queue? Tied to the operator's actual nvim usage.

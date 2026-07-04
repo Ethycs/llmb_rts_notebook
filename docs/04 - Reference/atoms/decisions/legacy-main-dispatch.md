@@ -1,7 +1,7 @@
 # Decision: V1 ships with legacy synchronous main() kernel boot
 
 **Status**: decision (V1 lock-in, 2026-04-28)
-**Source specs**: [BSP-004 V1.x retrospective](../../../03%20-%20Blueprint/BSP-004-kernel-runtime.md), [BSP-006 §7](../../../03%20-%20Blueprint/BSP-006-embedded-asgi.md), [PLAN-atom-refactor.md §4](../../../07%20-%20Status%20Reports/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms)
+**Source specs**: [BSP-004 V1.x retrospective](../../../03%20-%20Blueprint/BSP-004-kernel-runtime.md), [BSP-006 §7](../../../03%20-%20Blueprint/BSP-006-embedded-asgi.md), [PLAN-atom-refactor.md §4](../../../06%20-%20Roadmaps/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms)
 **Related atoms**: [decisions/asgi-deferred](asgi-deferred.md), [anti-patterns/bsp-004-retrospective](../anti-patterns/bsp-004-retrospective.md), [anti-patterns/windows-fd-inheritance](../anti-patterns/windows-fd-inheritance.md)
 
 ## The decision
@@ -49,4 +49,4 @@ The `app.py` / `boot_kernel` / `shutdown_kernel` scaffolding from BSP-004 stays 
 - [anti-patterns/windows-fd-inheritance](../anti-patterns/windows-fd-inheritance.md) — the parallel fix that lands regardless of runtime path.
 - [BSP-004 V1.x retrospective](../../../03%20-%20Blueprint/BSP-004-kernel-runtime.md) — the source narrative.
 - [BSP-006 §7](../../../03%20-%20Blueprint/BSP-006-embedded-asgi.md) — "Stay with legacy main() for V1 ship."
-- [PLAN-atom-refactor.md §4](../../../07%20-%20Status%20Reports/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms) — the 24-row decision table.
+- [PLAN-atom-refactor.md §4](../../../06%20-%20Roadmaps/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms) — the 24-row decision table.

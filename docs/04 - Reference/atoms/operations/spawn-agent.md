@@ -1,7 +1,7 @@
 # Operation: spawn-agent
 
 **Status**: V1 shipped (canonical `@@spawn` cell-magic form, S5.0 commit `336a6c7` / submodule `e6620db`; legacy `/spawn` retained as column-0 alias; BSP-002 K-AS slice; resume path wired via S2 / submodule commit `7e65d9b`)
-**Source specs**: [BSP-002 §3](../../../03%20-%20Blueprint/BSP-002-conversation-graph.md#3-cell-directive-grammar) (directive grammar), [BSP-002 §4.1](../../../03%20-%20Blueprint/BSP-002-conversation-graph.md#41-spawn) (spawn lifecycle), [BSP-002 §2.2](../../../03%20-%20Blueprint/BSP-002-conversation-graph.md#22-agent) (agent ref schema), [PLAN-S5.0-cell-magic-vocabulary.md §3.3](../../../07%20-%20Status%20Reports/PLAN-S5.0-cell-magic-vocabulary.md#33-cell_magics-registry--vendorllmkernelllm_kernelmagic_registrypy-new-150-loc) (`@@spawn` registry entry), [PLAN-S5.0-cell-magic-vocabulary.md §3.9](../../../07%20-%20Status%20Reports/PLAN-S5.0-cell-magic-vocabulary.md#39-legacy-compat--same-parser) (legacy alias)
+**Source specs**: [BSP-002 §3](../../../03%20-%20Blueprint/BSP-002-conversation-graph.md#3-cell-directive-grammar) (directive grammar), [BSP-002 §4.1](../../../03%20-%20Blueprint/BSP-002-conversation-graph.md#41-spawn) (spawn lifecycle), [BSP-002 §2.2](../../../03%20-%20Blueprint/BSP-002-conversation-graph.md#22-agent) (agent ref schema), [PLAN-S5.0-cell-magic-vocabulary.md §3.3](../../../06%20-%20Roadmaps/PLAN-S5.0-cell-magic-vocabulary.md#33-cell_magics-registry--vendorllmkernelllm_kernelmagic_registrypy-new-150-loc) (`@@spawn` registry entry), [PLAN-S5.0-cell-magic-vocabulary.md §3.9](../../../06%20-%20Roadmaps/PLAN-S5.0-cell-magic-vocabulary.md#39-legacy-compat--same-parser) (legacy alias)
 **Related atoms**: [agent](../concepts/agent.md), [turn](../concepts/turn.md), [zone](../concepts/zone.md), [magic](../concepts/magic.md), [continue-turn](continue-turn.md), [stop-agent](stop-agent.md)
 
 ## Definition
@@ -23,7 +23,7 @@ Legacy column-0 alias (still recognized):
 /spawn <agent_id> [provider:<name>] task:"<initial task>"
 ```
 
-The legacy form is rewritten to the canonical magic form by `cell_text.rewrite_legacy_directives` *before* parse, per [PLAN-S5.0 §3.9](../../../07%20-%20Status%20Reports/PLAN-S5.0-cell-magic-vocabulary.md#39-legacy-compat--same-parser); the `ParsedCell.legacy_alias_used` flag is set so round-trip emission can preserve the operator's original text on save.
+The legacy form is rewritten to the canonical magic form by `cell_text.rewrite_legacy_directives` *before* parse, per [PLAN-S5.0 §3.9](../../../06%20-%20Roadmaps/PLAN-S5.0-cell-magic-vocabulary.md#39-legacy-compat--same-parser); the `ParsedCell.legacy_alias_used` flag is set so round-trip emission can preserve the operator's original text on save.
 
 Kernel-side action envelope (per BSP-002 §9):
 

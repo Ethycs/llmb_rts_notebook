@@ -22,7 +22,7 @@ substrate `kernel/` docs). See [Layout](#layout) for the map.
 1. [`README.md`](../README.md) at repo root — Status section + slice
    ladder. **V1 SHA-ready 2026-06-30 — all 14 PLAN-v1-roadmap §5 rows ✅**. V1 UX feature-complete 2026-05-19; substrate gaps closed + atom drift resolved 2026-06-30; V2 lane opened 2026-05-20 (branch-switching UX + output-kind lens shipped).
 2. [`notebook/BSP-005-cell-roadmap.md §6.5`](03%20-%20Blueprint/BSP-005-cell-roadmap.md#65-slice-ladder-totals-after-issue-2--and-observed-velocity-2026-05-02-update) — V1 ladder shipped/deferred status. [§6.6](03%20-%20Blueprint/BSP-005-cell-roadmap.md#66-v2-lane-post-v1-feature-complete) enumerates the V2 lane.
-3. [`notebook/PLAN-v1-roadmap.md §5`](07%20-%20Status%20Reports/PLAN-v1-roadmap.md) — the 14-row V1 ship-ready checklist; rows 1-11 (operator-visible UX) are feature-complete.
+3. [`notebook/PLAN-v1-roadmap.md §5`](06%20-%20Roadmaps/PLAN-v1-roadmap.md) — the 14-row V1 ship-ready checklist; rows 1-11 (operator-visible UX) are feature-complete.
 4. [`atoms/README.md`](04%20-%20Reference/atoms/README.md) — the canonical definitions
    layer; browse `concepts/`, `operations/`, etc.
 
@@ -38,7 +38,7 @@ substrate `kernel/` docs). See [Layout](#layout) for the map.
    conversation turns).
 2. [`atoms/decisions/`](04%20-%20Reference/atoms/decisions/) — the V1/V2 implementation
    decisions (separate namespace from the formal ADRs above).
-3. [`notebook/PLAN-atom-refactor.md §4`](07%20-%20Status%20Reports/PLAN-atom-refactor.md) — the 24-row V1 decision table that the
+3. [`notebook/PLAN-atom-refactor.md §4`](06%20-%20Roadmaps/PLAN-atom-refactor.md) — the 24-row V1 decision table that the
    atom-layer decisions are anchored against.
 
 **For the design-as-of-source-conversation:**
@@ -75,12 +75,13 @@ docs/
 ├── 05 - Standards/            ← boundary contracts + conventions
 │   ├── rfcs/                  ← public RFCs 001-009
 │   └── VERSIONING.md          ← spec versioning conventions
-├── 06 - Roadmaps/             ← reserved (the roadmap-flavored plans live in 07; see its README)
-└── 07 - Status Reports/       ← every PLAN-S* / PLAN-V2 / roadmap plan + SESSION-* logs
-    ├── PLAN-v1-roadmap.md     ← 14-row V1 ship-ready checklist
-    ├── BSP-005…/PLAN-M-series ← roadmap-flavored plans
-    ├── PLAN-atom-refactor.md  ← executed plan for the atom-layer refactor
-    └── PLAN-kernel-facade.md  ← substrate Kernel-facade implementation plan
+├── 06 - Roadmaps/             ← ROADMAP.md + every PLAN-* execution / roadmap plan
+│   ├── ROADMAP.md             ← strategic narrative (V1 status, V2 lane, ceilings, non-goals)
+│   ├── PLAN-v1-roadmap.md     ← 14-row V1 ship-ready checklist
+│   ├── PLAN-M-series.md       ← roadmap-flavored milestone plan
+│   ├── PLAN-S*.md / PLAN-V2-*.md  ← per-slice execution plans
+│   └── PLAN-atom-refactor.md / PLAN-kernel-facade.md  ← executed refactor + substrate plans
+└── 07 - Status Reports/       ← SESSION-* session logs
 ```
 
 Several `kernel/` reference files are planned but not yet written — see
@@ -99,7 +100,7 @@ Two distinct kinds of "decisions" live in this tree:
 
 - [`atoms/decisions/`](04%20-%20Reference/atoms/decisions/) — the **V1/V2 implementation
   decisions** that surfaced during execution. Each maps to a row in the
-  24-decision table at [`notebook/PLAN-atom-refactor.md §4`](07%20-%20Status%20Reports/PLAN-atom-refactor.md). These are operational pins
+  24-decision table at [`notebook/PLAN-atom-refactor.md §4`](06%20-%20Roadmaps/PLAN-atom-refactor.md). These are operational pins
   ("V1 sections are flat", "section.status is the interruptibility
   lock", "RunFrame minimal schema", etc.).
 
@@ -131,7 +132,7 @@ atom-layer decisions pin the implementation.
    trail (16 records, provenance back to raw turns).
 2. [atoms/decisions/](04%20-%20Reference/atoms/decisions/) — the implementation decisions
    that surfaced post-conversation.
-3. [notebook/PLAN-atom-refactor.md](07%20-%20Status%20Reports/PLAN-atom-refactor.md) —
+3. [notebook/PLAN-atom-refactor.md](06%20-%20Roadmaps/PLAN-atom-refactor.md) —
    the executed plan that produced the atom layer.
 
 **For substrate / kernel work (embedding, transports, extensions):**
@@ -141,7 +142,7 @@ atom-layer decisions pin the implementation.
    "what to defend" charter (planned; see kernel/README.md for status).
 3. [kernel/identity-model.md](04%20-%20Reference/kernel/identity-model.md) — every kernel
    identifier in one reference (planned).
-4. [kernel/PLAN-kernel-facade.md](07%20-%20Status%20Reports/PLAN-kernel-facade.md) —
+4. [kernel/PLAN-kernel-facade.md](06%20-%20Roadmaps/PLAN-kernel-facade.md) —
    implementation plan for the embeddable `Kernel` facade (slice 2 of
    the substrate trajectory).
 
@@ -153,6 +154,6 @@ produced the original dev-guide + ADRs is described in
 [`_ingest/ARCHITECTURE.md`](../_ingest/ARCHITECTURE.md). The original
 plan is preserved in [`_ingest/PROCEDURE.md`](../_ingest/PROCEDURE.md).
 
-The atom layer was added later via [`notebook/PLAN-atom-refactor.md`](07%20-%20Status%20Reports/PLAN-atom-refactor.md) (executed 2026-04-28; ~91 atoms
+The atom layer was added later via [`notebook/PLAN-atom-refactor.md`](06%20-%20Roadmaps/PLAN-atom-refactor.md) (executed 2026-04-28; ~91 atoms
 across 7 subdirs). BSPs, FSPs, and PLAN-S* slice plans accumulated as
 implementation progressed.

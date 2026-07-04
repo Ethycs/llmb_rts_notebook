@@ -59,7 +59,7 @@ the trajectory and are kept in the repo for traceability and review.
 
 | File | Scope | Status |
 |---|---|---|
-| [`PLAN-kernel-facade.md`](../../07%20-%20Status%20Reports/PLAN-kernel-facade.md) | Slice 2 — `Kernel` facade extraction. Hoists subsystem wiring into a public `Kernel` class so the kernel can be embedded as a Python object (`from llm_kernel import Kernel`). Includes design conversation summary, 8 pros / 8 cons, 10-commit decomposition, verification. | Drafted; not yet started. |
+| [`PLAN-kernel-facade.md`](../../06%20-%20Roadmaps/PLAN-kernel-facade.md) | Slice 2 — `Kernel` facade extraction. Hoists subsystem wiring into a public `Kernel` class so the kernel can be embedded as a Python object (`from llm_kernel import Kernel`). Includes design conversation summary, 8 pros / 8 cons, 10-commit decomposition, verification. | Drafted; not yet started. |
 
 ## Cross-references
 

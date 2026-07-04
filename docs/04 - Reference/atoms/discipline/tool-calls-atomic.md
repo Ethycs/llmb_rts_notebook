@@ -1,7 +1,7 @@
 # Discipline: tool calls atomic, text I/O not
 
 **Status**: discipline (V1 invariant)
-**Source specs**: [BSP-002 §13.4](../../../03%20-%20Blueprint/BSP-002-conversation-graph.md#134-tool-calls-live-in-their-parent-turn-kb-target-03), [KB-notebook-target.md §0.3](../../../03%20-%20Blueprint/KB-notebook-target.md#03-tool-calls-live-in-their-parent-turn), [PLAN-atom-refactor.md §4 row S1](../../../07%20-%20Status%20Reports/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms)
+**Source specs**: [BSP-002 §13.4](../../../03%20-%20Blueprint/BSP-002-conversation-graph.md#134-tool-calls-live-in-their-parent-turn-kb-target-03), [KB-notebook-target.md §0.3](../../../03%20-%20Blueprint/KB-notebook-target.md#03-tool-calls-live-in-their-parent-turn), [PLAN-atom-refactor.md §4 row S1](../../../06%20-%20Roadmaps/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms)
 **Related atoms**: [tool-call](../concepts/tool-call.md), [span](../concepts/span.md), [turn](../concepts/turn.md), [operations/split-cell](../operations/split-cell.md), [operations/promote-span](../operations/promote-span.md)
 
 ## The rule

@@ -1,7 +1,7 @@
 # Decision: Capabilities table and privilege levels deferred to V2
 
 **Status**: decision (V1 lock-in, 2026-04-28)
-**Source specs**: [KB-notebook-target.md §0.7](../../../03%20-%20Blueprint/KB-notebook-target.md#07-capabilities--v2), [KB-notebook-target.md §20](../../../03%20-%20Blueprint/KB-notebook-target.md#20-permissions-and-trust), [BSP-002 §13.5.1](../../../03%20-%20Blueprint/BSP-002-conversation-graph.md#1351-metadatartscellsidcapabilities-kb-target-07--v2), [PLAN-atom-refactor.md §4](../../../07%20-%20Status%20Reports/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms)
+**Source specs**: [KB-notebook-target.md §0.7](../../../03%20-%20Blueprint/KB-notebook-target.md#07-capabilities--v2), [KB-notebook-target.md §20](../../../03%20-%20Blueprint/KB-notebook-target.md#20-permissions-and-trust), [BSP-002 §13.5.1](../../../03%20-%20Blueprint/BSP-002-conversation-graph.md#1351-metadatartscellsidcapabilities-kb-target-07--v2), [PLAN-atom-refactor.md §4](../../../06%20-%20Roadmaps/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms)
 **Related atoms**: [concepts/cell](../concepts/cell.md), [decisions/v1-runframe-minimal](v1-runframe-minimal.md)
 
 ## The decision
@@ -61,4 +61,4 @@ None of this is V1-blocking; all of it ships additively when the multi-actor use
 - [anti-patterns/secret-redaction](../anti-patterns/secret-redaction.md) — secrets stay env-only in V1; V2 capabilities formalize this.
 - [KB-target §20](../../../03%20-%20Blueprint/KB-notebook-target.md#20-permissions-and-trust) — the V2+ target model.
 - [BSP-002 §13.5.1](../../../03%20-%20Blueprint/BSP-002-conversation-graph.md#1351-metadatartscellsidcapabilities-kb-target-07--v2) — the schema slot reservation.
-- [PLAN-atom-refactor.md §4](../../../07%20-%20Status%20Reports/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms) — the 24-row decision table.
+- [PLAN-atom-refactor.md §4](../../../06%20-%20Roadmaps/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms) — the 24-row decision table.

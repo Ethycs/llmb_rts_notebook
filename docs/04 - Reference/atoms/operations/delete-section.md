@@ -1,7 +1,7 @@
 # Operation: delete-section
 
 **Status**: V1 shipped via BSP-007 overlay applier (submodule `3a430cb`; `overlay_applier._validate_delete_section`); enforces SD1 "section_not_empty" rejection; kernel tests in `test_overlay_applier.py` (PLAN-S5.5 Phase 1a)
-**Source specs**: [BSP-007 §3.3](../../../03%20-%20Blueprint/BSP-007-overlay-git-semantics.md#33-section-level-new-per-kb-target-01-kb-target-6) (operation), [BSP-007 §9](../../../03%20-%20Blueprint/BSP-007-overlay-git-semantics.md#9-test-surface) (`test_section_delete_requires_empty`), [PLAN-atom-refactor.md §4 row SD1](../../../07%20-%20Status%20Reports/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms)
+**Source specs**: [BSP-007 §3.3](../../../03%20-%20Blueprint/BSP-007-overlay-git-semantics.md#33-section-level-new-per-kb-target-01-kb-target-6) (operation), [BSP-007 §9](../../../03%20-%20Blueprint/BSP-007-overlay-git-semantics.md#9-test-surface) (`test_section_delete_requires_empty`), [PLAN-atom-refactor.md §4 row SD1](../../../06%20-%20Roadmaps/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms)
 **Related atoms**: [section](../concepts/section.md), [overlay-commit](../concepts/overlay-commit.md), [create-section](create-section.md), [move-cell](move-cell.md)
 
 ## Definition

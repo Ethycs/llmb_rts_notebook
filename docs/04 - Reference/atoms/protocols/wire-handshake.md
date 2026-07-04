@@ -3,7 +3,7 @@
 **Status**: V1.5 shipped (PLAN-S5.0.3d landed 2026-04-29; outer commit pin `ae7b1a6`; submodule pin `fc04eaa`)
 **Family**: `kernel.handshake` — pre-family transport bring-up (precedes A/B/C/F/G framing)
 **Direction**: bidirectional, request-response — driver → kernel, then kernel → driver
-**Source specs**: [PLAN-S5.0.3 §4.3](../../../07%20-%20Status%20Reports/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#43-handshake-envelope-new--first-envelope-on-any-connection), [PLAN-S5.0.3 §5.2](../../../07%20-%20Status%20Reports/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#52-tcp-server) (TCP auth model), [PLAN-S5.0.3 §7.1](../../../07%20-%20Status%20Reports/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#71-round-0-operator-30min) (RFC-006 v2.1.0 amendment), [RFC-006](../../../05%20-%20Standards/rfcs/RFC-006-kernel-extension-wire-format.md), [RFC-008](../../../05%20-%20Standards/rfcs/RFC-008-pty-transport.md)
+**Source specs**: [PLAN-S5.0.3 §4.3](../../../06%20-%20Roadmaps/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#43-handshake-envelope-new--first-envelope-on-any-connection), [PLAN-S5.0.3 §5.2](../../../06%20-%20Roadmaps/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#52-tcp-server) (TCP auth model), [PLAN-S5.0.3 §7.1](../../../06%20-%20Roadmaps/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#71-round-0-operator-30min) (RFC-006 v2.1.0 amendment), [RFC-006](../../../05%20-%20Standards/rfcs/RFC-006-kernel-extension-wire-format.md), [RFC-008](../../../05%20-%20Standards/rfcs/RFC-008-pty-transport.md)
 **Related atoms**: [discipline/wire-as-public-api](../discipline/wire-as-public-api.md), [concepts/driver](../concepts/driver.md), [concepts/transport-mode](../concepts/transport-mode.md), [protocols/family-f-notebook-metadata](family-f-notebook-metadata.md)
 
 ## Definition
@@ -58,7 +58,7 @@ The envelope contract is invariant across transports per [transport-mode](../con
 
 ## Version-skew semantics
 
-Per [PLAN-S5.0.3 §4.2](../../../07%20-%20Status%20Reports/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#42-version-constants-locked):
+Per [PLAN-S5.0.3 §4.2](../../../06%20-%20Roadmaps/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#42-version-constants-locked):
 
 | Comparison | Outcome |
 |---|---|
@@ -85,7 +85,7 @@ For TCP only: token comparison uses `hmac.compare_digest` (constant-time). On mi
 
 ## Multi-client (V1: single)
 
-Per [PLAN-S5.0.3 §5.2](../../../07%20-%20Status%20Reports/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#52-tcp-server), V1 kernel accepts one connection at a time. A second client mid-session receives `error: "kernel_busy"` and the connection closes. Multi-client is V2+; the handshake's `session_id` is forward-compatible with that work but V1 always issues a fresh session per accepted connection.
+Per [PLAN-S5.0.3 §5.2](../../../06%20-%20Roadmaps/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#52-tcp-server), V1 kernel accepts one connection at a time. A second client mid-session receives `error: "kernel_busy"` and the connection closes. Multi-client is V2+; the handshake's `session_id` is forward-compatible with that work but V1 always issues a fresh session per accepted connection.
 
 ## Invariants
 

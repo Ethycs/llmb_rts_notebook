@@ -1,7 +1,7 @@
 # Operation: rename-section
 
 **Status**: V1 shipped via BSP-007 overlay applier (submodule `3a430cb`; `overlay_applier._validate_rename_section`); kernel tests in `test_overlay_applier.py` (PLAN-S5.5 Phase 1a)
-**Source specs**: [BSP-007 §3.3](../../../03%20-%20Blueprint/BSP-007-overlay-git-semantics.md#33-section-level-new-per-kb-target-01-kb-target-6) (operation), [BSP-002 §13.1.1](../../../03%20-%20Blueprint/BSP-002-conversation-graph.md#1311-schema--metadatartszonesections) (section schema), [PLAN-atom-refactor.md §4 row SD2](../../../07%20-%20Status%20Reports/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms)
+**Source specs**: [BSP-007 §3.3](../../../03%20-%20Blueprint/BSP-007-overlay-git-semantics.md#33-section-level-new-per-kb-target-01-kb-target-6) (operation), [BSP-002 §13.1.1](../../../03%20-%20Blueprint/BSP-002-conversation-graph.md#1311-schema--metadatartszonesections) (section schema), [PLAN-atom-refactor.md §4 row SD2](../../../06%20-%20Roadmaps/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms)
 **Related atoms**: [section](../concepts/section.md), [overlay-commit](../concepts/overlay-commit.md), [create-section](create-section.md), [delete-section](delete-section.md)
 
 ## Definition

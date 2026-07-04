@@ -97,7 +97,7 @@ will attach over TCP and any latent bugs become user-visible there.
 
 ## Related
 
-- [PLAN-S5.0.3 driver-extraction](../../07%20-%20Status%20Reports/PLAN-S5.0.3-driver-extraction-and-external-runnability.md)
+- [PLAN-S5.0.3 driver-extraction](../../06%20-%20Roadmaps/PLAN-S5.0.3-driver-extraction-and-external-runnability.md)
 - [serve_mode.py](../../../vendor/LLMKernel/llm_kernel/serve_mode.py)
 - [Testing.md §"Tier 3"](../../../Testing.md) — the existing PTY smoke
 - Commits 28c3658 / b275e94 — Tier-3 PTY smoke fixes (the parallel work

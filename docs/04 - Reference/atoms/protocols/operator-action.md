@@ -3,7 +3,7 @@
 **Status**: `protocol` (V1 shipped; envelopes now sourced from cell-magic parser dispatch, S5.0 commit `336a6c7` / submodule `e6620db`)
 **Family**: RFC-006 Family D outer envelope
 **Direction**: extension → kernel
-**Source specs**: [BSP-002 §9](../../../03%20-%20Blueprint/BSP-002-conversation-graph.md#9-implementation-slices) (action_type registry), [RFC-006 §6](../../../05%20-%20Standards/rfcs/RFC-006-kernel-extension-wire-format.md#6--family-d-operator-action), [BSP-003 §3](../../../03%20-%20Blueprint/BSP-003-writer-registry.md#3-the-intent-envelope) (intent envelope rides this shape), [PLAN-S5.0-cell-magic-vocabulary.md §3.6](../../../07%20-%20Status%20Reports/PLAN-S5.0-cell-magic-vocabulary.md#36-extension-cell-directive-parser--extensionsrcnotebookcell-directivets-modest) (extension cell-magic dispatcher)
+**Source specs**: [BSP-002 §9](../../../03%20-%20Blueprint/BSP-002-conversation-graph.md#9-implementation-slices) (action_type registry), [RFC-006 §6](../../../05%20-%20Standards/rfcs/RFC-006-kernel-extension-wire-format.md#6--family-d-operator-action), [BSP-003 §3](../../../03%20-%20Blueprint/BSP-003-writer-registry.md#3-the-intent-envelope) (intent envelope rides this shape), [PLAN-S5.0-cell-magic-vocabulary.md §3.6](../../../06%20-%20Roadmaps/PLAN-S5.0-cell-magic-vocabulary.md#36-extension-cell-directive-parser--extensionsrcnotebookcell-directivets-modest) (extension cell-magic dispatcher)
 **Related atoms**: [protocols/family-d-event-log](family-d-event-log.md), [protocols/submit-intent-envelope](submit-intent-envelope.md), [concepts/magic](../concepts/magic.md), [operations/spawn-agent](../operations/spawn-agent.md), [contracts/intent-dispatcher](../contracts/intent-dispatcher.md)
 
 ## Definition
@@ -12,7 +12,7 @@ The `operator.action` envelope is the **outer wire shape** every operator-origin
 
 ## Source: cell-magic parser dispatch (S5.0)
 
-Per [PLAN-S5.0 §3.6](../../../07%20-%20Status%20Reports/PLAN-S5.0-cell-magic-vocabulary.md#36-extension-cell-directive-parser--extensionsrcnotebookcell-directivets-modest), the extension's `cell-directive.ts` produces these envelopes by dispatching the [magic](../concepts/magic.md) vocabulary:
+Per [PLAN-S5.0 §3.6](../../../06%20-%20Roadmaps/PLAN-S5.0-cell-magic-vocabulary.md#36-extension-cell-directive-parser--extensionsrcnotebookcell-directivets-modest), the extension's `cell-directive.ts` produces these envelopes by dispatching the [magic](../concepts/magic.md) vocabulary:
 
 | Cell text shape | Resulting `action_type` |
 |---|---|

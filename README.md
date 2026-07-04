@@ -19,10 +19,10 @@ deployment surfaces, per-slice implementation plans).
 
 ## Status — **V1 shipped (v1.0.0, 2026-06-30)**; all 14 ship-ready rows ✅
 
-V1 is shipped — tagged `v1.0.0` on 2026-06-30. Every row of the [PLAN-v1-roadmap §5 ship-ready checklist](docs/07%20-%20Status%20Reports/PLAN-v1-roadmap.md) is ✅ green. Rows 1-11 (operator-visible UX) shipped 2026-05-02 → 2026-05-19; the last two rows closed this cycle:
+V1 is shipped — tagged `v1.0.0` on 2026-06-30. Every row of the [PLAN-v1-roadmap §5 ship-ready checklist](docs/06%20-%20Roadmaps/PLAN-v1-roadmap.md) is ✅ green. Rows 1-11 (operator-visible UX) shipped 2026-05-02 → 2026-05-19; the last two rows closed this cycle:
 
-- **Row 13 (substrate gaps)** — all 9 gaps closed 2026-06-30 via [PLAN-substrate-gap-closure](docs/07%20-%20Status%20Reports/PLAN-substrate-gap-closure.md). Kernel test suite: **908/908 green.**
-- **Row 14 (atom drift)** — full [PLAN-atom-hygiene](docs/07%20-%20Status%20Reports/PLAN-atom-hygiene.md) sweep landed 2026-06-30. All 3 verification checks (orphan / drift / Status-line consistency) return empty.
+- **Row 13 (substrate gaps)** — all 9 gaps closed 2026-06-30 via [PLAN-substrate-gap-closure](docs/06%20-%20Roadmaps/PLAN-substrate-gap-closure.md). Kernel test suite: **908/908 green.**
+- **Row 14 (atom drift)** — full [PLAN-atom-hygiene](docs/06%20-%20Roadmaps/PLAN-atom-hygiene.md) sweep landed 2026-06-30. All 3 verification checks (orphan / drift / Status-line consistency) return empty.
 
 **Operator-visible V1 UX (feature-complete since 2026-05-19):** S5.5 sections (full collapse via native markdown fold), S7 sidebar trees (zones / agents / activity), S10 reduced V1 (streaming/artifact badges + bulk-collapse / find wrappers), S10 follow-on (sidebar Find-in-cells WebviewView with the full FSP-002 §2.1 search UX). S5.0.6 (nvim driver) deferred to whenever the nvim operator's dogfooding pressure justifies the per-cell affordance — the headless `llmnb execute --connect` CLI (`df95ad4`) covers file-level operation for nvim users in the interim.
 
@@ -51,7 +51,7 @@ text via the `@@` cell-magic + `@` line-magic vocabulary
   changes. Three new K-classes (K3M path-outside-workspace, K3N
   overwrite-refused, K3O bundled I/O failure with `cause` sub-code). The
   cell↔file matrix is now symmetric in all four quadrants.
-  ([PLAN-S5.0.5](docs/07%20-%20Status%20Reports/PLAN-S5.0.5-magic-file-encode-decode.md))
+  ([PLAN-S5.0.5](docs/06%20-%20Roadmaps/PLAN-S5.0.5-magic-file-encode-decode.md))
 - **PLAN-S5.0.4 — privileged magic emission** (extension `838aa85`;
   kernel `2306aef` / `bc24720` / `987b7ef`). `emit_magic_cell` MCP tool
   + `magic_emit_privileges[]` store + `promote_stream_magic` operator

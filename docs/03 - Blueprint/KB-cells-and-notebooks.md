@@ -6,7 +6,7 @@
 
 This doc is NOT a spec. Specs win on conflict. Atoms win on definitions.
 
-> **History**: this doc was a 434-line prose reference until 2026-04-28, when the [atom refactor](../07%20-%20Status%20Reports/PLAN-atom-refactor.md) moved every concept definition into [docs/atoms/](../04%20-%20Reference/atoms/) and the file was deleted in `4207504`. An empirical A/B/C test (atoms-only vs. original prose vs. ref-only) showed the prose version actively misled agents on specific cell ops (it omitted `split_cell` from its index entirely), while the ref-only form gave agents fast navigation plus the rigor of cross-atom synthesis. This file is the surviving ref-only form, restored as the reborn KB.
+> **History**: this doc was a 434-line prose reference until 2026-04-28, when the [atom refactor](../06%20-%20Roadmaps/PLAN-atom-refactor.md) moved every concept definition into [docs/atoms/](../04%20-%20Reference/atoms/) and the file was deleted in `4207504`. An empirical A/B/C test (atoms-only vs. original prose vs. ref-only) showed the prose version actively misled agents on specific cell ops (it omitted `split_cell` from its index entirely), while the ref-only form gave agents fast navigation plus the rigor of cross-atom synthesis. This file is the surviving ref-only form, restored as the reborn KB.
 
 ---
 
@@ -32,7 +32,7 @@ This doc is NOT a spec. Specs win on conflict. Atoms win on definitions.
 | Cell Manager façade (split/merge/move/promote ownership) | [atoms/discipline/cell-manager-owns-structure](../04%20-%20Reference/atoms/discipline/cell-manager-owns-structure.md) |
 | Overlay commits (operator edits as second git layer) | [atoms/concepts/overlay-commit](../04%20-%20Reference/atoms/concepts/overlay-commit.md) + [BSP-007](BSP-007-overlay-git-semantics.md) |
 | ContextPacker + RunFrames | [atoms/concepts/context-manifest](../04%20-%20Reference/atoms/concepts/context-manifest.md), [atoms/concepts/run-frame](../04%20-%20Reference/atoms/concepts/run-frame.md) + [BSP-008](BSP-008-contextpacker-runframes.md) |
-| 24 V1 decisions (D1-D8, S1-S6, M1-M3, SD1-SD3, CK1-CK3, F1) | [atoms/decisions/](../04%20-%20Reference/atoms/decisions/) + [PLAN-atom-refactor.md §4](../07%20-%20Status%20Reports/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms) |
+| 24 V1 decisions (D1-D8, S1-S6, M1-M3, SD1-SD3, CK1-CK3, F1) | [atoms/decisions/](../04%20-%20Reference/atoms/decisions/) + [PLAN-atom-refactor.md §4](../06%20-%20Roadmaps/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms) |
 | Anti-patterns we've already learned | [atoms/anti-patterns/](../04%20-%20Reference/atoms/anti-patterns/) |
 | Cross-cutting concerns and open questions | §12 of this doc (unique unresolved-thread tracker) |
 | Session chronology | §15 of this doc (unique historical record) |

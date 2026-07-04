@@ -83,5 +83,5 @@ grep -rn "^## Definition" "docs/03 - Blueprint" "docs/05 - Standards/rfcs"   # e
 
 ## Related
 
-- [PLAN-atom-refactor.md](../../07%20-%20Status%20Reports/PLAN-atom-refactor.md) — the refactor that established this layer.
+- [PLAN-atom-refactor.md](../../06%20-%20Roadmaps/PLAN-atom-refactor.md) — the refactor that established this layer.
 - [KB-notebook-target.md §0](../../03%20-%20Blueprint/KB-notebook-target.md#0-v1-decisions-and-amendments-2026-04-28) — the V1 amendments these atoms pin into the corpus.

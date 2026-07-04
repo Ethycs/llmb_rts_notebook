@@ -1,7 +1,7 @@
 # Discipline: Wire as public API
 
 **Status**: V1.5 shipped (PLAN-S5.0.3e landed 2026-04-29; outer commit pin `b493ee5`; submodule pin `2c090a4`)
-**Source specs**: [PLAN-S5.0.3 §4](../../../07%20-%20Status%20Reports/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#4-wire-interface-contract) (public surface + version constants + handshake), [PLAN-S5.0.3 §3.2](../../../07%20-%20Status%20Reports/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#32-what-moves-where) (`_rfc_schemas` → `wire/tools.py`), [PLAN-S5.0.3 §7.1](../../../07%20-%20Status%20Reports/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#71-round-0-operator-30min) (RFC-006 amendment), [RFC-006 §"Backward-compatibility analysis"](../../../05%20-%20Standards/rfcs/RFC-006-kernel-extension-wire-format.md)
+**Source specs**: [PLAN-S5.0.3 §4](../../../06%20-%20Roadmaps/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#4-wire-interface-contract) (public surface + version constants + handshake), [PLAN-S5.0.3 §3.2](../../../06%20-%20Roadmaps/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#32-what-moves-where) (`_rfc_schemas` → `wire/tools.py`), [PLAN-S5.0.3 §7.1](../../../06%20-%20Roadmaps/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#71-round-0-operator-30min) (RFC-006 amendment), [RFC-006 §"Backward-compatibility analysis"](../../../05%20-%20Standards/rfcs/RFC-006-kernel-extension-wire-format.md)
 **Related atoms**: [text-as-canonical](text-as-canonical.md), [concepts/driver](../concepts/driver.md), [protocols/wire-handshake](../protocols/wire-handshake.md), [concepts/transport-mode](../concepts/transport-mode.md)
 
 ## The rule
@@ -22,7 +22,7 @@
 
 ## How versioning works
 
-Per [PLAN-S5.0.3 §4.2](../../../07%20-%20Status%20Reports/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#42-version-constants-locked):
+Per [PLAN-S5.0.3 §4.2](../../../06%20-%20Roadmaps/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#42-version-constants-locked):
 
 ```python
 # llm_kernel/wire/version.py — single source of truth
@@ -59,7 +59,7 @@ The wire-as-public-API discipline is the **runtime** layer counterpart to [text-
 | Driver imports `llm_kernel.custom_messages.dispatch(...)` directly | Dispatcher is internal; ship the envelope through the transport instead. |
 | Adding a new envelope shape to `wire/families.py` without an RFC-006 minor bump | Public surface changes are RFC-tracked; otherwise consumers can't reason about compatibility. |
 | Bumping `WIRE_MAJOR` without an RFC-006 v3.0.0 amendment | Major bumps break every existing driver; require a deliberate, documented break. |
-| Cross-package access to `llm_kernel._rfc_schemas` from `llm_client/**` | Underscore-prefixed modules are private. Lint rejects this per [PLAN-S5.0.3 §3.3](../../../07%20-%20Status%20Reports/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#33-lint-boundary). |
+| Cross-package access to `llm_kernel._rfc_schemas` from `llm_client/**` | Underscore-prefixed modules are private. Lint rejects this per [PLAN-S5.0.3 §3.3](../../../06%20-%20Roadmaps/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#33-lint-boundary). |
 | Two competing definitions of an envelope shape (one in `wire/`, one in `custom_messages.py`) | One source of truth: `wire/families.py`. The dispatcher imports from there. |
 
 ## See also

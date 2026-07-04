@@ -1,7 +1,7 @@
 # Operation: parse-cell
 
 **Status**: V1 shipped (`vendor/LLMKernel/llm_kernel/cell_text.py:parse_cell`, S5.0 commit `336a6c7` / submodule `e6620db`)
-**Source specs**: [BSP-005 §S5.0](../../../03%20-%20Blueprint/BSP-005-cell-roadmap.md), [PLAN-S5.0-cell-magic-vocabulary.md §3.2](../../../07%20-%20Status%20Reports/PLAN-S5.0-cell-magic-vocabulary.md#32-per-cell-parser--same-module-60-loc), [PLAN-S5.0-cell-magic-vocabulary.md §3.9](../../../07%20-%20Status%20Reports/PLAN-S5.0-cell-magic-vocabulary.md#39-legacy-compat--same-parser) (legacy alias rewrite)
+**Source specs**: [BSP-005 §S5.0](../../../03%20-%20Blueprint/BSP-005-cell-roadmap.md), [PLAN-S5.0-cell-magic-vocabulary.md §3.2](../../../06%20-%20Roadmaps/PLAN-S5.0-cell-magic-vocabulary.md#32-per-cell-parser--same-module-60-loc), [PLAN-S5.0-cell-magic-vocabulary.md §3.9](../../../06%20-%20Roadmaps/PLAN-S5.0-cell-magic-vocabulary.md#39-legacy-compat--same-parser) (legacy alias rewrite)
 **Related atoms**: [concepts/magic](../concepts/magic.md), [concepts/cell](../concepts/cell.md), [concepts/cell-kinds](../concepts/cell-kinds.md), [operations/split-at-breaks](split-at-breaks.md), [discipline/text-as-canonical](../discipline/text-as-canonical.md)
 
 ## Definition
@@ -62,7 +62,7 @@ class ParsedCell:
 | **K31** | `unknown_cell_magic` — `@@<unknown>` at the kind position (before any body line / known kind) |
 | **K34** | `incompatible_kind_change` — `@mark <new_kind>` whose target is not a registered cell-kind name (V1 validates name only; full body-compat check is at the `cell_manager` layer) |
 
-K32 (reserved magic name as agent ID) is enforced at `AgentSupervisor.spawn`, not in `parse_cell`. K35 (plain magic in hash mode) is queued for [PLAN-S5.0.1](../../../07%20-%20Status%20Reports/PLAN-S5.0.1-cell-magic-injection-defense.md).
+K32 (reserved magic name as agent ID) is enforced at `AgentSupervisor.spawn`, not in `parse_cell`. K35 (plain magic in hash mode) is queued for [PLAN-S5.0.1](../../../06%20-%20Roadmaps/PLAN-S5.0.1-cell-magic-injection-defense.md).
 
 ## Callers
 

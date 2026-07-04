@@ -1,7 +1,7 @@
 # Cell kinds
 
 **Status**: V1 shipped (kind discriminator is the `@@<magic>` cell-magic line at top of cell text, S5.0 commit `336a6c7` / submodule `e6620db`; 4 kinds active, 4 reserved; markdown=no-badge and promoted-suffix render rules now enforced on the X-EXT side, S1 / commit `26ac581`)
-**Source specs**: [BSP-002 §13.2](../../../03%20-%20Blueprint/BSP-002-conversation-graph.md#132-cell-kinds-typed-enum-kb-target-04), [BSP-005 §S5.0](../../../03%20-%20Blueprint/BSP-005-cell-roadmap.md), [PLAN-S5.0-cell-magic-vocabulary.md §3.3](../../../07%20-%20Status%20Reports/PLAN-S5.0-cell-magic-vocabulary.md#33-cell_magics-registry--vendorllmkernelllm_kernelmagic_registrypy-new-150-loc), [KB-notebook-target.md §0.4](../../../03%20-%20Blueprint/KB-notebook-target.md#04-cell-kinds-typed-in-v1), [KB-notebook-target.md §13.1](../../../03%20-%20Blueprint/KB-notebook-target.md) (the eight-kind taxonomy)
+**Source specs**: [BSP-002 §13.2](../../../03%20-%20Blueprint/BSP-002-conversation-graph.md#132-cell-kinds-typed-enum-kb-target-04), [BSP-005 §S5.0](../../../03%20-%20Blueprint/BSP-005-cell-roadmap.md), [PLAN-S5.0-cell-magic-vocabulary.md §3.3](../../../06%20-%20Roadmaps/PLAN-S5.0-cell-magic-vocabulary.md#33-cell_magics-registry--vendorllmkernelllm_kernelmagic_registrypy-new-150-loc), [KB-notebook-target.md §0.4](../../../03%20-%20Blueprint/KB-notebook-target.md#04-cell-kinds-typed-in-v1), [KB-notebook-target.md §13.1](../../../03%20-%20Blueprint/KB-notebook-target.md) (the eight-kind taxonomy)
 **Related atoms**: [cell](cell.md), [magic](magic.md), [operations/parse-cell](../operations/parse-cell.md), [tool-call](tool-call.md), [artifact-ref](artifact-ref.md)
 
 ## Definition

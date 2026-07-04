@@ -1,7 +1,7 @@
 # Decision: Embedded ASGI runtime deferred
 
 **Status**: decision (V1 lock-in, 2026-04-28)
-**Source specs**: [BSP-006 §7](../../../03%20-%20Blueprint/BSP-006-embedded-asgi.md), [BSP-004 V1.x retrospective](../../../03%20-%20Blueprint/BSP-004-kernel-runtime.md), [PLAN-atom-refactor.md §4](../../../07%20-%20Status%20Reports/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms)
+**Source specs**: [BSP-006 §7](../../../03%20-%20Blueprint/BSP-006-embedded-asgi.md), [BSP-004 V1.x retrospective](../../../03%20-%20Blueprint/BSP-004-kernel-runtime.md), [PLAN-atom-refactor.md §4](../../../06%20-%20Roadmaps/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms)
 **Related atoms**: [decisions/legacy-main-dispatch](legacy-main-dispatch.md), [anti-patterns/bsp-004-retrospective](../anti-patterns/bsp-004-retrospective.md)
 
 ## The decision
@@ -58,4 +58,4 @@ Until one fires, V1 ships on legacy `main()`.
 - [anti-patterns/bsp-004-retrospective](../anti-patterns/bsp-004-retrospective.md) — the V1/V2 attempts that motivated this deferral.
 - [BSP-006](../../../03%20-%20Blueprint/BSP-006-embedded-asgi.md) — the ~300-line embedded ASGI design, ready when a trigger fires.
 - [BSP-004 §V3 plan](../../../03%20-%20Blueprint/BSP-004-kernel-runtime.md) — the `sock_recv`-based read loop that pairs with embedded ASGI.
-- [PLAN-atom-refactor.md §4](../../../07%20-%20Status%20Reports/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms) — the 24-row decision table.
+- [PLAN-atom-refactor.md §4](../../../06%20-%20Roadmaps/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms) — the 24-row decision table.

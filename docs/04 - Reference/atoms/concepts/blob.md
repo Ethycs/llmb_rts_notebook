@@ -35,7 +35,7 @@ A **blob** is one entry in the content-addressed store at `metadata.rts.zone.blo
 - **Round-trip-safe to directory layout.** Per [BSP-002 §8.1](../../../03%20-%20Blueprint/BSP-002-conversation-graph.md#81-convertibility-invariant), the JSON form flattens to `blobs/<hash>/{body, meta.json, artifact.json}`. `body` lives in its own file so directory diffs don't re-emit large payloads.
 - **Carries the V1 ArtifactRef shape.** [ArtifactRef](artifact-ref.md) and the blob entry are the same shape; cells reference blobs via the `id` (= `sha256-...`).
 - **`meta` preserves the Issue 1 fields unchanged** (`mime`, `source`, `size_bytes`, `created_at`). Issue 2's additive top-level fields (`id`, `kind`, `size`, `content_hash`, `body`) sit alongside.
-- **Append/replace via `apply_overlay_commit` writers**, not direct edit. Blobs are part of the persisted snapshot; the writer ([BSP-003](../../../07%20-%20Status%20Reports/PLAN-atom-refactor.md#7-operator-follow-ups-landing-in-this-refactor)) records the write through an intent.
+- **Append/replace via `apply_overlay_commit` writers**, not direct edit. Blobs are part of the persisted snapshot; the writer ([BSP-003](../../../06%20-%20Roadmaps/PLAN-atom-refactor.md#7-operator-follow-ups-landing-in-this-refactor)) records the write through an intent.
 
 ## V1 vs V2+
 

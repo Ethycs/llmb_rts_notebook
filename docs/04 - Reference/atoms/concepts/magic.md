@@ -1,7 +1,7 @@
 # Magic
 
 **Status**: V1 shipped (S5.0.x wave — cell-magic vocabulary S5.0 + injection defense S5.0.1, submodule `aaab372` / outer `13eda07`)
-**Source specs**: [BSP-005 §S5.0](../../../03%20-%20Blueprint/BSP-005-cell-roadmap.md), [PLAN-S5.0-cell-magic-vocabulary.md §3](../../../07%20-%20Status%20Reports/PLAN-S5.0-cell-magic-vocabulary.md#3-concrete-work), [PLAN-S5.0-cell-magic-vocabulary.md §4](../../../07%20-%20Status%20Reports/PLAN-S5.0-cell-magic-vocabulary.md#4-interface-contracts), [KB-notebook-target.md §13](../../../03%20-%20Blueprint/KB-notebook-target.md#13-cell-discipline-zachtronics-not-general-asm) (the design doctrine this operationalizes)
+**Source specs**: [BSP-005 §S5.0](../../../03%20-%20Blueprint/BSP-005-cell-roadmap.md), [PLAN-S5.0-cell-magic-vocabulary.md §3](../../../06%20-%20Roadmaps/PLAN-S5.0-cell-magic-vocabulary.md#3-concrete-work), [PLAN-S5.0-cell-magic-vocabulary.md §4](../../../06%20-%20Roadmaps/PLAN-S5.0-cell-magic-vocabulary.md#4-interface-contracts), [KB-notebook-target.md §13](../../../03%20-%20Blueprint/KB-notebook-target.md#13-cell-discipline-zachtronics-not-general-asm) (the design doctrine this operationalizes)
 **Related atoms**: [cell](cell.md), [cell-kinds](cell-kinds.md), [operations/parse-cell](../operations/parse-cell.md), [operations/split-at-breaks](../operations/split-at-breaks.md), [protocols/operator-action](../protocols/operator-action.md), [discipline/text-as-canonical](../discipline/text-as-canonical.md), [discipline/zachtronics](../discipline/zachtronics.md), [discipline/certified-magic-emitter](../discipline/certified-magic-emitter.md)
 
 ## Definition
@@ -85,9 +85,9 @@ Value forms in named args:
 | K33 | `unclosed_cell_at_file_end` — warning; serializer auto-closes |
 | K34 | `incompatible_kind_change` — `@mark <new_kind>` whose target is unknown / body-incompatible |
 
-K35 (plain magic in hash mode) and K36 (cell contaminated by agent emission) are shipped — see [PLAN-S5.0.1](../../../07%20-%20Status%20Reports/PLAN-S5.0.1-cell-magic-injection-defense.md) §3.9; hash-mode primitives + emission ban + auth lifecycle landed in S5.0.1a/b/c (submodule commits `360b658` / `94d1c39` / `ac25656`).
+K35 (plain magic in hash mode) and K36 (cell contaminated by agent emission) are shipped — see [PLAN-S5.0.1](../../../06%20-%20Roadmaps/PLAN-S5.0.1-cell-magic-injection-defense.md) §3.9; hash-mode primitives + emission ban + auth lifecycle landed in S5.0.1a/b/c (submodule commits `360b658` / `94d1c39` / `ac25656`).
 
-K3M / K3N / K3O ship with PLAN-S5.0.5 Phase 2 (`@@export`): path-outside-workspace, target-exists-no-overwrite, and bundled I/O / format failure with a `cause` sub-code. K3O is shared with multi-format `@@import` for parse / format errors. See [PLAN-S5.0.5 §7](../../../07%20-%20Status%20Reports/PLAN-S5.0.5-magic-file-encode-decode.md#7-k-class-additions).
+K3M / K3N / K3O ship with PLAN-S5.0.5 Phase 2 (`@@export`): path-outside-workspace, target-exists-no-overwrite, and bundled I/O / format failure with a `cause` sub-code. K3O is shared with multi-format `@@import` for parse / format errors. See [PLAN-S5.0.5 §7](../../../06%20-%20Roadmaps/PLAN-S5.0.5-magic-file-encode-decode.md#7-k-class-additions).
 
 ## Invariants
 

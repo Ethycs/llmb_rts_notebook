@@ -1,7 +1,7 @@
 # Operation: revert-overlay-commit
 
 **Status**: V1 spec'd (BSP-007 K-OVERLAY slice)
-**Source specs**: [BSP-007 §4.2](../../../03%20-%20Blueprint/BSP-007-overlay-git-semantics.md#42-revert_to_commitcommit_id--null) (primitive), [BSP-007 §2.2](../../../03%20-%20Blueprint/BSP-007-overlay-git-semantics.md#22-persistence) (refs persistence), [PLAN-atom-refactor.md §4 row CK3](../../../07%20-%20Status%20Reports/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms)
+**Source specs**: [BSP-007 §4.2](../../../03%20-%20Blueprint/BSP-007-overlay-git-semantics.md#42-revert_to_commitcommit_id--null) (primitive), [BSP-007 §2.2](../../../03%20-%20Blueprint/BSP-007-overlay-git-semantics.md#22-persistence) (refs persistence), [PLAN-atom-refactor.md §4 row CK3](../../../06%20-%20Roadmaps/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms)
 **Related atoms**: [overlay-commit](../concepts/overlay-commit.md), [apply-overlay-commit](apply-overlay-commit.md), [create-overlay-ref](create-overlay-ref.md), [discipline/save-is-git-style](../discipline/save-is-git-style.md)
 
 ## Definition

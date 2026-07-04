@@ -1,7 +1,7 @@
 # Discipline: Text as canonical
 
 **Status**: discipline (V1 invariant; landed S5.0 commit `336a6c7` / submodule `e6620db`)
-**Source specs**: [BSP-005 §S5.0](../../../03%20-%20Blueprint/BSP-005-cell-roadmap.md), [PLAN-S5.0-cell-magic-vocabulary.md §3.5](../../../07%20-%20Status%20Reports/PLAN-S5.0-cell-magic-vocabulary.md#35-schema-simplification--vendorllmkernelllm_kernelmetadata_writerpy-modest), [KB-notebook-target.md §13](../../../03%20-%20Blueprint/KB-notebook-target.md#13-cell-discipline-zachtronics-not-general-asm), [KB-notebook-target.md §17](../../../03%20-%20Blueprint/KB-notebook-target.md#17-source-layer-and-performing-layer)
+**Source specs**: [BSP-005 §S5.0](../../../03%20-%20Blueprint/BSP-005-cell-roadmap.md), [PLAN-S5.0-cell-magic-vocabulary.md §3.5](../../../06%20-%20Roadmaps/PLAN-S5.0-cell-magic-vocabulary.md#35-schema-simplification--vendorllmkernelllm_kernelmetadata_writerpy-modest), [KB-notebook-target.md §13](../../../03%20-%20Blueprint/KB-notebook-target.md#13-cell-discipline-zachtronics-not-general-asm), [KB-notebook-target.md §17](../../../03%20-%20Blueprint/KB-notebook-target.md#17-source-layer-and-performing-layer)
 **Related atoms**: [discipline/zachtronics](zachtronics.md), [concepts/cell](../concepts/cell.md), [concepts/magic](../concepts/magic.md), [operations/parse-cell](../operations/parse-cell.md), [discipline/cell-manager-owns-structure](cell-manager-owns-structure.md)
 
 ## The rule
@@ -52,7 +52,7 @@ Per `vendor/LLMKernel/llm_kernel/metadata_writer.py:migrate_cells_to_canonical_t
 
 [KB-target §17](../../../03%20-%20Blueprint/KB-notebook-target.md#17-source-layer-and-performing-layer) splits the notebook into a **source layer** (cell text, directives, prompt, files, ranges) and a **performing layer** (agents, streams, context packs). This discipline is the source-layer's contract: the visible tile *IS* the source. The performing layer reads the parsed view; operator typing is the only path that mutates kind / flags / args.
 
-The pin in [PLAN-S5.0.1 cell-magic injection defense](../../../07%20-%20Status%20Reports/PLAN-S5.0.1-cell-magic-injection-defense.md) is the one acknowledged exception: the HMAC pin in optional hash mode is the only operator-visible artifact that lives outside `text` (in OS keychain), justified by the prompt-injection threat model. That slice is queued, not yet shipped.
+The pin in [PLAN-S5.0.1 cell-magic injection defense](../../../06%20-%20Roadmaps/PLAN-S5.0.1-cell-magic-injection-defense.md) is the one acknowledged exception: the HMAC pin in optional hash mode is the only operator-visible artifact that lives outside `text` (in OS keychain), justified by the prompt-injection threat model. That slice is queued, not yet shipped.
 
 ## Authoring layer vs runtime layer
 

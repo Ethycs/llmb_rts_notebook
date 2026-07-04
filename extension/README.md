@@ -26,7 +26,7 @@ Shipped extension surfaces:
   envelope — [docs/atoms/operations/continue-turn.md](../docs/04%20-%20Reference/atoms/operations/continue-turn.md).
 - **S5.0** cell-magic dispatcher (`@@<kind>` cell-magic, `@<flag>`
   line-magic) with HMAC injection defense + emission ban + bidirectional
-  strip per [PLAN-S5.0.1](../docs/07%20-%20Status%20Reports/PLAN-S5.0-cell-magic-vocabulary.md). See [magic atom](../docs/04%20-%20Reference/atoms/concepts/magic.md) and
+  strip per [PLAN-S5.0.1](../docs/06%20-%20Roadmaps/PLAN-S5.0-cell-magic-vocabulary.md). See [magic atom](../docs/04%20-%20Reference/atoms/concepts/magic.md) and
   [discipline/certified-magic-emitter](../docs/04%20-%20Reference/atoms/discipline/certified-magic-emitter.md).
 - **S5.0.3.x** headless executor support: shares the cell-magic parser +
   HMAC signer + strip code with the extension as the canonical library
@@ -36,20 +36,20 @@ Shipped extension surfaces:
 - **S5.0.4 privileged magic emission** (commit `838aa85`) — promotion
   chip + grant/revoke toolbar + privilege header. Privileged agents
   can emit structural cells via `emit_magic_cell`; unprivileged stream
-  emissions stay sanitized. See [PLAN-S5.0.4](../docs/07%20-%20Status%20Reports/PLAN-S5.0.4-privileged-magic-emission.md).
+  emissions stay sanitized. See [PLAN-S5.0.4](../docs/06%20-%20Roadmaps/PLAN-S5.0.4-privileged-magic-emission.md).
 - **S5.5 sections** (commits `4c8e8a7` → `8251a5a`) — full state
   machine with dual-rep invariant and auto-flip on the kernel side;
   extension ships section operator commands (`llmnb.section.create` /
   `.rename` / `.delete` / `.setStatus` / `.openActions`), section-header
   decoration, `@@section` recognition, and native VS Code markdown-fold
   collapse so sections behave like Jupyter cell groups without a custom
-  panel. See [PLAN-S5.5](../docs/07%20-%20Status%20Reports/PLAN-S5.5-sections.md).
+  panel. See [PLAN-S5.5](../docs/06%20-%20Roadmaps/PLAN-S5.5-sections.md).
 - **S7 sidebar activity-bar trees** (commit `8aaa3e3`) — zones tree,
   agents tree, recent-activity tree as
   `vscode.TreeDataProvider`s consuming `metadata.rts.{zone.agents,
   layout, event_log.runs}`. Activity tree paginates via the
   `llmnb.sidebar.activity.loadMore` command. Code under
-  [src/sidebar/](src/sidebar/). See [PLAN-S7](../docs/07%20-%20Status%20Reports/PLAN-S7-sidebar-trees.md).
+  [src/sidebar/](src/sidebar/). See [PLAN-S7](../docs/06%20-%20Roadmaps/PLAN-S7-sidebar-trees.md).
 - **S8** partial inline `vscode.diff` for `propose_edit` spans
   (production code; contract tests pending).
 - **S9** cell-toolbar interrupt button (SIGINT to agent process).
@@ -63,7 +63,7 @@ Shipped extension surfaces:
   UX (search box + result tree + scroll-into-view) since the literal
   "floating search bar above the editor" is blocked on VS Code API.
   See [FSP-002](../docs/03%20-%20Blueprint/FSP-002-cell-search-collapse.md) and
-  [PLAN-S10](../docs/07%20-%20Status%20Reports/PLAN-S10-three-pane-search.md).
+  [PLAN-S10](../docs/06%20-%20Roadmaps/PLAN-S10-three-pane-search.md).
 - **Inspect mode V1** (commit `92c7412`) — read-only per-cell view of
   the latest RunFrame + ContextManifest produced by the kernel's
   BSP-008 substrate ([atoms/concepts/run-frame.md](../docs/04%20-%20Reference/atoms/concepts/run-frame.md),
@@ -78,11 +78,11 @@ Shipped extension surfaces:
 - **V2 — branch-switching UX** (commit `667dd68`) — sidebar Branches
   subnode under each agent that has forked descendants. Lineage
   recovered from `metadata.rts.zone.event_log[*]` `fork_agent`
-  envelopes (no kernel changes). See [PLAN-V2-branch-switching-ux](../docs/07%20-%20Status%20Reports/PLAN-V2-branch-switching-ux.md).
+  envelopes (no kernel changes). See [PLAN-V2-branch-switching-ux](../docs/06%20-%20Roadmaps/PLAN-V2-branch-switching-ux.md).
 - **V2 — output-kind lens UI** (commit `85bd5e4`) — 5th sidebar view
   grouping every tagged span across the active notebook by `output_kind`.
   Pure read-side. Code under [src/sidebar/output-kind-lens/](src/sidebar/output-kind-lens/).
-  See [PLAN-V2-output-kind-lens](../docs/07%20-%20Status%20Reports/PLAN-V2-output-kind-lens.md).
+  See [PLAN-V2-output-kind-lens](../docs/06%20-%20Roadmaps/PLAN-V2-output-kind-lens.md).
 
 **Deferred:** S5.0.6 (nvim driver) deferred to whenever nvim operator
 dogfooding pressure justifies the per-cell affordance — the headless
@@ -149,6 +149,6 @@ is preserved behind `llmnb.kernel.useStub = true`.
 
 - [docs/atoms/concepts/cell.md](../docs/04%20-%20Reference/atoms/concepts/cell.md) — what cells are post-S5.0.
 - [docs/atoms/concepts/magic.md](../docs/04%20-%20Reference/atoms/concepts/magic.md) — the `@@`/`@` vocabulary.
-- [docs/notebook/PLAN-S5.0-cell-magic-vocabulary.md](../docs/07%20-%20Status%20Reports/PLAN-S5.0-cell-magic-vocabulary.md) — the cell-magic + injection-defense plan.
+- [docs/notebook/PLAN-S5.0-cell-magic-vocabulary.md](../docs/06%20-%20Roadmaps/PLAN-S5.0-cell-magic-vocabulary.md) — the cell-magic + injection-defense plan.
 - [docs/rfcs/RFC-006-kernel-extension-wire-format.md](../docs/05%20-%20Standards/rfcs/RFC-006-kernel-extension-wire-format.md) — kernel↔extension wire (v2.1.0).
 - [docs/rfcs/RFC-008-kernel-host-integration.md](../docs/05%20-%20Standards/rfcs/RFC-008-kernel-host-integration.md) — host integration + TCP transport (v1.0.1).

@@ -1,7 +1,7 @@
 # Discipline: Cell Manager owns structure
 
 **Status**: discipline (V1 invariant; structural API is now the text-mutation primitives in `cell_manager.py`, S5.0 commit `336a6c7` / submodule `e6620db`)
-**Source specs**: [KB-notebook-target.md §2](../../../03%20-%20Blueprint/KB-notebook-target.md#2-what-we-already-have) (Cell Manager named), [KB-notebook-target.md §17](../../../03%20-%20Blueprint/KB-notebook-target.md#17-source-layer-and-performing-layer) (source/performing split), [BSP-002 §13.2.3](../../../03%20-%20Blueprint/BSP-002-conversation-graph.md#1323-cell-kind-merge-invariants-kb-target-221-forward-reference) (merge invariants), [BSP-005 §S5.0](../../../03%20-%20Blueprint/BSP-005-cell-roadmap.md), [PLAN-S5.0-cell-magic-vocabulary.md §3.8](../../../07%20-%20Status%20Reports/PLAN-S5.0-cell-magic-vocabulary.md#38-cell-manager-text-operations--vendorllmkernelllm_kernelcell_managerpy-new-80-loc), [BSP-007 §2.4](../../../03%20-%20Blueprint/BSP-007-overlay-git-semantics.md#24-materialization) (Cell Manager as resolver)
+**Source specs**: [KB-notebook-target.md §2](../../../03%20-%20Blueprint/KB-notebook-target.md#2-what-we-already-have) (Cell Manager named), [KB-notebook-target.md §17](../../../03%20-%20Blueprint/KB-notebook-target.md#17-source-layer-and-performing-layer) (source/performing split), [BSP-002 §13.2.3](../../../03%20-%20Blueprint/BSP-002-conversation-graph.md#1323-cell-kind-merge-invariants-kb-target-221-forward-reference) (merge invariants), [BSP-005 §S5.0](../../../03%20-%20Blueprint/BSP-005-cell-roadmap.md), [PLAN-S5.0-cell-magic-vocabulary.md §3.8](../../../06%20-%20Roadmaps/PLAN-S5.0-cell-magic-vocabulary.md#38-cell-manager-text-operations--vendorllmkernelllm_kernelcell_managerpy-new-80-loc), [BSP-007 §2.4](../../../03%20-%20Blueprint/BSP-007-overlay-git-semantics.md#24-materialization) (Cell Manager as resolver)
 **Related atoms**: [overlay-commit](../concepts/overlay-commit.md), [apply-overlay-commit](../operations/apply-overlay-commit.md), [magic](../concepts/magic.md), [text-as-canonical](text-as-canonical.md), [discipline/save-is-git-style](save-is-git-style.md), [discipline/zachtronics](zachtronics.md)
 
 ## The rule
@@ -17,7 +17,7 @@ It materializes the visible cell arrangement by folding `commits[]` from the ove
 
 ## Structural API (text-mutation primitives, S5.0)
 
-Per [PLAN-S5.0-cell-magic-vocabulary.md §3.8](../../../07%20-%20Status%20Reports/PLAN-S5.0-cell-magic-vocabulary.md#38-cell-manager-text-operations--vendorllmkernelllm_kernelcell_managerpy-new-80-loc), the Cell Manager's structural API is now five text-mutation primitives in `vendor/LLMKernel/llm_kernel/cell_manager.py`. Each operates on `cells[<id>].text` (the canonical source per [text-as-canonical](text-as-canonical.md)) and returns the mutated text; the writer is the only sink that persists it.
+Per [PLAN-S5.0-cell-magic-vocabulary.md §3.8](../../../06%20-%20Roadmaps/PLAN-S5.0-cell-magic-vocabulary.md#38-cell-manager-text-operations--vendorllmkernelllm_kernelcell_managerpy-new-80-loc), the Cell Manager's structural API is now five text-mutation primitives in `vendor/LLMKernel/llm_kernel/cell_manager.py`. Each operates on `cells[<id>].text` (the canonical source per [text-as-canonical](text-as-canonical.md)) and returns the mutated text; the writer is the only sink that persists it.
 
 | Primitive | Effect on `cells[<id>].text` |
 |---|---|

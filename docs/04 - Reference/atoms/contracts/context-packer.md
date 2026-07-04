@@ -2,7 +2,7 @@
 
 **Status**: `contract` (V1 shipped — BSP-008 K-CTXR slice landed via S3.5 / K-AS-A / submodule commit `87cb127` (`b983148`); pure deterministic walker present in code)
 **Module**: `vendor/LLMKernel/llm_kernel/context_packer.py`
-**Source specs**: [BSP-008 §2](../../../03%20-%20Blueprint/BSP-008-contextpacker-runframes.md#2-contextpacker--purpose) (purpose), [BSP-008 §3](../../../03%20-%20Blueprint/BSP-008-contextpacker-runframes.md#3-contextpacker-v1-algorithm) (algorithm), [BSP-008 §4](../../../03%20-%20Blueprint/BSP-008-contextpacker-runframes.md#4-contextmanifest-schema) (output schema), [PLAN-S3.5-context-packer.md](../../../07%20-%20Status%20Reports/PLAN-S3.5-context-packer.md), [decisions/v1-contextpacker-walk](../decisions/v1-contextpacker-walk.md)
+**Source specs**: [BSP-008 §2](../../../03%20-%20Blueprint/BSP-008-contextpacker-runframes.md#2-contextpacker--purpose) (purpose), [BSP-008 §3](../../../03%20-%20Blueprint/BSP-008-contextpacker-runframes.md#3-contextpacker-v1-algorithm) (algorithm), [BSP-008 §4](../../../03%20-%20Blueprint/BSP-008-contextpacker-runframes.md#4-contextmanifest-schema) (output schema), [PLAN-S3.5-context-packer.md](../../../06%20-%20Roadmaps/PLAN-S3.5-context-packer.md), [decisions/v1-contextpacker-walk](../decisions/v1-contextpacker-walk.md)
 **Related atoms**: [context-manifest](../concepts/context-manifest.md), [run-frame](../concepts/run-frame.md), [contracts/agent-supervisor](agent-supervisor.md), [contracts/metadata-writer](metadata-writer.md)
 
 ## Definition

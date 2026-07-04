@@ -1,7 +1,7 @@
 # Driver
 
 **Status**: V1 shipped (S5.0.x wave — PLAN-S5.0.3e landed 2026-04-29; outer commit pin `b493ee5`; submodule pin `2c090a4`; live-mode functional as of PLAN-S5.0.3.1 / outer commit `27c0fcc`, 2026-04-30)
-**Source specs**: [PLAN-S5.0.3 §3](../../../07%20-%20Status%20Reports/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#3-reorg-shape) (package layout), [PLAN-S5.0.3 §6](../../../07%20-%20Status%20Reports/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#6-cli-surface) (executor CLI), [PLAN-S5.0.3 §9](../../../07%20-%20Status%20Reports/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#9-interface-contracts-locked-before-dispatch) (driver interface contracts), [RFC-008 §"Transport boundary"](../../../05%20-%20Standards/rfcs/RFC-008-pty-transport.md)
+**Source specs**: [PLAN-S5.0.3 §3](../../../06%20-%20Roadmaps/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#3-reorg-shape) (package layout), [PLAN-S5.0.3 §6](../../../06%20-%20Roadmaps/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#6-cli-surface) (executor CLI), [PLAN-S5.0.3 §9](../../../06%20-%20Roadmaps/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#9-interface-contracts-locked-before-dispatch) (driver interface contracts), [RFC-008 §"Transport boundary"](../../../05%20-%20Standards/rfcs/RFC-008-pty-transport.md)
 **Related atoms**: [agent](agent.md), [transport-mode](transport-mode.md), [discipline/wire-as-public-api](../discipline/wire-as-public-api.md), [contracts/kernel-client](../contracts/kernel-client.md), [protocols/wire-handshake](../protocols/wire-handshake.md)
 
 ## Definition
@@ -21,7 +21,7 @@ A **driver** is a peer-of-extension client that consumes the [wire](../disciplin
 
 ## The lint boundary (enforced)
 
-Per [PLAN-S5.0.3 §3.3](../../../07%20-%20Status%20Reports/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#33-lint-boundary), CI rejects any import of the form `llm_kernel.<x>` where `<x> != "wire"` from any path under `llm_client/**`. A unit test (`tests/test_lint_boundary.py`) re-runs the same check so the rule is visible inside the repo, not only on CI.
+Per [PLAN-S5.0.3 §3.3](../../../06%20-%20Roadmaps/PLAN-S5.0.3-driver-extraction-and-external-runnability.md#33-lint-boundary), CI rejects any import of the form `llm_kernel.<x>` where `<x> != "wire"` from any path under `llm_client/**`. A unit test (`tests/test_lint_boundary.py`) re-runs the same check so the rule is visible inside the repo, not only on CI.
 
 This is the formal version of a discipline the VS Code extension already follows by virtue of being TypeScript: it cannot import Python kernel modules at all. The lint generalises that property to any future Python-side driver.
 

@@ -1,7 +1,7 @@
 # Discipline: Sub-agent dispatch pattern
 
 **Status**: discipline (coordinator methodology, not artifact spec)
-**Source specs**: [Engineering_Guide.md](../../../../Engineering_Guide.md) (multi-agent rounds, parallel-test discipline), [PLAN-atom-refactor.md §6](../../../07%20-%20Status%20Reports/PLAN-atom-refactor.md) (fan-out template), [PLAN-v1-roadmap.md](../../../07%20-%20Status%20Reports/PLAN-v1-roadmap.md) (multi-round campaign structure)
+**Source specs**: [Engineering_Guide.md](../../../../Engineering_Guide.md) (multi-agent rounds, parallel-test discipline), [PLAN-atom-refactor.md §6](../../../06%20-%20Roadmaps/PLAN-atom-refactor.md) (fan-out template), [PLAN-v1-roadmap.md](../../../06%20-%20Roadmaps/PLAN-v1-roadmap.md) (multi-round campaign structure)
 **Related atoms**: [zachtronics](zachtronics.md) (visible-tile principle), [save-is-git-style](save-is-git-style.md) (commit-disciplined work units)
 
 ## What this atom captures
@@ -97,4 +97,4 @@ The boundary at ~50–200 LoC is where the coordinator-vs-delegate tradeoff inve
 - [discipline/zachtronics](zachtronics.md) — visible tiles principle (applies to agent briefs too: every constraint visible in the brief, no hidden expectations)
 - [discipline/save-is-git-style](save-is-git-style.md) — agent commits are atomic + reversible per the same discipline
 - [Engineering_Guide.md §8](../../../../Engineering_Guide.md) — multi-agent rounds (broader project methodology)
-- [PLAN-atom-refactor.md §6](../../../07%20-%20Status%20Reports/PLAN-atom-refactor.md) — the original fan-out template that evolved into this pattern
+- [PLAN-atom-refactor.md §6](../../../06%20-%20Roadmaps/PLAN-atom-refactor.md) — the original fan-out template that evolved into this pattern

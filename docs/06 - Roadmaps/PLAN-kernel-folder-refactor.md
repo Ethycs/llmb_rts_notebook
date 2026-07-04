@@ -1,7 +1,7 @@
 # PLAN — Kernel folder refactor: layout hygiene + package regrouping
 
 **Status**: drafted 2026-07-03. Not started. Operational analog of
-[`ROADMAP-kernel-folders.md`](../06%20-%20Roadmaps/ROADMAP-kernel-folders.md)
+[`ROADMAP-kernel-folders.md`](ROADMAP-kernel-folders.md)
 (the strategic narrative; Phases 1/2/3 here = Horizons 1/2/3 there).
 Companion plan to
 [`PLAN-kernel-development.md`](PLAN-kernel-development.md) (code
@@ -209,7 +209,7 @@ valid — file contents don't change — only path prefixes move.
    `vendor/LLMKernel/docs/`, and the two READMEs.
 2. Write `tools/check_doc_links.py` (precedent:
    `tools/check_atom_drift.py`): for every
-   `[...](...vendor/LLMKernel/...)` and intra-docs relative link,
+   `[...](../07%20-%20Status%20Reports/...vendor/LLMKernel/...)` and intra-docs relative link,
    assert the target file exists. Run it in Phase 1 too (it will
    catch R-05/R-07 fallout) and keep it as a standing tool.
 3. Also patch in the sweep: SE-11's already-broken

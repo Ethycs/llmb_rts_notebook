@@ -1,7 +1,7 @@
 # Decision: V1 has no nesting — neither sections nor merge re-merge
 
 **Status**: decision (V1 lock-in, 2026-04-28)
-**Source specs**: [PLAN-atom-refactor.md §4 rows D3, D6](../../../07%20-%20Status%20Reports/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms), [BSP-002 §13.1.1](../../../03%20-%20Blueprint/BSP-002-conversation-graph.md#1311-schema--metadatartszonesections), [KB-notebook-target.md §0.1](../../../03%20-%20Blueprint/KB-notebook-target.md#01-naming-reconciliation)
+**Source specs**: [PLAN-atom-refactor.md §4 rows D3, D6](../../../06%20-%20Roadmaps/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms), [BSP-002 §13.1.1](../../../03%20-%20Blueprint/BSP-002-conversation-graph.md#1311-schema--metadatartszonesections), [KB-notebook-target.md §0.1](../../../03%20-%20Blueprint/KB-notebook-target.md#01-naming-reconciliation)
 **Related atoms**: [decisions/v1-flat-sections](v1-flat-sections.md), [discipline/cell-manager-owns-structure](../discipline/cell-manager-owns-structure.md), [operations/merge-cells](../operations/merge-cells.md), [concepts/section](../concepts/section.md)
 
 ## The decision
@@ -49,4 +49,4 @@ The schema doesn't change at any of these unlocks — only validator rules relax
 - [operations/merge-cells](../operations/merge-cells.md) — where K94 fires on re-merge attempt.
 - [operations/split-cell](../operations/split-cell.md) — the operator's escape hatch.
 - [concepts/sub-turn](../concepts/sub-turn.md) — sub-turns are 1-indexed within ONE merge; re-merge would multiply that.
-- [PLAN-atom-refactor.md §4](../../../07%20-%20Status%20Reports/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms) — rows D3 + D6.
+- [PLAN-atom-refactor.md §4](../../../06%20-%20Roadmaps/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms) — rows D3 + D6.

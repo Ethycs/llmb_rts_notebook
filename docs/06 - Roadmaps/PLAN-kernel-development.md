@@ -59,7 +59,7 @@ it the substrate.
   are out of scope.
 - **No V2 UX work**. The V2 lane (branch-switching UX,
   output-kind lens) is UI-side and lives under BSP-005 §6.6 /
-  [ROADMAP.md](../06%20-%20Roadmaps/ROADMAP.md).
+  [ROADMAP.md](ROADMAP.md).
 - **No changes to the RFC-006 v2 wire format**. Extensions add tools;
   extensions do not change envelopes.
 - **No changes to RFC-002 canonical system prompt template major
@@ -83,7 +83,7 @@ recommended priority (highest first).
 | SE-08 | Med | [RunFrame schema (BSP-008)](../03%20-%20Blueprint/BSP-008-contextpacker-runframes.md) + `executor_id` field | `executor_id` is defined on RunFrames but always equals `agent_id` in practice. Field mislead future readers about what is polymorphic. Either commit to polymorphism (slice ties to PLAN-kernel-facade) or remove the field. | Deferred: this is downstream of the facade extraction. Recommendation: keep the field, document as "always equals `agent_id` until executor abstraction lands" in the identity-model doc (SE-06). Do not remove — polymorphism is the eventual target. | Covered by SE-06. |
 | SE-09 | Low | [mcp_server.py:186](../../vendor/LLMKernel/llm_kernel/mcp_server.py) `_handlers` dict + [custom_messages.py](../../vendor/LLMKernel/llm_kernel/custom_messages.py) `register_handler` | The dispatcher registers handlers per message type — event routing, not addressed dispatch. My earlier "kernel is microkernel-shaped already" claim is optimistic; there is real distance to a documented bus contract with service identity and capability discovery. | Deferred: not touched by any Part 2 slice. Bus formalization only lands when a second in-kernel routing concern beyond the current envelope routing emerges (see §5 deferred items). | Not verified in this plan. |
 | SE-10 | Low | [mcp_manager.py:16](../../vendor/LLMKernel/llm_kernel/mcp_manager.py) vs [mcp_server.py:36](../../vendor/LLMKernel/llm_kernel/mcp_server.py) | Client uses `fastmcp.Client`; server uses the lower-level official `mcp.server.Server`. Mixed conventions in adjacent modules. | Deferred: convergence to FastMCP everywhere is a cleanup that should ride on a separate slice when someone is next deep in `mcp_server.py`. External MCP transport (slice B) will add a FastMCP server; convergence follows opportunistically. | Not verified in this plan. |
-| SE-11 | Low | [docs/04 - Reference/kernel/README.md](../04%20-%20Reference/kernel/README.md) Planning-artifacts section | The Planning-artifacts table there links to `PLAN-kernel-facade.md` at the folder-local path — but after the doc reorg the file lives at [`docs/07 - Status Reports/PLAN-kernel-facade.md`](PLAN-kernel-facade.md). Broken link. | Fix the link to reference the Status-Reports location. Consider whether Planning-artifacts should be a section in the kernel README at all (all PLAN files now live in `07 - Status Reports/`). | Manual click-through in an IDE preview. |
+| SE-11 | Low | [docs/04 - Reference/kernel/README.md](../04%20-%20Reference/kernel/README.md) Planning-artifacts section | The Planning-artifacts table there links to `PLAN-kernel-facade.md` at the folder-local path — but after the doc reorg the file lives at [`docs/06 - Roadmaps/PLAN-kernel-facade.md`](PLAN-kernel-facade.md). Broken link. | Fix the link to reference the Roadmaps location. Consider whether Planning-artifacts should be a section in the kernel README at all (all PLAN files now live in `06 - Roadmaps/`). | Manual click-through in an IDE preview. |
 | SE-12 | Low | [_provisioning.py:59-104](../../vendor/LLMKernel/llm_kernel/_provisioning.py) `CANONICAL_SYSTEM_PROMPT_TEMPLATE` | The system prompt aggressively suppresses free-form text (DR-0010) — necessary given the MCP-only surface, but tight. A `reflect(note, importance)` or `note(observation, importance)` tool that captures intentional prose without flooding the operator could be a release valve for pattern violations. | Deferred: design work. Not blocking. Track as an RFC-001 v1.2 candidate. | N/A. |
 
 **Priority legend**: **High** = ships broken behavior or blocks any future writer path. **Med** = quality-of-life or new-slice-blocker. **Low** = polish or deferred design.
@@ -202,7 +202,7 @@ pixi run -e kernel python -m llm_kernel metadata-writer-smoke
   code hygiene).
 - [`docs/04 - Reference/kernel/README.md`](../04%20-%20Reference/kernel/README.md)
   — the kernel-substrate doc index (SE-06 and SE-07 land there).
-- [`ROADMAP.md`](../06%20-%20Roadmaps/ROADMAP.md) — the V2 strategic
+- [`ROADMAP.md`](ROADMAP.md) — the V2 strategic
   queue.
 
 ## §9. Definition of done

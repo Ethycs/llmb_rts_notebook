@@ -1,7 +1,7 @@
 # Decision: V1 ships the ArtifactRef shape; body inline, V2 streams
 
 **Status**: decision (V1 lock-in, 2026-04-28)
-**Source specs**: [KB-notebook-target.md §0.9](../../../03%20-%20Blueprint/KB-notebook-target.md#09-artifacts--v1-ships-the-shape-v2-ships-streaming), [BSP-002 §13.5.3](../../../03%20-%20Blueprint/BSP-002-conversation-graph.md#1353-artifactref-shape-on-metadatartszoneblobssha256), [PLAN-atom-refactor.md §4](../../../07%20-%20Status%20Reports/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms)
+**Source specs**: [KB-notebook-target.md §0.9](../../../03%20-%20Blueprint/KB-notebook-target.md#09-artifacts--v1-ships-the-shape-v2-ships-streaming), [BSP-002 §13.5.3](../../../03%20-%20Blueprint/BSP-002-conversation-graph.md#1353-artifactref-shape-on-metadatartszoneblobssha256), [PLAN-atom-refactor.md §4](../../../06%20-%20Roadmaps/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms)
 **Related atoms**: [concepts/artifact-ref](../concepts/artifact-ref.md), [concepts/blob](../concepts/blob.md), [decisions/v1-runframe-minimal](v1-runframe-minimal.md)
 
 ## The decision
@@ -59,4 +59,4 @@ V2+ adds `byte_index`, `line_index`, `semantic_index`, `loaded_windows`, `pinned
 - [concepts/blob](../concepts/blob.md) — content-addressed storage; ArtifactRef references it.
 - [decisions/v1-runframe-minimal](v1-runframe-minimal.md) — `artifact_windows[]` deferred is part of the same V2-streaming bundle.
 - [BSP-002 §13.5.3](../../../03%20-%20Blueprint/BSP-002-conversation-graph.md#1353-artifactref-shape-on-metadatartszoneblobssha256) — the schema source.
-- [PLAN-atom-refactor.md §4](../../../07%20-%20Status%20Reports/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms) — the 24-row decision table.
+- [PLAN-atom-refactor.md §4](../../../06%20-%20Roadmaps/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms) — the 24-row decision table.

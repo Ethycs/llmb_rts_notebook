@@ -1,7 +1,7 @@
 # Decision: V1 sections are flat (no nesting)
 
 **Status**: decision (V1 lock-in, 2026-04-28)
-**Source specs**: [PLAN-atom-refactor.md §4 rows D3, D5](../../../07%20-%20Status%20Reports/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms), [KB-notebook-target.md §0.1](../../../03%20-%20Blueprint/KB-notebook-target.md#01-naming-reconciliation), [BSP-002 §13.1.1](../../../03%20-%20Blueprint/BSP-002-conversation-graph.md#1311-schema--metadatartszonesections)
+**Source specs**: [PLAN-atom-refactor.md §4 rows D3, D5](../../../06%20-%20Roadmaps/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms), [KB-notebook-target.md §0.1](../../../03%20-%20Blueprint/KB-notebook-target.md#01-naming-reconciliation), [BSP-002 §13.1.1](../../../03%20-%20Blueprint/BSP-002-conversation-graph.md#1311-schema--metadatartszonesections)
 **Related atoms**: [section](../concepts/section.md), [decisions/v1-no-nesting](v1-no-nesting.md), [operations/move-cell](../operations/move-cell.md), [operations/merge-cells](../operations/merge-cells.md)
 
 ## The decision
@@ -56,4 +56,4 @@ The schema doesn't change. Only the validator rule and the renderer.
 - [operations/create-section](../operations/create-section.md) — where the rejection is enforced.
 - [operations/merge-cells](../operations/merge-cells.md) — uses this for the same-section precondition.
 - [decisions/v1-no-nesting](v1-no-nesting.md) — the broader umbrella.
-- [PLAN-atom-refactor.md §4](../../../07%20-%20Status%20Reports/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms) — the 24-row decision table this is row D3 + D5.
+- [PLAN-atom-refactor.md §4](../../../06%20-%20Roadmaps/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms) — the 24-row decision table this is row D3 + D5.

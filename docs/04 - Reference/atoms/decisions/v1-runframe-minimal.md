@@ -1,7 +1,7 @@
 # Decision: V1 RunFrame ships the minimal subset
 
 **Status**: decision (V1 lock-in, 2026-04-28)
-**Source specs**: [KB-notebook-target.md §0.5](../../../03%20-%20Blueprint/KB-notebook-target.md#05-runframes--minimal-v1-schema), [BSP-008 §7](../../../03%20-%20Blueprint/BSP-008-contextpacker-runframes.md), [PLAN-atom-refactor.md §4](../../../07%20-%20Status%20Reports/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms)
+**Source specs**: [KB-notebook-target.md §0.5](../../../03%20-%20Blueprint/KB-notebook-target.md#05-runframes--minimal-v1-schema), [BSP-008 §7](../../../03%20-%20Blueprint/BSP-008-contextpacker-runframes.md), [PLAN-atom-refactor.md §4](../../../06%20-%20Roadmaps/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms)
 **Related atoms**: [concepts/run-frame](../concepts/run-frame.md), [concepts/context-manifest](../concepts/context-manifest.md), [decisions/v1-contextpacker-walk](v1-contextpacker-walk.md)
 
 ## The decision
@@ -65,4 +65,4 @@ The shape doesn't change. Only fields are added.
 - [decisions/capabilities-deferred-v2](capabilities-deferred-v2.md) — why `tool_permissions` is missing.
 - [decisions/v1-artifact-shape](v1-artifact-shape.md) — why `artifact_windows[]` is missing.
 - [BSP-008 §7](../../../03%20-%20Blueprint/BSP-008-contextpacker-runframes.md) — the schema source.
-- [PLAN-atom-refactor.md §4](../../../07%20-%20Status%20Reports/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms) — the 24-row decision table.
+- [PLAN-atom-refactor.md §4](../../../06%20-%20Roadmaps/PLAN-atom-refactor.md#4-the-24-v1-decisions-to-land-in-decisions-atoms) — the 24-row decision table.

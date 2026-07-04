@@ -53,7 +53,7 @@ The attribute is **additive** on the wire. RFC-006 §1's "Mandatory attributes p
 ## V1 vs V2+
 
 - **V1**: ship the tag on emitted spans; no lens UI. The attribute round-trips through the wire ([RFC-006 §1](../../../05%20-%20Standards/rfcs/RFC-006-kernel-extension-wire-format.md)) and is recorded in the immutable span record.
-- **V2 (2026-05-29 partial-ship)**: lens UI shipped as the 5th sidebar view (`llmnb.outputKinds`) in the existing activity-bar container. Groups every tagged span across the active notebook by `outputKind`; high-attention kinds (`decision` / `question` / `warning`) render first. Each row click reveals the source cell via `llmnb.revealCell`. Unknown values bucket under a synthetic `<other>` group (forward-compat). See [PLAN-V2-output-kind-lens](../../../07%20-%20Status%20Reports/PLAN-V2-output-kind-lens.md). Operator-defined custom lenses + per-cell filtering remain queued.
+- **V2 (2026-05-29 partial-ship)**: lens UI shipped as the 5th sidebar view (`llmnb.outputKinds`) in the existing activity-bar container. Groups every tagged span across the active notebook by `outputKind`; high-attention kinds (`decision` / `question` / `warning`) render first. Each row click reveals the source cell via `llmnb.revealCell`. Unknown values bucket under a synthetic `<other>` group (forward-compat). See [PLAN-V2-output-kind-lens](../../../06%20-%20Roadmaps/PLAN-V2-output-kind-lens.md). Operator-defined custom lenses + per-cell filtering remain queued.
 
 ## See also
 

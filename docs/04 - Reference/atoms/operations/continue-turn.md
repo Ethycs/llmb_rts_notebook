@@ -1,7 +1,7 @@
 # Operation: continue-turn
 
 **Status**: V1 shipped (canonical `@@agent <id>` cell-magic form, S5.0 commit `336a6c7` / submodule `e6620db`; legacy `@<id>:` retained as column-0 alias; BSP-002 K-AS slice; `send_user_turn` shipped in S3 / submodule commit `3d43efb`)
-**Source specs**: [BSP-002 §3](../../../03%20-%20Blueprint/BSP-002-conversation-graph.md#3-cell-directive-grammar) (directive grammar), [BSP-002 §4.2](../../../03%20-%20Blueprint/BSP-002-conversation-graph.md#42-continuation) (continuation lifecycle), [BSP-002 §4.6](../../../03%20-%20Blueprint/BSP-002-conversation-graph.md#46-cross-agent-context-handoff) (cross-agent handoff), [PLAN-S5.0-cell-magic-vocabulary.md §3.3](../../../07%20-%20Status%20Reports/PLAN-S5.0-cell-magic-vocabulary.md#33-cell_magics-registry--vendorllmkernelllm_kernelmagic_registrypy-new-150-loc) (`@@agent` registry entry), [PLAN-S5.0-cell-magic-vocabulary.md §3.9](../../../07%20-%20Status%20Reports/PLAN-S5.0-cell-magic-vocabulary.md#39-legacy-compat--same-parser) (legacy alias)
+**Source specs**: [BSP-002 §3](../../../03%20-%20Blueprint/BSP-002-conversation-graph.md#3-cell-directive-grammar) (directive grammar), [BSP-002 §4.2](../../../03%20-%20Blueprint/BSP-002-conversation-graph.md#42-continuation) (continuation lifecycle), [BSP-002 §4.6](../../../03%20-%20Blueprint/BSP-002-conversation-graph.md#46-cross-agent-context-handoff) (cross-agent handoff), [PLAN-S5.0-cell-magic-vocabulary.md §3.3](../../../06%20-%20Roadmaps/PLAN-S5.0-cell-magic-vocabulary.md#33-cell_magics-registry--vendorllmkernelllm_kernelmagic_registrypy-new-150-loc) (`@@agent` registry entry), [PLAN-S5.0-cell-magic-vocabulary.md §3.9](../../../06%20-%20Roadmaps/PLAN-S5.0-cell-magic-vocabulary.md#39-legacy-compat--same-parser) (legacy alias)
 **Related atoms**: [agent](../concepts/agent.md), [turn](../concepts/turn.md), [magic](../concepts/magic.md), [spawn-agent](spawn-agent.md), [stop-agent](stop-agent.md)
 
 ## Definition
@@ -32,7 +32,7 @@ Legacy column-0 alias:
 
 ## Legacy `@<id>:` shorthand
 
-Per [PLAN-S5.0 §3.9](../../../07%20-%20Status%20Reports/PLAN-S5.0-cell-magic-vocabulary.md#39-legacy-compat--same-parser) the legacy single-line shorthand `@alpha: hello world` is rewritten to canonical magic form by `cell_text.rewrite_legacy_directives` *before* parsing. The rewrite is **first-line-only**:
+Per [PLAN-S5.0 §3.9](../../../06%20-%20Roadmaps/PLAN-S5.0-cell-magic-vocabulary.md#39-legacy-compat--same-parser) the legacy single-line shorthand `@alpha: hello world` is rewritten to canonical magic form by `cell_text.rewrite_legacy_directives` *before* parsing. The rewrite is **first-line-only**:
 
 - The first non-blank line must match `^@<id>\s*:\s*<rest>` (anchored at column 0).
 - The rewrite produces a two-line head: `@@agent <id>` then `<rest>` (the post-colon body of the first line).
