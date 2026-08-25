@@ -1,7 +1,17 @@
 # PLAN — Kernel development: hygiene sweep + substrate trajectory
 
-**Status**: drafted 2026-06-30. Not started. Companion plan to
+**Status**: **Phase 1 (hygiene sweep) COMPLETE 2026-08-24.** SE-01, SE-03,
+SE-04, SE-05, SE-06, SE-07, SE-11 landed; SE-02 dropped as obsolete (see §3);
+SE-08/09/10/12 remain deferred. Kernel suite **913 passed / 2 skipped**;
+metadata-writer + agent-supervisor smokes green. Phases 2-4 (facade → external
+MCP → extensions) not started — Phase 2 is next. Companion plan to
 [`PLAN-kernel-facade.md`](PLAN-kernel-facade.md) (slice-2 detail).
+
+> **Note (2026-08-24):** the kernel was reorganized into domain subpackages
+> (`supervision/`, `capture/`, `wire/`, `mcp/`, `magics/`, `text/`,
+> `transports/`) after this plan was drafted, so the flat `file:line` anchors
+> in §3 below are stale — the *modules* moved, the sharp edges were still real.
+> Statuses in §3 were reconciled against the post-refactor tree.
 
 **Audience**: an LLM or operator picking up post-V1 kernel work cold.
 Self-contained.
@@ -71,6 +81,35 @@ it the substrate.
 Each row: severity, file:line, one-line fix, verification. Sorted by
 recommended priority (highest first).
 
+**Phase-1 status (2026-08-24)** — reconciled against the post-refactor tree;
+the anchors in the table below are pre-refactor and stale (modules moved into
+subpackages, the sharp edges were still real):
+
+- ✅ **SE-01** — `AgentHandle._stdin_lock` + serialized write/flush in
+  `send_user_turn`; the regression test is verified to fail without the lock.
+- ⛔ **SE-02** — **DROPPED as obsolete.** The row's premise is false on the
+  current tree: `emit_magic_cell` is *not* in `RFC001_ALLOWED_TOOLS` (still the
+  13-tool catalog) and `render_mcp_config` validates exactly those 13 for every
+  agent. `emit_magic_cell` is a *privileged* native tool reached only via the
+  operator-behalf / stream-promotion path (`magics/promote_stream_magic`,
+  supervisor `_privileged_for_magic`), never an agent's allow-listed MCP tool.
+  Adding the prompt bullet would advertise an emission-ban-exempt capability to
+  every agent — against the injection-defense model. No change made.
+- ✅ **SE-03** — keyword-only `send_user_turn(..., inject_notebook_prefix=True)`;
+  `False` skips the missed-turn walk and leaves `last_seen_turn_id` untouched.
+- ✅ **SE-04** — extracted `_resume_if_needed(handle, agent_id, fresh_task_text)`.
+- ✅ **SE-05** — `MetadataWriter.event_log_queue_depth()` +
+  `overflow_checkpoint_count()` on the Family-G heartbeat. Correction: the queue
+  does **not** drop-oldest silently (the row's premise) — `record_run`
+  checkpoints + snapshots to disk (RFC-005 §F13) and `event_log[]` archives, so
+  the second metric is a backpressure-events count, not a lost-envelope count.
+- ✅ **SE-06** — `identity-model.md`. ✅ **SE-07** — `capture-invariants.md`.
+- ✅ **SE-11** — link already fixed by the PLAN-* → `06 - Roadmaps/` move.
+- ⏸ **SE-08 / SE-09 / SE-10 / SE-12** — deferred, unchanged (see §5).
+
+Kernel suite **913 passed / 2 skipped** (908 baseline + 5 new tests);
+metadata-writer + agent-supervisor smokes green.
+
 | # | Severity | File / anchor | Description | Fix | Verification |
 |---|---|---|---|---|---|
 | SE-01 | High | [agent_supervisor.py:639, 770-773](../../vendor/LLMKernel/llm_kernel/agent_supervisor.py) | `send_user_turn` takes `self._lock` only to resolve the handle; the stdin write block runs unlocked. Under any concurrent caller (extensions, external MCP, future PBX) two writers to the same handle interleave lines. | Add `_stdin_lock: threading.Lock` to `AgentHandle`; extract `_write_user_turn_locked(handle, lines)`; refactor the write block to use it. Behavior-preserving. | `test_send_user_turn_concurrent_no_interleave` — two threads dial the same target with distinct bodies; assert stdin contents split cleanly. |
@@ -128,26 +167,26 @@ scope here:
 
 Suggested commit order — each keeps the codebase in a shipping state.
 
-**Phase 1 — Hygiene sweep (SE-01 through SE-07).** No slice
-dependency, ships behavior-preserving improvements. ~1 week.
+**Phase 1 — Hygiene sweep. ✅ COMPLETE 2026-08-24.** No slice
+dependency; behavior-preserving. As-landed (order differed from the
+original suggestion — SE-05 before SE-03/04; docs batched):
 
-1. `refactor(supervisor): per-handle stdin write lock` (SE-01).
-2. `fix(provisioning): include emit_magic_cell in system prompt;
-   template v1.0.1` (SE-02).
-3. `refactor(supervisor): factor _resume_if_needed; add
-   inject_notebook_prefix flag` (SE-03 + SE-04).
-4. `feat(metadata): queue depth + drop count on Family-G heartbeat`
-   (SE-05).
-5. `docs(kernel): identity-model.md` (SE-06).
-6. `docs(kernel): capture-invariants.md` (SE-07).
-7. `docs(kernel): fix stale PLAN-kernel-facade.md link in README`
-   (SE-11).
+1. ✅ `refactor(supervisor): per-handle stdin write lock` (SE-01) — submodule `2da31a4`.
+2. ⛔ SE-02 — dropped as obsolete (see §3); no commit.
+3. ✅ `feat(metadata): event-log queue depth + overflow count on heartbeat`
+   (SE-05) — submodule `0274059`.
+4. ✅ `refactor(supervisor): extract _resume_if_needed + inject_notebook_prefix`
+   (SE-03 + SE-04) — submodule `8be0d6e`.
+5. ✅ `docs(kernel): identity-model + capture-invariants` (SE-06 + SE-07) —
+   superproject `32d8ed1`.
+6. ✅ SE-11 (stale README link) — folded into the PLAN-* → `06 - Roadmaps/` move.
 
-**Phase 2 — Facade extraction (slice A).** Follow the 10-commit
+Superproject gitlink bumps: `32d8ed1` (SE-01 + docs), `8ead400` (SE-05 + SE-03/04).
+
+**Phase 2 — Facade extraction (slice A). ← NEXT.** Follow the 10-commit
 decomposition in [PLAN-kernel-facade.md](PLAN-kernel-facade.md) §Commit
-decomposition. Depends on Phase 1 SE-01, SE-03, SE-04 (the facade
-public methods rely on the write lock and the notebook-prefix flag).
-~1-2 weeks.
+decomposition. Phase-1 prerequisites are in place (SE-01 write lock,
+SE-03/04 notebook-prefix flag + `_resume_if_needed`). ~1-2 weeks.
 
 **Phase 3 — External MCP transport (slice B).** Write a dedicated
 `PLAN-external-mcp-transport.md` at start of the phase — the sketch
@@ -162,14 +201,18 @@ tools if slice B is live). ~1-2 weeks.
 
 ## §7. Test surface
 
-Kernel test suite baseline: **908 tests green** as of `127a034`.
+Kernel test suite baseline: **908 tests green** as of `127a034`;
+**913 passed / 2 skipped** after Phase 1 (5 new tests).
 
-Phase 1 additions (~6-8 new tests):
+Phase 1 additions (as landed):
 - `test_send_user_turn_concurrent_no_interleave` (SE-01)
-- `test_system_prompt_includes_emit_magic_cell` (SE-02)
-- `test_send_user_turn_no_notebook_prefix_skips_handoff_walk`
-  (SE-03)
-- `test_heartbeat_includes_queue_depth_and_drop_count` (SE-05)
+- `test_heartbeat_includes_queue_depth_and_overflow_count` (SE-05)
+- `test_heartbeat_omits_queue_fields_without_writer` (SE-05)
+- `test_send_user_turn_no_notebook_prefix_skips_handoff_walk` (SE-03)
+- `test_resume_if_needed_idempotent_for_live_handle` (SE-04)
+
+(SE-02's proposed `test_system_prompt_includes_emit_magic_cell` was not
+added — SE-02 dropped as obsolete.)
 
 Existing 908 tests must stay green throughout every hygiene commit.
 
@@ -207,14 +250,17 @@ pixi run -e kernel python -m llm_kernel metadata-writer-smoke
 
 ## §9. Definition of done
 
-**Phase 1 done when:**
-- SE-01 through SE-07 land as separate commits (SE-08 through SE-12
-  either deferred with reason or fixed opportunistically).
-- Kernel test suite ≥ 914/914 green (908 baseline + ~6 new tests).
-- All four smoke tests green.
-- [`docs/04 - Reference/kernel/README.md`](../04%20-%20Reference/kernel/README.md)
+**Phase 1 done ✅ (2026-08-24):**
+- ✅ SE-01, SE-03, SE-04, SE-05, SE-06, SE-07, SE-11 landed as separate
+  commits; SE-02 dropped as obsolete (with reason, §3); SE-08/09/10/12
+  deferred (§5).
+- ✅ Kernel test suite **913 passed / 2 skipped** (908 baseline + 5 new;
+  the "≥914 / ~6 new" was an estimate — SE-02's test was not needed).
+- ⚠️ Smokes: `metadata-writer-smoke` + `agent-supervisor-smoke` green;
+  `pty-mode-smoke` not re-run (transport layer, untouched by Phase 1).
+- ✅ [`docs/04 - Reference/kernel/README.md`](../04%20-%20Reference/kernel/README.md)
   "Files in this folder" table marks `identity-model.md` and
-  `capture-invariants.md` as **Present** (not **Planned**).
+  `capture-invariants.md` as **Present**.
 
 **Overall plan done when:**
 - Phases 1-4 land.
