@@ -36,8 +36,8 @@ extension contract rather than being carved into the core.
 | [`README.md`](README.md) | This index. | Present (slice 1). |
 | [`identity-model.md`](identity-model.md) | Single-page reference for every kernel identifier (`agent_id`, `zone_id`, `executor_id`, `trace_id`, `run_id`, `cell_id`, `turn_id`, `manifest_id`, `claude_session_id`, `correlation_id`). | Present (slice 1). |
 | [`capture-invariants.md`](capture-invariants.md) | The substrate's load-bearing properties: every-byte-resets-watchdog, malformed-lines-as-spans, tape-plus-spans, no-silent-drops, K-class error taxonomy. The "what to defend" charter. | Present (slice 1). |
-| `architecture.md` | The `Kernel` facade, `Transport` protocol, `Extension` protocol. Sequence diagrams for boot, transport-bind, extension-register, shutdown. | Planned — slice 2. |
-| `embedding.md` | Library-embedding guide. How to `from llm_kernel import Kernel`, drive it from a Python script / FastAPI app / Jupyter cell. Async-only contract, event-loop ownership, threadsafety. | Planned — slice 2. |
+| [`architecture.md`](architecture.md) | The `Kernel` facade: lifecycle, the construction/shutdown wiring sequence, the in-process kernel shell, the full public surface, the thin `bind_transport` hook, and deviations from the plan. Boot + shutdown sequence diagrams. | Present. |
+| [`embedding.md`](embedding.md) | Library-embedding guide. How to `from llm_kernel import Kernel`, drive it from a Python script / FastAPI app / Jupyter cell. Async-only contract, event-loop ownership, threadsafety. | Present. |
 | `deployment.md` | The three surfaces (internal stdio MCP, kernel-host PTY+socket, external HTTP MCP). Auth/scope model. Session resumption. Operational concerns. | Planned — slice 3. |
 | `external-mcp-reference.md` | Reference docs for the external MCP surface: tool catalog, resource catalog, notification catalog, session-id semantics. | Planned — slice 3. |
 | `extensions.md` | Extension authoring guide. The `Extension` protocol contract. PBX as the worked example. Versioning + prompt-marker conventions. | Planned — slice 4. |
@@ -132,8 +132,9 @@ the trajectory and are kept in the repo for traceability and review.
    (`C:\Users\Qeyto\.claude\plans\*.md`) if implementing planned work.
 4. Read the relevant RFC for any wire-visible change.
 
-**For an extension author (after slice 2 lands):**
-1. Read `architecture.md` to understand the `Kernel` facade and
-   `Extension` protocol.
-2. Read `extensions.md` for the authoring guide.
-3. Use `pbx.md` as a worked example.
+**For an extension author (the `Extension` protocol lands in slice 4):**
+1. Read [`architecture.md`](architecture.md) to understand the `Kernel`
+   facade (the `Extension` protocol is deferred to slice 4).
+2. Read [`embedding.md`](embedding.md) for the library-embedding contract.
+3. Read `extensions.md` for the authoring guide (planned — slice 4).
+4. Use `pbx.md` as a worked example (planned — slice 4).
