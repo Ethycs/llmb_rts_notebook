@@ -39,6 +39,7 @@ Both pure read-side, no kernel changes:
 
 | Slice | Scope | Why now |
 |---|---|---|
+| **Sidebar glanceability** | Animated live-status icons, fleet count badge, `FileDecorationProvider` exception badges, inline reveal/interrupt actions on agent rows | Highest-ROI path to the DR-0001 "fleet at a glance" promise — all stable API, no new render substrate. Scoped in [PLAN-V2-sidebar-glanceability](PLAN-V2-sidebar-glanceability.md); ~2-3 days across 4 independent sub-slices. |
 | **Output-kind lens — per-cell decoration** | Dim cells whose outputs don't match the active filter | Closes the lens story. Blocked on `notebookCellDecoration` API surface (same ceiling as the V1 three-pane gutter); see §4. |
 | **FSP-002 collapse state promotion** (option B) | Per-cell collapse state travels with the `.llmnb` file | Adds `set_cell_metadata_bulk` intent to BSP-003 writer registry; ~1 day. Unblocks collaborative scenarios. |
 | **Inspect mode session lineage** | Inspect mode shows which `claude_session_id` produced each turn across `/branch` / `/revert` | Pure read-side; session ids already persisted. ~half day. |
