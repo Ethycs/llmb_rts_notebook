@@ -1,6 +1,6 @@
 # Plan: V2 sidebar glanceability (live status, badges, inline actions)
 
-**Status**: planned (authored 2026-08-27)
+**Status**: shipped 2026-08-27 (A1-A4 in one pass; three parallel agents wrote the pure modules + T0 tests, orchestrator composed the vscode wiring)
 **Audience**: an LLM (or operator) picking this up cold. Self-contained.
 **Goal**: make the existing S7 sidebar trees carry the "fleet at a glance" load the RTS pivot (DR-0001) promised — animated live-status, count badges, per-node decorations, and inline quick actions — using only stable VS Code API (`engines: ^1.92.0`, zero `enabledApiProposals`).
 
@@ -48,7 +48,7 @@ Four sub-slices, ordered so each ships independently.
 
 - `getTreeItem` for `agent` rows: when the run-state map (see below) says the agent has an in-flight run, use `new vscode.ThemeIcon('loading~spin', getAgentStatusBadgeColor(status))`; otherwise keep the current `person` icon ([agents-tree.ts:138](../../extension/src/sidebar/agents-tree.ts#L138)).
 - Add `item.tooltip = buildAgentTooltip(agent)` returning a `vscode.MarkdownString` (agent id, `runtime_status`, provider, turn count, last event timestamp, active section). `supportThemeIcons: true` so codicons render in the card.
-- New pure helper `extension/src/sidebar/agent-run-state.ts`: derive `hasInFlightRun(agentId, snapshot)` from `metadata.rts.zone.event_log.runs` (a run with `run.start` and no matching `run.complete`/`run.error`). Pure function over the snapshot — same pattern as `agent-lineage.ts` from the branch-switching slice.
+- New pure helper `extension/src/sidebar/agent-run-state.ts`: derive `hasInFlightRun(agentId, snapshot)` from `metadata.rts.zone.run_frames` (a frame with `executor_id === agentId`, null `ended_at`, and a non-terminal `status`). Pure function over the snapshot — same pattern as `agent-lineage.ts` from the branch-switching slice.
 
 ### §3.2 A2 — fleet badge on the Agents view (~2 h)
 
@@ -114,10 +114,15 @@ No wire changes. Reads `metadata.rts.zone.{agents, event_log}` per [PLAN-S6.0 §
 
 ## §7. Definition of done
 
-- [ ] A1: streaming agents spin; every agent row has a Markdown unit-card tooltip.
-- [ ] A2: Agents view badge shows alive count; absent at zero.
-- [ ] A3: reveal + interrupt inline actions render on hover; stop button only on running rows; interrupt reaches the S9 path.
-- [ ] A4: `!!` / `▶` / `✗` decorations render with priority ordering and propagate to zone rows.
-- [ ] ~26 new contract tests pass; no existing S7/V2 sidebar tests regress.
-- [ ] `package.json` still declares zero `enabledApiProposals`.
-- [ ] agent.md, BSP-005 §6.6, ROADMAP §2.2 updated.
+- [x] A1: streaming agents spin; every agent row has a Markdown unit-card tooltip. (`agent-run-state.ts`, 10 T0 tests)
+- [x] A2: Agents view badge shows alive count; absent at zero. (`view-badge.ts`, 5 T0 tests)
+- [x] A3: reveal + interrupt inline actions render on hover; stop button only on running rows (`.running` contextValue gate); interrupt re-resolves the run frame at click time and delegates to the S9 path. (`interrupt-agent-resolver.ts` + `interrupt-agent-command.ts`, 5 T0 tests)
+- [x] A4: `!!` / `▶` / `✗` decorations render with priority ordering; propagation lands on the Zones tree's Agents subnode rather than the zone row itself — the zone row keeps its file URI so git decorations on the `.llmnb` file stay intact. (`agent-decoration-logic.ts` + `agent-decorations.ts`, 10 T0 tests)
+- [x] 30 new T0 unit tests pass (63 unit total); stub tier 379 passing, no S7/V2 sidebar regressions. (Two kernel-handshake smokes flaked on a cold machine and passed on rerun — not sidebar-related.)
+- [x] `package.json` still declares zero `enabledApiProposals`.
+- [x] agent.md, BSP-005 §6.6, ROADMAP §2.1/§2.2 updated.
+
+**Deviation notes (composition pass):**
+- §3.1's original wording derived run state from `event_log.runs`; the real substrate is `zone.run_frames` (`executor_id` / `ended_at` / terminal-status set). §3.1 corrected.
+- A4's attention condition reads OTLP spans from the top-level `metadata.rts.event_log.runs[]` (the lens's own extractor is vscode-bound and cell-output-based, so the pure module re-derives the walk — `// TODO(A4)` marks the fold-back condition).
+- An inline reveal wrapper command (`llmnb.sidebar.revealAgent`) was added because menu invocations pass the tree element, not the `{cell_id}` shape `llmnb.revealCell` expects.

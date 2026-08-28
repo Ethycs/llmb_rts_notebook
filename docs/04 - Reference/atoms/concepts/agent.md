@@ -70,6 +70,7 @@ The `provider` lives on each turn record (so the per-cell badge can render the c
 
 - **V1**: providers limited to `claude-code`; persistent lifecycle (spawn → stays alive → accepts turns via stdin → idle exit on timeout or `/stop`); idle resume via `--resume`; `/branch` and `/revert` data-model ratified.
 - **V2 (2026-05-20 partial-ship)**: branch-switching UX — the S7 Agents sidebar now renders a "Branches" subnode under any agent that has forked descendants (lineage recovered from `metadata.rts.zone.event_log[*]` `fork_agent` envelopes; see [PLAN-V2-branch-switching-ux](../../../06%20-%20Roadmaps/PLAN-V2-branch-switching-ux.md)). Clicking a branch row reveals that branch agent's first cell. Additional providers (`gpt-cli`, `gemini`, `ollama`) and richer Inspect-mode session lineage remain queued.
+- **V2 (2026-08-27 partial-ship)**: sidebar glanceability — agent rows carry live-run state (spinning `loading~spin` icon while a run frame is in flight per [run-frame](run-frame.md) `executor_id`), a Markdown "unit card" tooltip (status / provider / turn count / last activity), an inline stop button (gated to running rows; delegates to the S9 interrupt path), and 2-char exception badges (`!!` attention / `▶` running / `✗` terminated) via a `FileDecorationProvider` on the `llmnb-agent://` scheme, propagating to the Zones tree's Agents subnode. The Agents view shows an alive-count badge on the Activity Bar. See [PLAN-V2-sidebar-glanceability](../../../06%20-%20Roadmaps/PLAN-V2-sidebar-glanceability.md).
 
 ## See also
 

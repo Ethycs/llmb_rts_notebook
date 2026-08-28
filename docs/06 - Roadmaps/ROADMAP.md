@@ -28,18 +28,18 @@ The next campaign is **V2**: build on V1's persisted data with operator-visible 
 
 ## 2. V2 lane
 
-### 2.1 Shipped (2026-05-20 → 2026-05-29)
+### 2.1 Shipped (2026-05-20 → 2026-08-27)
 
-Both pure read-side, no kernel changes:
+All read-side (glanceability adds one thin interrupt delegate), no kernel changes:
 
 - **Branch-switching UX** (`667dd68`) — Agents sidebar surfaces a `Branches` subnode under each agent that has forked descendants. Lineage recovered from `metadata.rts.zone.event_log[*]` `fork_agent` envelopes. Click a branch → reveal its first cell. Sets the precedent: existing V1-persisted data is fair game for V2 sidebar surface without re-shaping the wire.
 - **Output-kind lens UI** (`85bd5e4`) — 5th sidebar view (`llmnb.outputKinds`) grouping every span tagged with `llmnb.output.kind` by kind. High-attention kinds (decision / question / warning / diagnostic) render first; forward-compat `<other>` bucket for unknown values. Realizes the V1 promise that "V1 ships the tag; V2 ships the lens."
+- **Sidebar glanceability** (2026-08-27) — the DR-0001 "fleet at a glance" surfaces on stable API: spinning live-run icons + unit-card tooltips on agent rows, alive-count badge on the Agents view, inline reveal/interrupt actions (stop button gated to running rows, delegating to the S9 path), and `FileDecorationProvider` exception badges (`!!` / `▶` / `✗`) on the `llmnb-agent://` scheme with propagation into the Zones tree. See [PLAN-V2-sidebar-glanceability](PLAN-V2-sidebar-glanceability.md).
 
 ### 2.2 Queued — short horizon (next 1-3 sessions)
 
 | Slice | Scope | Why now |
 |---|---|---|
-| **Sidebar glanceability** | Animated live-status icons, fleet count badge, `FileDecorationProvider` exception badges, inline reveal/interrupt actions on agent rows | Highest-ROI path to the DR-0001 "fleet at a glance" promise — all stable API, no new render substrate. Scoped in [PLAN-V2-sidebar-glanceability](PLAN-V2-sidebar-glanceability.md); ~2-3 days across 4 independent sub-slices. |
 | **Output-kind lens — per-cell decoration** | Dim cells whose outputs don't match the active filter | Closes the lens story. Blocked on `notebookCellDecoration` API surface (same ceiling as the V1 three-pane gutter); see §4. |
 | **FSP-002 collapse state promotion** (option B) | Per-cell collapse state travels with the `.llmnb` file | Adds `set_cell_metadata_bulk` intent to BSP-003 writer registry; ~1 day. Unblocks collaborative scenarios. |
 | **Inspect mode session lineage** | Inspect mode shows which `claude_session_id` produced each turn across `/branch` / `/revert` | Pure read-side; session ids already persisted. ~half day. |

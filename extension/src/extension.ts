@@ -82,7 +82,11 @@ import {
   registerPinStatusHeaderCommand
 } from './notebook/pin-status-header.js';
 import { registerResetContaminationCommand } from './notebook/commands/reset-contamination.js';
-import { registerRevealCellCommand } from './notebook/commands/reveal-cell.js';
+import {
+  registerRevealCellCommand,
+  REVEAL_CELL_COMMAND_ID
+} from './notebook/commands/reveal-cell.js';
+import { firstTurnCellId } from './sidebar/agents-tree.js';
 import { registerSectionCommands } from './notebook/commands/section-ops.js';
 import {
   registerSectionHeaderProvider,
@@ -95,6 +99,9 @@ import {
 } from './sidebar/metadata-source.js';
 import { ZonesTreeProvider } from './sidebar/zones-tree.js';
 import { AgentsTreeProvider } from './sidebar/agents-tree.js';
+import { computeAgentsViewBadge } from './sidebar/view-badge.js';
+import { registerSidebarInterruptCommand } from './sidebar/interrupt-agent-command.js';
+import { AgentDecorationProvider } from './sidebar/agent-decorations.js';
 import { ActivityTreeProvider } from './sidebar/activity-tree.js';
 import { ThreePaneBadgeStatusBarProvider } from './notebook/three-pane-badges.js';
 import { registerThreePaneCommands } from './notebook/three-pane-commands.js';
@@ -520,8 +527,56 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
   const agentsProvider = new AgentsTreeProvider(sidebarSource);
   activeSidebarAgents = agentsProvider;
   context.subscriptions.push({ dispose: () => agentsProvider.dispose() });
+  const agentsView = vscode.window.createTreeView('llmnb.agents', {
+    treeDataProvider: agentsProvider
+  });
+  context.subscriptions.push(agentsView);
+
+  // PLAN-V2-sidebar-glanceability §3.2 — fleet count badge on the
+  // Agents view container. Rides the same throttled change signal as
+  // the providers; `undefined` clears the badge at zero so an idle
+  // fleet doesn't render a stale bubble.
+  const refreshAgentsBadge = (): void => {
+    agentsView.badge = computeAgentsViewBadge(
+      sidebarSource.getActiveZone()?.metadata
+    );
+  };
+  context.subscriptions.push(sidebarSource.onChange(refreshAgentsBadge));
+  refreshAgentsBadge();
+
+  // PLAN-V2-sidebar-glanceability §3.3 — inline stop button target.
   context.subscriptions.push(
-    vscode.window.createTreeView('llmnb.agents', { treeDataProvider: agentsProvider })
+    registerSidebarInterruptCommand(sidebarSource, logger)
+  );
+  // Inline reveal wrapper — menu invocations pass the tree ELEMENT
+  // (AgentsNode), not the {cell_id} shape llmnb.revealCell expects, so
+  // this thin adapter resolves the agent's first-turn cell first. Row
+  // click stays the primary reveal path; the inline icon is the
+  // explicit affordance for rows whose click toggled expand instead.
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      'llmnb.sidebar.revealAgent',
+      async (node: { agentId?: string } | undefined) => {
+        const agentId = node?.agentId;
+        if (typeof agentId !== 'string' || agentId.length === 0) return;
+        const agent =
+          sidebarSource.getActiveZone()?.metadata?.zone?.agents?.[agentId];
+        const cellId = firstTurnCellId(agent?.turns);
+        if (!cellId) return;
+        await vscode.commands.executeCommand(REVEAL_CELL_COMMAND_ID, {
+          cell_id: cellId
+        });
+      }
+    )
+  );
+
+  // PLAN-V2-sidebar-glanceability §3.4 — exception badges (!!, ▶, ✗)
+  // on agent rows via the llmnb-agent:// resource scheme; propagate
+  // reaches the Zones tree rows sharing the scheme.
+  const agentDecorations = new AgentDecorationProvider(sidebarSource);
+  context.subscriptions.push({ dispose: () => agentDecorations.dispose() });
+  context.subscriptions.push(
+    vscode.window.registerFileDecorationProvider(agentDecorations)
   );
 
   const activityProvider = new ActivityTreeProvider(sidebarSource);

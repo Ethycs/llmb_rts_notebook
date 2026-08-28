@@ -16,6 +16,10 @@ import {
   getAgentStatusBadgeColor,
   getSectionStatusBadgeColor
 } from './badge-style.js';
+import {
+  AGENT_RESOURCE_SCHEME,
+  agentResourceUriString
+} from './agent-decoration-logic.js';
 
 export class ZonesTreeProvider
   implements vscode.TreeDataProvider<ZonesNode>, vscode.Disposable {
@@ -61,6 +65,14 @@ export class ZonesTreeProvider
         );
         item.iconPath = new vscode.ThemeIcon('person');
         item.contextValue = 'llmnb.sidebar.agentsRoot';
+        // PLAN-V2-sidebar-glanceability §3.4 — ancestor URI on the
+        // llmnb-agent:// scheme so agent exception badges (propagate:
+        // true) bubble up to this subnode. The zone row above keeps its
+        // file URI (git decorations on the .llmnb file stay intact).
+        const zoneId = this.findZone(node.parentUri)?.metadata?.zone?.zone_id;
+        item.resourceUri = vscode.Uri.parse(
+          `${AGENT_RESOURCE_SCHEME}:///${encodeURIComponent(zoneId ?? 'zone')}`
+        );
         return item;
       }
       case 'sections-root': {
@@ -75,7 +87,11 @@ export class ZonesTreeProvider
       case 'zone-agent': {
         const snapshot = this.findZone(node.parentUri);
         const session = snapshot?.metadata?.zone?.agents?.[node.agentId]?.session;
-        return this.buildAgentItem(node.agentId, session);
+        return this.buildAgentItem(
+          node.agentId,
+          session,
+          snapshot?.metadata?.zone?.zone_id
+        );
       }
       case 'zone-section': {
         const snapshot = this.findZone(node.parentUri);
@@ -143,13 +159,17 @@ export class ZonesTreeProvider
 
   private buildAgentItem(
     agentId: string,
-    session: RawAgentSession | undefined
+    session: RawAgentSession | undefined,
+    zoneId: string | undefined
   ): vscode.TreeItem {
     const status = session?.runtime_status ?? 'idle';
     const item = new vscode.TreeItem(agentId, vscode.TreeItemCollapsibleState.None);
     item.iconPath = new vscode.ThemeIcon('person', getAgentStatusBadgeColor(status));
     item.description = status;
     item.contextValue = 'llmnb.sidebar.zoneAgent';
+    item.resourceUri = vscode.Uri.parse(
+      agentResourceUriString(zoneId ?? 'zone', agentId)
+    );
     return item;
   }
 

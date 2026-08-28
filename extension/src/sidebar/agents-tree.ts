@@ -13,16 +13,17 @@
 // at `agents[id].turns[0].cell_id` per metadata_writer.py:1579.
 
 import * as vscode from 'vscode';
-import type { AgentsNode, RawAgent, RawAgentSession, RawTurnRecord } from './types.js';
+import type { AgentsNode, RawAgent, RawAgentSession, RawTurnRecord, RtsSnapshot } from './types.js';
 import type { SidebarMetadataSource } from './metadata-source.js';
 import { AGENTS_EMPTY } from './empty-states.js';
 import { getAgentStatusBadgeColor } from './badge-style.js';
 import { REVEAL_CELL_COMMAND_ID } from '../notebook/commands/reveal-cell.js';
+import { buildAgentLineage } from './agent-lineage.js';
+import { hasInFlightRun, buildAgentTooltipMarkdown } from './agent-run-state.js';
 import {
-  buildAgentLineage,
-  type AgentLineage,
-  type ForkRecord
-} from './agent-lineage.js';
+  isAgentRunningContextValue
+} from './interrupt-agent-resolver.js';
+import { agentResourceUriString } from './agent-decoration-logic.js';
 
 export class AgentsTreeProvider
   implements vscode.TreeDataProvider<AgentsNode>, vscode.Disposable {
@@ -53,7 +54,7 @@ export class AgentsTreeProvider
       case 'agent': {
         const active = this.source.getActiveZone();
         const agent = active?.metadata?.zone?.agents?.[node.agentId];
-        return this.buildAgentItem(node.agentId, agent);
+        return this.buildAgentItem(node.agentId, agent, active?.metadata);
       }
       case 'agent-detail': {
         const item = new vscode.TreeItem(
@@ -127,7 +128,8 @@ export class AgentsTreeProvider
 
   private buildAgentItem(
     agentId: string,
-    agent: RawAgent | undefined
+    agent: RawAgent | undefined,
+    snapshot: RtsSnapshot | undefined
   ): vscode.TreeItem {
     const session = agent?.session;
     const status = session?.runtime_status ?? 'idle';
@@ -135,9 +137,23 @@ export class AgentsTreeProvider
       agentId,
       vscode.TreeItemCollapsibleState.Collapsed
     );
-    item.iconPath = new vscode.ThemeIcon('person', getAgentStatusBadgeColor(status));
+    // PLAN-V2-sidebar-glanceability §3.1/§3.3/§3.4 — a streaming agent
+    // spins; the contextValue variant gates the inline stop button; the
+    // resourceUri routes the row through the FileDecorationProvider.
+    const inFlight = hasInFlightRun(agentId, snapshot);
+    item.iconPath = inFlight
+      ? new vscode.ThemeIcon('loading~spin', getAgentStatusBadgeColor(status))
+      : new vscode.ThemeIcon('person', getAgentStatusBadgeColor(status));
     item.description = status;
-    item.contextValue = 'llmnb.sidebar.agent';
+    item.contextValue = isAgentRunningContextValue(inFlight);
+    const tooltip = new vscode.MarkdownString(
+      buildAgentTooltipMarkdown(agentId, snapshot)
+    );
+    tooltip.supportThemeIcons = true;
+    item.tooltip = tooltip;
+    item.resourceUri = vscode.Uri.parse(
+      agentResourceUriString(snapshot?.zone?.zone_id ?? 'zone', agentId)
+    );
     // Reveal the agent's first cell on click. The command no-ops if the
     // cell_id is missing or doesn't match any cell in the active editor
     // (per reveal-cell.ts runRevealCellCommand fallback).

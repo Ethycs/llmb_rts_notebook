@@ -153,8 +153,44 @@
         "command": "llmnb.findInCells",
         "title": "LLMNB: Find in cells",
         "category": "LLMNB"
+      },
+      {
+        "command": "llmnb.sidebar.interruptAgent",
+        "title": "Interrupt agent",
+        "category": "LLMNB",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "llmnb.sidebar.revealAgent",
+        "title": "Jump to first cell",
+        "category": "LLMNB",
+        "icon": "$(go-to-file)"
       }
     ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "llmnb.sidebar.interruptAgent",
+          "when": "false"
+        },
+        {
+          "command": "llmnb.sidebar.revealAgent",
+          "when": "false"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "llmnb.sidebar.interruptAgent",
+          "when": "view == llmnb.agents && viewItem == llmnb.sidebar.agent.running",
+          "group": "inline@1"
+        },
+        {
+          "command": "llmnb.sidebar.revealAgent",
+          "when": "view == llmnb.agents && viewItem =~ /^llmnb\\.sidebar\\.agent(\\.running)?$/",
+          "group": "inline@2"
+        }
+      ]
+    },
     "viewsContainers": {
       "activitybar": [
         {
