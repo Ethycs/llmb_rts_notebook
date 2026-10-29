@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Workspace root for the llmb_rts_notebook V1 VS Code extension. The actual extension lives in extension/.",
-  "license": "GPL-3.0-only",
+  "license": "MIT",
   "workspaces": [
     "extension"
   ],
