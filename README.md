@@ -205,7 +205,7 @@ decisions (PLAN-§4 row IDs like D1-D8 / S1-S6 / etc.) — distinct namespace.
 ```
 llmb_rts_notebook/
 ├── README.md                            ← you are here
-├── LICENSE                              ← GPL v3
+├── LICENSE                              ← MIT
 ├── CLAUDE.md                            ← Claude Code project guidance
 ├── pixi_guide.md                        ← Pixi CLI quick reference
 ├── pyproject.toml / pixi.lock           ← Pixi workspace
@@ -250,4 +250,4 @@ See [extension/README.md](extension/README.md) for extension-specific build
 
 ## License
 
-GPL v3 — see [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE).

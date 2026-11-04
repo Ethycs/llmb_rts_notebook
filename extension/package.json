@@ -4,7 +4,7 @@
   "description": "Operator interface for supervising fleets of autonomous coding agents. Subtractive fork of vscode-jupyter; renders .llmnb notebooks backed by LLMKernel as MCP/PTY mediator.",
   "version": "0.1.0",
   "publisher": "ethycs",
-  "license": "GPL-3.0-only",
+  "license": "MIT",
   "engines": {
     "vscode": "^1.92.0",
     "node": ">=20.0.0"
