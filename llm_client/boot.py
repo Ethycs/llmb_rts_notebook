@@ -26,7 +26,8 @@ import uuid as _uuid
 from pathlib import Path
 from typing import Literal
 
-from llm_kernel.wire import WIRE_VERSION
+from llm_kernel.wire import WIRE_VERSION  # noqa: F401  (re-exported; read live below)
+from llm_kernel.wire import versions as _versions
 
 # Internal scaffolding — lint exemption documented in the module.
 from llm_client._test_helpers.mock_kernel import make_mock_kernel
@@ -61,7 +62,7 @@ class KernelConnection:
         read_only: bool = False,
     ) -> None:
         self.session_id = session_id
-        self.wire_version = WIRE_VERSION
+        self.wire_version = _versions.WIRE_VERSION
         self._dispatcher = dispatcher
         self._tracker = tracker
         self._server = server
