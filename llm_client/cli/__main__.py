@@ -18,7 +18,7 @@ from __future__ import annotations
 import argparse
 import sys
 
-from . import auth, convert, execute, serve, smoke, validate
+from . import auth, convert, execute, gc, serve, smoke, validate
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -39,6 +39,10 @@ def main(argv: list[str] | None = None) -> int:
     p_val = sub.add_parser("validate", help="Validate magic syntax in a notebook.")
     validate.add_arguments(p_val)
     p_val.set_defaults(_run=validate.run)
+
+    p_gc = sub.add_parser("gc", help="Remove unreferenced blobs from a .llmnb file.")
+    gc.add_arguments(p_gc)
+    p_gc.set_defaults(_run=gc.run)
 
     p_smoke = sub.add_parser("smoke", help="Run a named smoke test.")
     smoke.add_arguments(p_smoke)

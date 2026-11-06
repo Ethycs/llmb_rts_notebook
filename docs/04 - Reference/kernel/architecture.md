@@ -286,10 +286,14 @@ points are captured here.
 
 One further as-shipped note beyond the plan and audit: the audit lists an
 **optional** `OperatorBridgeServer` construction (with bridge
-cross-wiring) as a possibility for agent MCP connectivity. The shipped
-facade does **not** build a bridge — `start()` wires dispatcher →
-run-tracker → metadata-writer → supervisor → dispatcher collaborators and
-nothing more.
+cross-wiring). The facade builds it: `start()` wires dispatcher →
+run-tracker → metadata-writer → supervisor → operator bridge (cross-wired
+to the kernel shell, supervisor and metadata writer, as
+`attach_kernel_subsystems` does) → dispatcher collaborators. The bridge
+is the kernel's single `operator.action` router, so serve, pty-mode, the
+app and library callers act on operator actions exactly like the IPython
+kernel. `shutdown()` detaches it right after draining the transports and
+before terminating agents; it owns no threads.
 
 For the full as-is subsystem map, per-entry-point boot order, and the
 stale-anchor reconciliation table, see the wiring audit alongside this

@@ -22,9 +22,14 @@ Three execution modes per PLAN §6.2:
     request_approval surface), run_notebook raises
     EscalationRequiresOperatorError before booting. Operators must
     pass unattended=True to acknowledge that all approvals will be
-    auto-rejected.
+    auto-rejected: in live mode every ``request_approval`` / ``escalate``
+    ``run.start`` the driver drains is answered at once with an
+    ``operator.action`` ``approval_response`` (``decision: "deny"``,
+    RFC-001's rejection value), recorded under ``approval_responses`` in
+    that cell's ``record_to`` line.
 
-Lint contract: only llm_kernel.wire and llm_kernel.text.cell_text imports.
+Lint contract: only llm_kernel.wire, llm_kernel.text.cell_text and
+llm_kernel.notebook.notebook_format imports.
 """
 
 from __future__ import annotations
@@ -39,6 +44,7 @@ from datetime import datetime, timezone
 from typing import Any, Iterable, Literal, NamedTuple, Optional
 
 from llm_kernel.wire import WIRE_VERSION  # noqa: F401  (re-exported in result)
+from llm_kernel.notebook.notebook_format import check_rts_integrity
 from llm_kernel.text.cell_text import (  # PLAN-S5.5 Phase 4 — @@section
     ParserContext,
     parse_cell,
@@ -134,12 +140,16 @@ def _load_notebook(path: Path) -> dict:
     """Parse a notebook from disk into a dict (.llmnb shape).
 
     Format-detection per llm_client.notebook.detect_format. Magic-text
-    inputs are converted via magic_to_llmnb on load.
+    inputs are converted via magic_to_llmnb on load. ``.llmnb`` inputs
+    pass the RFC-005 integrity checks (raises ``LlmnbIntegrityError``,
+    a ``ValueError``, on F5/F9/F10/F11; F4/F12 are normalized in place).
     """
     fmt = detect_format(path)
     text = path.read_text(encoding="utf-8")
     if fmt == "llmnb":
-        return json.loads(text)
+        notebook = json.loads(text)
+        check_rts_integrity(notebook.get("metadata", {}).get("rts", {}) or {})
+        return notebook
     if fmt == "ipynb":
         # Convert ipynb to llmnb on load. Imports are warned at the
         # CLI layer; this function is pure (no print).
@@ -477,6 +487,98 @@ def _mint_section_id_from_title(title: str) -> str:
     return f"sec_{slug + '_' if slug else ''}{tail}"
 
 
+#: PLAN-S5 §3.6 — control line magics the driver ships as one
+#: ``operator.action`` envelope each, wire shapes per
+#: ``protocols/operator-action.md``. ``@handoff`` ships nothing: per the
+#: magic atom it edits the NEXT cell's ``bound_agent_id``.
+_LINE_MAGIC_ACTIONS: dict[str, str] = {
+    "branch": "agent_branch",
+    "revert": "agent_revert",
+    "stop": "agent_stop",
+}
+
+
+def _keyword_args(
+    args_str: str, keywords: tuple[str, ...],
+) -> tuple[Optional[str], dict[str, str]]:
+    """Split ``<first> [<keyword> <value>]...`` into ``(first, {kw: value})``."""
+    tokens = args_str.split()
+    first = tokens[0] if tokens else None
+    found: dict[str, str] = {}
+    i = 1
+    while i < len(tokens):
+        if tokens[i] in keywords and i + 1 < len(tokens):
+            found[tokens[i]] = tokens[i + 1]
+            i += 2
+        else:
+            i += 1
+    return first, found
+
+
+def _derive_line_magic_envelopes(
+    cell_id: str,
+    text: str,
+    *,
+    session_id: str,
+    ordinal: int,
+    parser_context: Optional[ParserContext] = None,
+) -> tuple[list[dict[str, Any]], Optional[str], Optional[str]]:
+    """Map a cell's ``@branch`` / ``@revert`` / ``@stop`` / ``@handoff`` lines.
+
+    Returns ``(envelopes, handoff_agent_id, body)``: one
+    ``operator.action`` per branch/revert/stop magic in cell order, the
+    ``@handoff`` target (last one wins; ``None`` if absent), and the
+    parsed body with the magic lines removed (``None`` when the cell
+    carries none of these magics, so callers keep the cell text as-is).
+
+    Grammar (BSP-002 §3): ``@branch <source> [at <turn>] as <new_id>``,
+    ``@revert <agent> to <turn>``, ``@stop <agent>``, ``@handoff <id>``.
+    Missing arguments are shipped as ``null`` and rejected kernel-side
+    (K42).
+    """
+    try:
+        parsed = parse_cell(text, parser_context=parser_context)
+    except Exception:  # noqa: BLE001 — unparseable cell: no magics
+        return [], None, None
+    envelopes: list[dict[str, Any]] = []
+    handoff: Optional[str] = None
+    seen = False
+    for name, args_str in parsed.line_magics:
+        if name == "handoff":
+            seen = True
+            target, _ = _keyword_args(args_str, ())
+            if target:
+                handoff = target
+            continue
+        action_type = _LINE_MAGIC_ACTIONS.get(name)
+        if action_type is None:
+            continue
+        seen = True
+        params: dict[str, Any]
+        if name == "branch":
+            source, kw = _keyword_args(args_str, ("at", "as"))
+            params = {"source_agent": source, "new_agent_id": kw.get("as")}
+            if "at" in kw:
+                params["at_turn_id"] = kw["at"]
+        elif name == "revert":
+            agent, kw = _keyword_args(args_str, ("to",))
+            params = {"agent_id": agent, "target_turn_id": kw.get("to")}
+        else:
+            agent, _ = _keyword_args(args_str, ())
+            params = {"agent_id": agent}
+        params["cell_id"] = cell_id
+        envelopes.append({
+            "type": "operator.action",
+            "request_id": f"{session_id}:{ordinal}:{len(envelopes)}",
+            "payload": {
+                "action_type": action_type,
+                "parameters": params,
+                "originating_cell_id": cell_id,
+            },
+        })
+    return envelopes, handoff, (parsed.body if seen else None)
+
+
 def _run_live_mode(
     notebook: dict,
     path: Path,
@@ -543,6 +645,8 @@ def _run_live_mode(
     hb_last: Optional[float] = None
     hb_gaps: list[float] = []
     kernel_lost = False
+    # PLAN-S5.0.3 §10 risk #7: approval requests already auto-rejected.
+    answered_approvals: set[str] = set()
 
     try:
         # Initial Family F hydrate — same as V1's prior shape.
@@ -573,6 +677,9 @@ def _run_live_mode(
         working_rts: dict[str, Any] = rts
         session_id = getattr(conn, "session_id", "live") or "live"
         run_deadline = time.monotonic() + total_timeout
+        # ``@handoff <id>`` re-binds the next cell (magic atom).
+        pending_handoff: Optional[str] = None
+        handoff_bindings: dict[str, str] = {}
 
         for ordinal, cid in enumerate(ordered_ids):
             if time.monotonic() > run_deadline:
@@ -587,11 +694,34 @@ def _run_live_mode(
             if not isinstance(record, dict):
                 continue
 
-            envelope = _derive_cell_envelope(
-                cid, record, session_id=session_id, ordinal=ordinal,
-                parser_context=parser_context_from_config(rts.get("config")),
+            parser_context = parser_context_from_config(rts.get("config"))
+            kind = (record.get("kind") or "").lower()
+            if pending_handoff is not None:
+                # The previous cell's ``@handoff`` binds this cell; only
+                # agent cells carry a binding.
+                if kind == "agent":
+                    record = {**record, "bound_agent_id": pending_handoff}
+                    handoff_bindings[cid] = pending_handoff
+                pending_handoff = None
+            magic_envelopes, pending_handoff, magic_body = (
+                _derive_line_magic_envelopes(
+                    cid, record.get("text", "") or "",
+                    session_id=session_id, ordinal=ordinal,
+                    parser_context=parser_context,
+                )
             )
-            if envelope is None:
+            if magic_body is not None and kind == "agent":
+                # Control magic lines are not prose for the agent; a cell
+                # holding only magics sends no agent_continue.
+                record = {**record, "text": magic_body}
+            if magic_body is not None and kind == "agent" and not magic_body.strip():
+                envelope = None
+            else:
+                envelope = _derive_cell_envelope(
+                    cid, record, session_id=session_id, ordinal=ordinal,
+                    parser_context=parser_context,
+                )
+            if envelope is None and not magic_envelopes:
                 # No-op cell-kind (markdown / scratch / native / unknown).
                 # Counted as succeeded with empty outputs to match stub-
                 # mode's degrade-to-noop behavior.
@@ -613,9 +743,14 @@ def _run_live_mode(
                     ))
                 continue
 
-            # Ship the envelope.
+            # Ship the envelope(s): one per control line magic in cell
+            # order, then the cell's own (PLAN-S5 §3.6). The last one
+            # keys the drain below.
+            outgoing = magic_envelopes + ([envelope] if envelope is not None else [])
+            envelope = outgoing[-1]
             try:
-                conn.send(envelope)
+                for out in outgoing:
+                    conn.send(out)
             except Exception as exc:  # noqa: BLE001
                 failed.append(_synthetic_k_envelope(
                     cid, "K_TRANSPORT_LOST", str(exc),
@@ -641,6 +776,7 @@ def _run_live_mode(
             completion_reason = "cell_timeout"
             received_for_cell: Optional[dict] = None
             drained: list[dict] = []
+            approval_responses: list[dict] = []
             window_extensions = 0
 
             while time.monotonic() < cell_deadline:
@@ -711,6 +847,17 @@ def _run_live_mode(
                         del hb_gaps[:-8]
                     hb_last = now
 
+                if unattended:
+                    rejection = _approval_rejection(
+                        reply, cell_id=cid, answered=answered_approvals,
+                    )
+                    if rejection is not None:
+                        try:
+                            conn.send(rejection)
+                            approval_responses.append(rejection)
+                        except Exception:  # noqa: BLE001 — next recv reports it
+                            pass
+
                 if verdict.extends_window:
                     quiescence_start = None
                     window_extensions += 1
@@ -745,6 +892,7 @@ def _run_live_mode(
                         completion_reason=completion_reason, sent_at=sent_at,
                         started=cell_started, drained=drained,
                         window_extensions=window_extensions,
+                        approval_responses=approval_responses,
                     ))
                 break
 
@@ -779,12 +927,16 @@ def _run_live_mode(
                 succeeded.append(received_for_cell)
 
             if record_to is not None:
-                sent_received.append(_live_record_entry(
+                entry = _live_record_entry(
                     cell_id=cid, sent=envelope, received=received_for_cell,
                     completion_reason=completion_reason, sent_at=sent_at,
                     started=cell_started, drained=drained,
                     window_extensions=window_extensions,
-                ))
+                    approval_responses=approval_responses,
+                )
+                if magic_envelopes:
+                    entry["sent_line_magics"] = magic_envelopes
+                sent_received.append(entry)
 
             if kernel_lost:
                 # Same fail-fast as a closed transport: do not spend a
@@ -812,6 +964,19 @@ def _run_live_mode(
                     break
                 if not reply:
                     continue
+                if unattended:
+                    rejection = _approval_rejection(
+                        reply, cell_id=None, answered=answered_approvals,
+                    )
+                    if rejection is not None:
+                        try:
+                            conn.send(rejection)
+                        except Exception:  # noqa: BLE001
+                            break
+                        if sent_received:
+                            sent_received[-1].setdefault(
+                                "approval_responses", [],
+                            ).append(rejection)
                 msg_type = (
                     reply.get("message_type")
                     or reply.get("type", "")
@@ -833,6 +998,15 @@ def _run_live_mode(
                 outputs = working_record.get("outputs")
                 if isinstance(outputs, list):
                     nb_record["outputs"] = outputs
+
+        # ``@handoff`` re-bindings are driver-side edits; the kernel's
+        # snapshots do not carry them, so apply them to the final state.
+        final_cells = working_rts.get("cells")
+        if isinstance(final_cells, dict):
+            for hcid, agent in handoff_bindings.items():
+                final_record = final_cells.get(hcid)
+                if isinstance(final_record, dict):
+                    final_record["bound_agent_id"] = agent
 
         # Update the notebook's metadata.rts to the final working state
         # (mirrors stub mode's behavior of treating the result as the
@@ -1015,6 +1189,7 @@ def _live_record_entry(
     started: Optional[float] = None,
     drained: Optional[list[dict[str, Any]]] = None,
     window_extensions: int = 0,
+    approval_responses: Optional[list[dict[str, Any]]] = None,
 ) -> dict[str, Any]:
     """One ``.replay.jsonl`` line for a cell.
 
@@ -1025,9 +1200,11 @@ def _live_record_entry(
     transport_lost | interrupted | noop``; ``drained`` lists every
     uncorrelated envelope consumed while the cell was in flight, with
     the kernel's ``timestamp``, the driver's ``received_at`` and whether
-    it extended the quiescence window.
+    it extended the quiescence window. ``approval_responses`` (present
+    only when non-empty) lists the unattended auto-rejections sent while
+    the cell was in flight.
     """
-    return {
+    entry = {
         "sent": sent,
         "received": received,
         "cell_id": cell_id,
@@ -1040,6 +1217,64 @@ def _live_record_entry(
         "window_extensions": window_extensions,
         "drained": list(drained or []),
     }
+    if approval_responses:
+        entry["approval_responses"] = list(approval_responses)
+    return entry
+
+
+#: RFC-001 tools that block on an operator decision the unattended driver
+#: must refuse (PLAN-S5.0.3 §10 risk #7).
+_UNATTENDED_REJECT_TOOLS: frozenset[str] = frozenset({"request_approval", "escalate"})
+#: RFC-001 ``request_approval`` output enum: ``approve |
+#: approve_with_modification | deny | defer``; ``deny`` is the rejection.
+_UNATTENDED_DECISION = "deny"
+
+
+def _approval_rejection(
+    reply: dict[str, Any],
+    *,
+    cell_id: Optional[str],
+    answered: set[str],
+) -> Optional[dict[str, Any]]:
+    """Auto-reject envelope for a ``request_approval`` / ``escalate`` run.
+
+    Matches the Family A ``run.start`` the kernel's MCP server opens for
+    the tool call (span ``name`` is the tool name) and answers it with
+    the ``operator.action`` ``approval_response`` the kernel resolves:
+    ``parameters.request_id`` is the run's ``spanId`` (the key of the
+    pending round-trip; ``run_id`` carries the same value per the
+    operator-action atom). Each run is answered once.
+    """
+    msg_type = reply.get("message_type") or reply.get("type", "")
+    span = reply.get("payload")
+    if msg_type != "run.start" or not isinstance(span, dict):
+        return None
+    tool = span.get("name")
+    if tool not in _UNATTENDED_REJECT_TOOLS:
+        for attr in span.get("attributes") or []:
+            if isinstance(attr, dict) and attr.get("key") in (
+                "tool.name", "llmnb.tool_name", "llmnb.metadata.tool.name",
+            ):
+                tool = (attr.get("value") or {}).get("stringValue")
+                break
+    if tool not in _UNATTENDED_REJECT_TOOLS:
+        return None
+    run_id = span.get("spanId") or reply.get("correlation_id")
+    if not isinstance(run_id, str) or not run_id or run_id in answered:
+        return None
+    answered.add(run_id)
+    payload: dict[str, Any] = {
+        "action_type": "approval_response",
+        "parameters": {
+            "request_id": run_id,
+            "run_id": run_id,
+            "decision": _UNATTENDED_DECISION,
+            "operator_note": f"auto-rejected {tool}: unattended run",
+        },
+    }
+    if cell_id is not None:
+        payload["originating_cell_id"] = cell_id
+    return {"type": "operator.action", "payload": payload}
 
 
 #: A keepalive that stops for this many observed intervals means the peer
@@ -1232,7 +1467,9 @@ def run_notebook(
     unattended:
         Default ``False``. When ``False`` and the notebook contains
         escalate-bearing cells, raises EscalationRequiresOperatorError
-        before booting. ``True`` proceeds with auto-rejected escalates.
+        before booting. ``True`` proceeds with auto-rejected escalates:
+        live mode answers every ``request_approval`` / ``escalate`` run
+        with ``approval_response`` ``decision: "deny"``.
 
     Returns
     -------

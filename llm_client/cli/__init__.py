@@ -9,6 +9,7 @@ Public CLI surface (``python -m llm_client <subcommand>``):
                     [--replay FILE] [--record FILE] [--unattended]
     convert  <input> <output>
     validate <path>
+    gc       <path>
     smoke    {paper-telephone,supervisor,metadata-writer}
     auth     init
     serve    [--bind HOST:PORT] [--auth-token-env NAME]   (stub for S5.0.3d)

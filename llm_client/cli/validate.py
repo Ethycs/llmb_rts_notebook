@@ -5,6 +5,10 @@ Runs cell_text.parse_cell on every cell. Exits non-zero on K30/K31
 failures with the K-code listing. K33/K35 advisory emissions are
 printed as warnings but do not affect the exit code (per cell_text
 parser semantics — they're advisory, not fatal).
+
+``.llmnb`` files first pass the RFC-005 load-time integrity checks
+(``check_rts_integrity``): a rejected file (F5/F9/F10/F11) exits 2 with
+the RFC-005 code in the error; tolerated rows (F4/F12) print warnings.
 """
 
 from __future__ import annotations
@@ -21,6 +25,8 @@ from llm_kernel.text.cell_text import (  # type: ignore[import-not-found]
     parser_context_from_config,
     split_at_breaks,
 )
+
+from llm_kernel.notebook.notebook_format import check_rts_integrity
 
 from llm_client.notebook import detect_format
 
@@ -73,13 +79,27 @@ def _load_parser_context(path: Path) -> ParserContext | None:
     return parser_context_from_config(rts.get("config"))
 
 
+def _check_integrity(path: Path) -> list[str]:
+    """RFC-005 integrity warnings for an ``.llmnb`` file ([] otherwise).
+
+    Raises ``LlmnbIntegrityError`` (a ``ValueError``) on rejection.
+    """
+    if detect_format(path) != "llmnb":
+        return []
+    nb = json.loads(path.read_text(encoding="utf-8"))
+    return check_rts_integrity(nb.get("metadata", {}).get("rts", {}) or {})
+
+
 def run(args: argparse.Namespace) -> int:
     try:
+        integrity_warnings = _check_integrity(args.path)
         cell_texts = _iter_cell_texts(args.path)
         parser_context = _load_parser_context(args.path)
     except (OSError, ValueError, json.JSONDecodeError) as e:
         print(f"error: {e}", file=sys.stderr)
         return 2
+    for warning in integrity_warnings:
+        print(f"warning: {warning}", file=sys.stderr)
 
     failures: list[tuple[str, str, str]] = []  # (cell_id, k_code, reason)
     advisories: list[tuple[str, str, str]] = []
