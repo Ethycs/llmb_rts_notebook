@@ -35,7 +35,8 @@ import os
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterable, Literal, Optional
+from datetime import datetime, timezone
+from typing import Any, Iterable, Literal, NamedTuple, Optional
 
 from llm_kernel.wire import WIRE_VERSION  # noqa: F401  (re-exported in result)
 from llm_kernel.text.cell_text import (  # PLAN-S5.5 Phase 4 — @@section
@@ -316,8 +317,10 @@ def _run_replay_mode(
     succeeded: list[dict] = []
     failed: list[dict] = []
     for ordinal, (cid, entry) in enumerate(zip(ordered_ids, entries)):
-        sent = entry.get("sent", {})
-        received = entry.get("received", {})
+        # A noop cell (``@@break``) records ``sent: null``; a recording that
+        # cannot be replayed is not much of a recording either.
+        sent = entry.get("sent") or {}
+        received = entry.get("received") or {}
         sent_payload = sent.get("payload") or {}
         rec_cid = sent_payload.get("cell_id")
         if rec_cid is not None and rec_cid != cid:
@@ -500,6 +503,22 @@ def _run_live_mode(
     only** completion: a cell is done when either a correlated
     ``run.complete`` arrives, OR ``quiescence_window`` of empty recv
     ticks elapses, OR ``cell_timeout`` is exceeded.
+
+    Quiescence means *the cell* went quiet, not *the socket*. The kernel
+    also emits traffic on a clock that has nothing to do with the cell in
+    flight -- ``heartbeat.kernel`` every 5 s (RFC-006 §7, mandatory) and
+    ``notebook.metadata`` ``trigger: "timer"`` autosave snapshots -- and
+    none of that may extend the window, or any window >= the heartbeat
+    period can never elapse and every cell runs to ``cell_timeout``.
+    Every envelope is therefore classified by
+    :func:`_classify_live_envelope` *before* the quiescence clock is
+    touched: only envelopes attributable to the cell (correlated reply,
+    K-class for this cell, Family A ``run.*``, snapshots whose record for
+    this cell changed, other cell-addressed envelopes) reset it.
+    Clock-driven envelopes are still consumed: snapshots still replace
+    ``working_rts`` and everything drained is written to the recording
+    (``drained[]`` with timestamps + ``completion_reason`` per cell) so a
+    timeout is explainable after the fact.
     """
     # Lazy import to keep the lint surface narrow for unit tests that
     # never reach the boot path.
@@ -519,6 +538,11 @@ def _run_live_mode(
     succeeded: list[dict] = []
     failed: list[dict] = []
     interrupted = False
+    # Keepalive bookkeeping (RFC-006 §7 heartbeat.kernel): learn the cadence
+    # from the kernel itself, never from a constant on our side.
+    hb_last: Optional[float] = None
+    hb_gaps: list[float] = []
+    kernel_lost = False
 
     try:
         # Initial Family F hydrate — same as V1's prior shape.
@@ -583,7 +607,10 @@ def _run_live_mode(
                 }
                 succeeded.append(synth)
                 if record_to is not None:
-                    sent_received.append({"sent": None, "received": synth})
+                    sent_received.append(_live_record_entry(
+                        cell_id=cid, sent=None, received=synth,
+                        completion_reason="noop",
+                    ))
                 continue
 
             # Ship the envelope.
@@ -594,10 +621,10 @@ def _run_live_mode(
                     cid, "K_TRANSPORT_LOST", str(exc),
                 ))
                 if record_to is not None:
-                    sent_received.append({
-                        "sent": envelope,
-                        "received": failed[-1],
-                    })
+                    sent_received.append(_live_record_entry(
+                        cell_id=cid, sent=envelope, received=failed[-1],
+                        completion_reason="transport_lost",
+                    ))
                 # Fail-fast remaining cells with the same code.
                 for remaining in ordered_ids[ordinal + 1:]:
                     failed.append(_synthetic_k_envelope(
@@ -607,79 +634,118 @@ def _run_live_mode(
 
             # Per-cell ship-then-drain loop.
             cell_deadline = time.monotonic() + cell_timeout
+            cell_started = time.monotonic()
+            sent_at = _utc_now_iso()
             quiescence_start: Optional[float] = None
             cell_completed = False
+            completion_reason = "cell_timeout"
             received_for_cell: Optional[dict] = None
+            drained: list[dict] = []
+            window_extensions = 0
 
             while time.monotonic() < cell_deadline:
                 try:
                     reply = conn.recv(timeout=0.1)
                 except KeyboardInterrupt:
                     interrupted = True
+                    completion_reason = "interrupted"
                     break
                 except Exception as exc:  # noqa: BLE001
                     failed.append(_synthetic_k_envelope(
                         cid, "K_TRANSPORT_LOST", str(exc),
                     ))
+                    received_for_cell = failed[-1]
                     cell_completed = True
+                    completion_reason = "transport_lost"
                     break
 
                 if not reply:
+                    silence = _heartbeat_silence(hb_last, hb_gaps)
+                    if silence is not None:
+                        quiet_for, cadence = silence
+                        received_for_cell = _synthetic_k_envelope(
+                            cid, "K_KERNEL_LOST",
+                            f"kernel heartbeat silent for {quiet_for:.1f}s "
+                            f"(observed cadence {cadence:.1f}s, RFC-006 §7); "
+                            "kernel presumed gone",
+                        )
+                        failed.append(received_for_cell)
+                        cell_completed = True
+                        completion_reason = "heartbeat_lost"
+                        kernel_lost = True
+                        break
                     if quiescence_start is None:
                         quiescence_start = time.monotonic()
                     elif time.monotonic() - quiescence_start >= quiescence_window:
                         # Quiescence-only completion (Ambiguity 1).
                         cell_completed = True
+                        completion_reason = "quiescence"
                         break
                     continue
 
-                # Got an envelope — reset quiescence.
-                quiescence_start = None
-
-                msg_type = (
-                    reply.get("message_type")
-                    or reply.get("type", "")
+                # Got an envelope. Classify it BEFORE touching the
+                # quiescence clock: heartbeats and timer snapshots are
+                # emitted on the kernel's clock, not because of this
+                # cell, and must not keep the window open.
+                verdict = _classify_live_envelope(
+                    reply,
+                    cell_id=cid,
+                    request_id=envelope["request_id"],
+                    working_rts=working_rts,
                 )
                 payload = reply.get("payload") or {}
+                if not isinstance(payload, dict):
+                    payload = {}
 
-                if msg_type == "notebook.metadata":
+                if verdict.message_type == "notebook.metadata":
                     snap = payload.get("snapshot")
                     if isinstance(snap, dict):
                         # PLAN §3.C: replace working state, no patch mode.
+                        # Applied for every snapshot, timer-driven or not.
                         working_rts = snap
 
-                # Correlate by request_id for clean per-cell completion.
-                reply_corr = (
-                    reply.get("correlation_id")
-                    or reply.get("request_id")
-                    or payload.get("correlation_id")
-                    or payload.get("request_id")
-                )
-                if reply_corr == envelope["request_id"]:
+                if verdict.kind == "heartbeat":
+                    now = time.monotonic()
+                    if hb_last is not None:
+                        hb_gaps.append(now - hb_last)
+                        del hb_gaps[:-8]
+                    hb_last = now
+
+                if verdict.extends_window:
+                    quiescence_start = None
+                    window_extensions += 1
+
+                if verdict.kind == "correlated_reply":
+                    # Correlated by request_id: clean per-cell completion.
                     received_for_cell = reply
                     if payload.get("k_code"):
                         failed.append(reply)
                     else:
                         succeeded.append(reply)
                     cell_completed = True
+                    completion_reason = "correlated_reply"
                     break
 
-                # K-class envelope keyed on cell_id (no correlation_id).
-                if (
-                    payload.get("k_code")
-                    and payload.get("cell_id") == cid
-                ):
+                if verdict.kind == "k_code":
+                    # K-class envelope keyed on cell_id (no correlation_id).
                     received_for_cell = reply
                     failed.append(reply)
                     cell_completed = True
+                    completion_reason = "k_code"
                     break
+
+                # Uncorrelated traffic: keep it in the recording so a
+                # timeout can be explained from the record alone.
+                drained.append(_drained_record(reply, verdict))
 
             if interrupted:
                 if record_to is not None:
-                    sent_received.append({
-                        "sent": envelope,
-                        "received": received_for_cell,
-                    })
+                    sent_received.append(_live_record_entry(
+                        cell_id=cid, sent=envelope, received=received_for_cell,
+                        completion_reason=completion_reason, sent_at=sent_at,
+                        started=cell_started, drained=drained,
+                        window_extensions=window_extensions,
+                    ))
                 break
 
             if not cell_completed:
@@ -713,13 +779,31 @@ def _run_live_mode(
                 succeeded.append(received_for_cell)
 
             if record_to is not None:
-                sent_received.append({
-                    "sent": envelope,
-                    "received": received_for_cell,
-                })
+                sent_received.append(_live_record_entry(
+                    cell_id=cid, sent=envelope, received=received_for_cell,
+                    completion_reason=completion_reason, sent_at=sent_at,
+                    started=cell_started, drained=drained,
+                    window_extensions=window_extensions,
+                ))
 
-        # Trailing drain for `end_of_run` snapshot.
-        if not interrupted:
+            if kernel_lost:
+                # Same fail-fast as a closed transport: do not spend a
+                # budget per remaining cell on a kernel that stopped beating.
+                for remaining in ordered_ids[ordinal + 1:]:
+                    lost_env = _synthetic_k_envelope(
+                        remaining, "K_KERNEL_LOST", "kernel heartbeat lost earlier in this run",
+                    )
+                    failed.append(lost_env)
+                    if record_to is not None:
+                        sent_received.append(_live_record_entry(
+                            cell_id=remaining, sent=None, received=lost_env,
+                            completion_reason="heartbeat_lost",
+                        ))
+                break
+
+        # Trailing drain for `end_of_run` snapshot (pointless once the
+        # kernel has stopped beating).
+        if not interrupted and not kernel_lost:
             tail_deadline = time.monotonic() + quiescence_window
             while time.monotonic() < tail_deadline:
                 try:
@@ -772,6 +856,212 @@ def _run_live_mode(
         raise KeyboardInterrupt()
 
     return notebook, succeeded, failed
+
+
+# ---------------------------------------------------------------------------
+# Live-mode envelope classification (quiescence is per-cell, not per-socket)
+# ---------------------------------------------------------------------------
+
+#: Family E liveness pings (RFC-006 §7): emitted every 5 s by the kernel
+#: regardless of what any cell is doing. Never evidence of cell progress.
+_LIVE_HEARTBEAT_TYPES: frozenset[str] = frozenset({
+    "heartbeat.kernel", "heartbeat.extension",
+})
+#: Family A run lifecycle: only ever emitted because something ran.
+_LIVE_RUN_LIFECYCLE_TYPES: frozenset[str] = frozenset({
+    "run.start", "run.event", "run.complete",
+})
+#: Family F snapshot triggers that fire on a clock (RFC-005 §"Snapshot
+#: triggers": the autosave timer) rather than because of a cell.
+_LIVE_CLOCK_SNAPSHOT_TRIGGERS: frozenset[str] = frozenset({"timer"})
+
+
+class _LiveVerdict(NamedTuple):
+    """Classification of one envelope drained while a cell is in flight."""
+
+    #: ``correlated_reply`` | ``k_code`` | ``run_lifecycle`` | ``snapshot``
+    #: | ``timer_snapshot`` | ``heartbeat`` | ``cell_attributed`` |
+    #: ``unrelated``
+    kind: str
+    #: Whether the envelope counts as activity *for this cell* and may
+    #: therefore reset the quiescence clock.
+    extends_window: bool
+    message_type: str
+    detail: dict[str, Any]
+
+
+def _utc_now_iso() -> str:
+    return (
+        datetime.now(timezone.utc)
+        .isoformat(timespec="milliseconds")
+        .replace("+00:00", "Z")
+    )
+
+
+def _payload_cell_id(payload: dict[str, Any]) -> Optional[str]:
+    """Best-effort cell attribution for uncorrelated envelopes."""
+    for key in ("cell_id", "originating_cell_id"):
+        value = payload.get(key)
+        if isinstance(value, str) and value:
+            return value
+    params = payload.get("parameters")
+    if isinstance(params, dict):
+        value = params.get("cell_id")
+        if isinstance(value, str) and value:
+            return value
+    return None
+
+
+def _classify_live_envelope(
+    reply: dict[str, Any],
+    *,
+    cell_id: str,
+    request_id: str,
+    working_rts: dict[str, Any],
+) -> _LiveVerdict:
+    """Decide whether ``reply`` is attributable to ``cell_id``.
+
+    The quiescence window measures how long *the cell* has been quiet,
+    so only envelopes that exist because of the cell may extend it:
+
+    * a reply correlated to our ``request_id`` (completes the cell);
+    * a K-class envelope addressed to this ``cell_id`` (completes it);
+    * Family A ``run.*`` lifecycle (something is executing);
+    * a Family F snapshot whose ``cells[cell_id]`` record differs from
+      the working state (the cell's outputs/status moved) -- unless the
+      snapshot was emitted by the autosave *timer*;
+    * any other envelope explicitly addressed to this cell.
+
+    ``heartbeat.kernel`` (RFC-006 §7, every 5 s, mandatory) and
+    ``trigger: "timer"`` snapshots are emitted on the kernel's clock and
+    never extend the window; a window >= the heartbeat period would
+    otherwise be impossible to satisfy.
+    """
+    msg_type = reply.get("message_type") or reply.get("type", "") or ""
+    payload = reply.get("payload") or {}
+    if not isinstance(payload, dict):
+        payload = {}
+
+    reply_corr = (
+        reply.get("correlation_id")
+        or reply.get("request_id")
+        or payload.get("correlation_id")
+        or payload.get("request_id")
+    )
+    if reply_corr == request_id:
+        return _LiveVerdict("correlated_reply", True, msg_type, {})
+
+    if payload.get("k_code") and payload.get("cell_id") == cell_id:
+        return _LiveVerdict("k_code", True, msg_type, {})
+
+    if msg_type in _LIVE_HEARTBEAT_TYPES:
+        return _LiveVerdict(
+            "heartbeat", False, msg_type,
+            {"kernel_state": payload.get("kernel_state")},
+        )
+
+    if msg_type in _LIVE_RUN_LIFECYCLE_TYPES:
+        return _LiveVerdict("run_lifecycle", True, msg_type, {})
+
+    if msg_type == "notebook.metadata":
+        trigger = payload.get("trigger")
+        detail: dict[str, Any] = {
+            "mode": payload.get("mode"),
+            "trigger": trigger,
+            "snapshot_version": payload.get("snapshot_version"),
+        }
+        if trigger in _LIVE_CLOCK_SNAPSHOT_TRIGGERS:
+            return _LiveVerdict("timer_snapshot", False, msg_type, detail)
+        snap = payload.get("snapshot")
+        if not isinstance(snap, dict):
+            # mode=patch or malformed: nothing we can attribute.
+            return _LiveVerdict("snapshot", False, msg_type, detail)
+        new_cells = snap.get("cells")
+        old_cells = working_rts.get("cells") if isinstance(working_rts, dict) else None
+        new_rec = new_cells.get(cell_id) if isinstance(new_cells, dict) else None
+        old_rec = old_cells.get(cell_id) if isinstance(old_cells, dict) else None
+        changed = new_rec != old_rec
+        detail["cell_changed"] = changed
+        return _LiveVerdict("snapshot", changed, msg_type, detail)
+
+    attributed = _payload_cell_id(payload) == cell_id
+    return _LiveVerdict(
+        "cell_attributed" if attributed else "unrelated",
+        attributed, msg_type, {},
+    )
+
+
+def _drained_record(reply: dict[str, Any], verdict: _LiveVerdict) -> dict[str, Any]:
+    """Compact, timestamped summary of an uncorrelated drained envelope."""
+    entry: dict[str, Any] = {
+        "received_at": _utc_now_iso(),
+        "message_type": verdict.message_type,
+        "timestamp": reply.get("timestamp"),
+        "correlation_id": reply.get("correlation_id") or reply.get("request_id"),
+        "classification": verdict.kind,
+        "extended_window": verdict.extends_window,
+    }
+    entry.update(verdict.detail)
+    return entry
+
+
+def _live_record_entry(
+    *,
+    cell_id: str,
+    sent: Optional[dict[str, Any]],
+    received: Optional[dict[str, Any]],
+    completion_reason: str,
+    sent_at: Optional[str] = None,
+    started: Optional[float] = None,
+    drained: Optional[list[dict[str, Any]]] = None,
+    window_extensions: int = 0,
+) -> dict[str, Any]:
+    """One ``.replay.jsonl`` line for a cell.
+
+    ``sent`` / ``received`` keep the original replay contract (one line
+    per cell, replay reads only those two keys). The remaining keys make
+    the recording explain *why* a cell ended: ``completion_reason`` is
+    one of ``correlated_reply | k_code | quiescence | cell_timeout |
+    transport_lost | interrupted | noop``; ``drained`` lists every
+    uncorrelated envelope consumed while the cell was in flight, with
+    the kernel's ``timestamp``, the driver's ``received_at`` and whether
+    it extended the quiescence window.
+    """
+    return {
+        "sent": sent,
+        "received": received,
+        "cell_id": cell_id,
+        "completion_reason": completion_reason,
+        "sent_at": sent_at,
+        "completed_at": _utc_now_iso(),
+        "elapsed_s": (
+            round(time.monotonic() - started, 3) if started is not None else None
+        ),
+        "window_extensions": window_extensions,
+        "drained": list(drained or []),
+    }
+
+
+#: A keepalive that stops for this many observed intervals means the peer
+#: is gone (TCP keepalive / HTTP-2 PING semantics). The floor keeps a
+#: scheduling hiccup on a fast fake clock from looking like a dead kernel.
+HEARTBEAT_LOSS_FACTOR = 3.0
+HEARTBEAT_LOSS_FLOOR_S = 0.5
+
+
+def _heartbeat_silence(
+    hb_last: Optional[float], hb_gaps: list[float],
+) -> Optional[tuple[float, float]]:
+    """Return ``(quiet_for, cadence)`` once the kernel's heartbeats, whose
+    cadence we have observed at least twice, have been silent for longer
+    than ``HEARTBEAT_LOSS_FACTOR`` intervals; ``None`` otherwise."""
+    if hb_last is None or len(hb_gaps) < 2:
+        return None
+    cadence = sorted(hb_gaps)[len(hb_gaps) // 2]
+    quiet_for = time.monotonic() - hb_last
+    if quiet_for > max(HEARTBEAT_LOSS_FACTOR * cadence, HEARTBEAT_LOSS_FLOOR_S):
+        return quiet_for, cadence
+    return None
 
 
 def _synthetic_k_envelope(
