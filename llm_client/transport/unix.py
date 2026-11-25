@@ -37,8 +37,8 @@ class _UnixSocketConnection(KernelConnection):
     ) -> None:
         # We bypass the parent __init__ since there's no in-process dispatcher.
         self.session_id = session_id
-        from llm_kernel.wire import WIRE_VERSION
-        self.wire_version = WIRE_VERSION
+        from llm_kernel.wire import versions as _versions
+        self.wire_version = _versions.WIRE_VERSION
         self._sock = sock
         self._recv_timeout = recv_timeout
         self._buf = bytearray()

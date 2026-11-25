@@ -37,7 +37,8 @@ import time
 import uuid as _uuid
 from typing import Any, Dict, List, Optional
 
-from llm_kernel.wire import WIRE_MAJOR, WIRE_VERSION
+from llm_kernel.wire import WIRE_MAJOR, WIRE_VERSION  # noqa: F401  (re-exported; call sites read _versions live)
+from llm_kernel.wire import versions as _versions
 
 from llm_client.boot import KernelConnection
 
@@ -224,9 +225,9 @@ def connect(
     *,
     bind: str,
     token: str,
-    wire_version_request: str = WIRE_VERSION,
+    wire_version_request: Optional[str] = None,
     client_name: str = "llmnb-cli",
-    client_version: str = "0.1.0",
+    client_version: Optional[str] = None,
     capabilities: Optional[List[str]] = None,
     timeout: float = 30.0,
 ) -> KernelConnection:
@@ -241,12 +242,16 @@ def connect(
         (``os.environ[LLMNB_AUTH_TOKEN]``, a keychain, etc). Never
         accept it on argv -- leaks via ``ps``.
     wire_version_request:
-        Wire version the driver requests. Defaults to
-        :data:`llm_kernel.wire.WIRE_VERSION`.
+        Wire version the driver requests. ``None`` (default) resolves at
+        call time to the live :data:`llm_kernel.wire.WIRE_VERSION`.
     client_name, client_version:
         Driver identity. Logged kernel-side; no security significance.
+        ``client_version=None`` resolves to
+        :data:`llm_kernel.wire.versions.CLIENT_VERSION`.
     capabilities:
-        Capability set the driver advertises. V1 default: full set.
+        Capability set the driver advertises. ``None`` (default) resolves
+        at call time to the kernel's advertised set,
+        :data:`llm_kernel.wire.versions.KERNEL_CAPABILITIES`.
     timeout:
         Total budget (seconds) for the connect + handshake. The kernel
         gets at most this long to respond; on timeout the socket is
@@ -273,10 +278,14 @@ def connect(
         TCP-level connect failed.
     """
     host, port = _parse_bind(bind)
+    # Resolve defaults at call time from the single source
+    # (llm_kernel.wire.versions) so a runtime override is honoured.
+    if wire_version_request is None:
+        wire_version_request = _versions.WIRE_VERSION
+    if client_version is None:
+        client_version = _versions.CLIENT_VERSION
     if capabilities is None:
-        capabilities = [
-            "family_a", "family_b", "family_c", "family_f", "family_g",
-        ]
+        capabilities = _versions.kernel_capabilities()
 
     sock = _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM)
     try:
@@ -352,13 +361,14 @@ def connect(
                 f"kernel returned malformed wire_version: {kernel_wire!r}",
                 payload=payload,
             )
-        if kernel_major != WIRE_MAJOR:
+        driver_major = _versions.semver_major(_versions.WIRE_VERSION)
+        if kernel_major != driver_major:
             sock.close()
             raise TcpVersionMismatchError(
                 "version_mismatch_major",
                 (
                     f"kernel wire_version major={kernel_major} differs from "
-                    f"driver major={WIRE_MAJOR}"
+                    f"driver major={driver_major}"
                 ),
                 payload=payload,
             )
@@ -390,7 +400,7 @@ def connect(
         return _TcpKernelConnection(
             session_id=session_id,
             sock=sock,
-            wire_version=str(kernel_wire) or WIRE_VERSION,
+            wire_version=str(kernel_wire) or _versions.WIRE_VERSION,
             accepted_capabilities=list(accepted),
             warnings=list(warnings),
             recv_timeout=timeout,
