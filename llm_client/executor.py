@@ -38,7 +38,11 @@ from pathlib import Path
 from typing import Any, Iterable, Literal, Optional
 
 from llm_kernel.wire import WIRE_VERSION  # noqa: F401  (re-exported in result)
-from llm_kernel.text.cell_text import parse_cell  # PLAN-S5.5 Phase 4 — @@section
+from llm_kernel.text.cell_text import (  # PLAN-S5.5 Phase 4 — @@section
+    ParserContext,
+    parse_cell,
+    parser_context_from_config,
+)
 
 from llm_client.notebook import (
     detect_format,
@@ -347,6 +351,7 @@ def _derive_cell_envelope(
     *,
     session_id: str,
     ordinal: int,
+    parser_context: Optional[ParserContext] = None,
 ) -> Optional[dict[str, Any]]:
     """Derive a wire envelope for a cell, or ``None`` for no-op cell-kinds.
 
@@ -418,7 +423,7 @@ def _derive_cell_envelope(
         # operator gesture (Command Palette or
         # ``move_cells_into_section`` op).
         try:
-            parsed = parse_cell(text)
+            parsed = parse_cell(text, parser_context=parser_context)
             title = parsed.args.get("title") or parsed.args.get("section_name")
             section_id = parsed.args.get("section_id")
         except Exception:  # noqa: BLE001 — defensive; degrade to no-op
@@ -560,6 +565,7 @@ def _run_live_mode(
 
             envelope = _derive_cell_envelope(
                 cid, record, session_id=session_id, ordinal=ordinal,
+                parser_context=parser_context_from_config(rts.get("config")),
             )
             if envelope is None:
                 # No-op cell-kind (markdown / scratch / native / unknown).

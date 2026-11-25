@@ -16,7 +16,9 @@ from pathlib import Path
 
 from llm_kernel.text.cell_text import (  # type: ignore[import-not-found]
     CellParseError,
+    ParserContext,
     parse_cell,
+    parser_context_from_config,
     split_at_breaks,
 )
 
@@ -56,9 +58,25 @@ def _iter_cell_texts(path: Path) -> list[tuple[str, str]]:
     raise ValueError(f"cannot detect notebook format: {path}")
 
 
+def _load_parser_context(path: Path) -> ParserContext | None:
+    """Hash-mode context for an ``.llmnb`` file (None for other formats).
+
+    Reads ``metadata.rts.config``; hash mode is honoured only when the
+    in-session pin matches the file's fingerprint (see
+    ``parser_context_from_config``), so validation classifies plain
+    magics exactly as the kernel would.
+    """
+    if detect_format(path) != "llmnb":
+        return None
+    nb = json.loads(path.read_text(encoding="utf-8"))
+    rts = nb.get("metadata", {}).get("rts", {}) or {}
+    return parser_context_from_config(rts.get("config"))
+
+
 def run(args: argparse.Namespace) -> int:
     try:
         cell_texts = _iter_cell_texts(args.path)
+        parser_context = _load_parser_context(args.path)
     except (OSError, ValueError, json.JSONDecodeError) as e:
         print(f"error: {e}", file=sys.stderr)
         return 2
@@ -70,7 +88,7 @@ def run(args: argparse.Namespace) -> int:
         if not text.strip():
             continue
         try:
-            parsed = parse_cell(text)
+            parsed = parse_cell(text, parser_context=parser_context)
         except CellParseError as e:
             failures.append((cid, e.code, e.reason))
             continue
