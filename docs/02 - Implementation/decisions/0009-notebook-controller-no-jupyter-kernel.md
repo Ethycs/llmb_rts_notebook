@@ -51,3 +51,10 @@ The cell paradigm is kept; the kernel is dropped. Cells are conversation units, 
   - [turn-082-assistant.md](../../../_ingest/raw/phase-06-vscode-notebook-substrate/turn-082-assistant.md) — the kernel-drop: keep cells, drop Jupyter kernel, use VS Code's `NotebookController` API directly. Architecture lock for DR-0009.
   - [turn-084-assistant.md](../../../_ingest/raw/phase-06-vscode-notebook-substrate/turn-084-assistant.md) — synthesis of the substrate stack, layer-by-layer role of `NotebookController` in the final design.
 - **Dev guide:** [chapter 06](../../01%20-%20Design/dev-guide/06-vscode-notebook-substrate.md)
+
+## Refinement (V2 — `LLMNBKernel` Jupyter surface)
+
+- **Era:** Post-facade V2 (after `PLAN-kernel-facade` commits 1–10).
+- **Preserved:** The VS Code extension continues to use `NotebookController` + RFC-008 PTY+socket without a Python REPL expectation collision, and `llmnb` cells remain conversation/magic units rather than Python code.
+- **Adjusted:** Alongside PTY+socket and TCP, the kernel now exposes a full Jupyter messaging v5.4 kernel (`llm_kernel.jupyter_kernel.LLMNBKernel`, kernelspec `llmnb`, language `llmnb`, `interrupt_mode: "message"`) consuming the same `Kernel` facade (`llm_kernel.kernel_facade.Kernel`), RFC-006 v2 carriers (Family A on IOPub `display_data`/`update_display_data`, Families B–F on `llmnb.rts.v2` Comms), RFC-005 drift detection, and PLAN-S5.0.1 cell-magic injection defense.
+- **Conformance:** Jupyter frontends discover and boot `llmnb` via standard kernelspec machinery; `llm_client` drivers can additionally attach via `llm_client.transport.jupyter` (`--connect jupyter://<connection_file>`). See [protocols/jupyter-mapping](../../04%20-%20Reference/atoms/protocols/jupyter-mapping.md).

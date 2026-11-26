@@ -127,11 +127,13 @@ def _parse_connect_url(url: str) -> tuple[str, str]:
         return "tcp", url[len("tcp://"):]
     if url.startswith("unix://"):
         return "unix", url[len("unix://"):]
+    if url.startswith("jupyter://"):
+        return "jupyter", url[len("jupyter://"):]
     if "://" in url:
         scheme = url.split("://", 1)[0]
         raise ValueError(
             f"unsupported transport scheme: {scheme!r} "
-            "(expected tcp:// or unix://)"
+            "(expected tcp://, unix://, or jupyter://)"
         )
     return "tcp", url
 
@@ -153,6 +155,9 @@ def _open_connection(args: argparse.Namespace) -> Any:
             "(connect_to_kernel only supports tcp in V1.5). Use "
             "tcp://HOST:PORT for now."
         )
+    if transport == "jupyter":
+        from llm_client.boot import connect_to_kernel
+        return connect_to_kernel(bind, transport="jupyter")
     if transport != "tcp":
         raise ValueError(f"unsupported transport: {transport!r}")
 

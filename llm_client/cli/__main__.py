@@ -18,7 +18,7 @@ from __future__ import annotations
 import argparse
 import sys
 
-from . import auth, convert, execute, serve, smoke, validate
+from . import auth, convert, execute, kernel, kernelspec, serve, smoke, validate
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -51,6 +51,14 @@ def main(argv: list[str] | None = None) -> int:
     p_serve = sub.add_parser("serve", help="Start a TCP-mode kernel (S5.0.3d stub).")
     serve.add_arguments(p_serve)
     p_serve.set_defaults(_run=serve.run)
+
+    p_kernel = sub.add_parser("kernel", help="Launch the LLMNB Jupyter kernel.")
+    kernel.add_arguments(p_kernel)
+    p_kernel.set_defaults(_run=kernel.run)
+
+    p_kspec = sub.add_parser("kernelspec", help="Manage the LLMNB Jupyter kernelspec.")
+    kernelspec.add_arguments(p_kspec)
+    p_kspec.set_defaults(_run=kernelspec.run)
 
     args = parser.parse_args(argv)
     return int(args._run(args))

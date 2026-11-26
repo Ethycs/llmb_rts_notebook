@@ -1,6 +1,6 @@
 # Protocol: Jupyter kernel architecture — mapping to LLMKernel
 
-**Status**: `protocol` (V1 — descriptive; documents an existing structural correspondence, no new wire)
+**Status**: `protocol` (V2 — implemented by [`llm_kernel/jupyter_kernel.py`](../../../../vendor/LLMKernel/llm_kernel/jupyter_kernel.py), kernelspec `llmnb`, and [`llm_client/transport/jupyter.py`](../../../../llm_client/transport/jupyter.py))
 **Family**: meta — describes how RFC-006 Families A-F relate to Jupyter's 5-socket kernel protocol
 **Direction**: bidirectional analysis
 **Source specs**: [Jupyter messaging spec v5.4](https://jupyter-client.readthedocs.io/en/stable/messaging.html) (external), [RFC-006](../../../05%20-%20Standards/rfcs/RFC-006-kernel-extension-wire-format.md), [BSP-003](../../../03%20-%20Blueprint/BSP-003-writer-registry.md), [DR-0009](../../../02%20-%20Implementation/decisions/0009-notebook-controller-no-jupyter-kernel.md), [DR-0011](../../../02%20-%20Implementation/decisions/0011-subtractive-fork-vscode-jupyter.md), [DR-0012](../../../02%20-%20Implementation/decisions/0012-llmkernel-sole-kernel.md)
@@ -36,14 +36,14 @@ Jupyter ships 5 ZMQ sockets defined by a connection file:
 | `stream` (IOPub) | Family A span with `name: "agent_emit"`, `events[]` carrying chunks | We use OTLP events for streaming chunks rather than separate stream messages |
 | `display_data` / `update_display_data` (IOPub) | **Same Jupyter messages** — Family A directly rides them | `display_id` MUST equal OTLP `spanId` per [family-a-otlp-spans](family-a-otlp-spans.md) |
 | `status` (IOPub) | Family A span attribute `llmnb.kernel_status` (when shipped) | Jupyter's busy/idle/starting; we add `agent_status` per agent |
-| `kernel_info_request/reply` (Shell) | **Missing** — would return `{language: "llmnb", language_version: "1.0", agents: [{id, provider, model}]}` |
-| `is_complete_request/reply` (Shell) | **Missing** — directives are single-line in V1 so this is a no-op-able stub |
-| `complete_request/reply` (Shell) | **Missing** — would back operator-side autocomplete on directive grammar (`/spawn`, `@<agent>`) |
-| `inspect_request/reply` (Shell) | **Missing** — would back hover-info on cells/agents |
-| `history_request/reply` (Shell) | superseded by [turn](../concepts/turn.md) DAG + [run-frame](../concepts/run-frame.md) records | Our model is richer than Jupyter's flat exec history |
-| `comm_open` / `comm_msg` / `comm_close` (Shell + IOPub) | RFC-006 Family B–F all ride `comm_msg` with target name `llmnb.rts.v2` | Comm IS the extension hook; we use it as designed |
-| `shutdown_request/reply` (Control) | Lifecycle envelope (`action_type: "kernel_shutdown"`) | Same shape |
-| `interrupt_request` (Control) | S9 interrupt envelope (`action_type: "agent_interrupt"`) | Per-agent rather than whole-kernel |
+| `kernel_info_request/reply` (Shell) | **Shipped** — returns `implementation: "llmnb"`, `language_info: {name: "llmnb", version, mimetype: "application/vnd.llmnb+json", file_extension: ".llmnb"}`, `agents: [{id, zone_id, provider, model, status}]`, and `llmnb` version/capability block from `llm_kernel.wire.versions` | Implemented in `LLMNBKernel.kernel_info` |
+| `is_complete_request/reply` (Shell) | **Shipped** — returns `complete | incomplete | invalid` across `@@` cell magics, `@` line magics, unclosed quotes/fences, and body-expecting cells | Implemented in `LLMNBKernel.do_is_complete` |
+| `complete_request/reply` (Shell) | **Shipped** — completes `@@<cell_magic>`, `@<line_magic>`, `/spawn`, `@<agent_id>:`, live/hydrated agent IDs, `@mark` kinds, `@auth` subcommands, kwargs, declared endpoints, and templates | Implemented in `LLMNBKernel.do_complete` |
+| `inspect_request/reply` (Shell) | **Shipped** — returns `text/plain` + `text/markdown` docs for magics, live/hydrated agents (plus RunFrame/ContextManifest at `detail_level >= 1`), cells, sections, endpoints, and templates | Implemented in `LLMNBKernel.do_inspect` |
+| `history_request/reply` (Shell) | **Shipped** — supports `range`, `tail`, and `search` (with `output`, `unique`, and `@auth` pin redaction) alongside the [turn](../concepts/turn.md) DAG + [run-frame](../concepts/run-frame.md) records | Implemented in `LLMNBKernel.do_history` |
+| `comm_open` / `comm_msg` / `comm_close` / `comm_info` (Shell + IOPub) | **Shipped** — RFC-006 Family B–F ride `comm_msg` on `llmnb.rts.v2` with multi-client fan-out; unregistered targets are refused with `comm_close` per RFC-006 §2 | Implemented in `_JupyterCommManager` |
+| `shutdown_request/reply` (Control) | **Shipped** — shuts down the `Kernel` facade (drains transports, terminates agents, emits `shutdown` Family F snapshot, atomically persists bound `.llmnb` file) plus Comm `kernel.shutdown_request` support | Implemented in `LLMNBKernel.do_shutdown` |
+| `interrupt_request/reply` (Control) | **Shipped** — `interrupt_mode: "message"` (plus POSIX SIGINT fallback) interrupts active/live agents via `AgentSupervisor.interrupt` without killing the kernel | Implemented in `LLMNBKernel.interrupt_request` |
 | `debug_request` (Control) | **Out of scope** — V2+ Inspect mode is the closest analog | |
 
 ## Connection-file / launch ceremony
@@ -90,8 +90,11 @@ L1 + L2 are pure additive metadata moves and don't reverse any LOCK-IN ADR. L3 /
 
 ## V1 vs V2+
 
-- **V1**: structural isomorphism is documented (this atom); Family A actively uses Jupyter `display_data`; B-F use `comm_msg`. No external Jupyter clients can attach. No kernelspec on disk.
-- **V2+**: candidate path is **L3 transcoder shim** — keeps RFC-006 normative for our editor, lets external Jupyter clients attach via the adapter. Decision deferred until V1 ships.
+- **V1**: structural isomorphism documented; VS Code extension uses PTY+socket ([RFC-008](../../../05%20-%20Standards/rfcs/RFC-008-kernel-host-integration.md)); CLI uses TCP ([transport-mode](../concepts/transport-mode.md)).
+- **V2 (shipped)**: **L1 + L2 + L3-co-resident** landed together, wrapping the embeddable `Kernel` facade (`llm_kernel/kernel_facade.py`):
+  - **L1 (kernelspec)**: `llmnb` kernelspec (`kernels/llmnb/kernel.json`, `llmnb kernelspec install|uninstall|list|show`, `llm_kernel.install`) invoking `python -m llm_kernel.jupyter_kernel -f {connection_file}` (also reachable via `python -m llm_kernel jupyter` and `llmnb kernel`).
+  - **L2 (self-describing metadata)**: `notebook_format.magic_to_llmnb`, `llmnb_to_ipynb`, and `file_actions.apply_export` stamp top-level `metadata.kernelspec` (`name: "llmnb"`) and `metadata.language_info` while keeping `metadata.rts` untouched.
+  - **L3-co-resident (`LLMNBKernel` + `llm_client.transport.jupyter`)**: full Jupyter v5.4 5-socket ZMQ kernel hosting the `Kernel` facade, multi-client `llmnb.rts.v2` Comm fan-out, Family A `application/vnd.rts.run+json` IOPub spans, Stdin approval fallback, cell-magic injection defense (PLAN-S5.0.1), drift detection on hydrate (RFC-005), and `llmnb execute --connect jupyter://<connection_file>` driver attach. PTY+socket remains unchanged for the VS Code extension.
 
 ## See also
 

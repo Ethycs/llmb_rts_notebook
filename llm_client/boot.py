@@ -286,8 +286,8 @@ def boot_minimal_kernel(
 def connect_to_kernel(
     bind: str,
     *,
-    token: str,
-    transport: Literal["tcp"] = "tcp",
+    token: str = "",
+    transport: Literal["tcp", "jupyter"] = "tcp",
     timeout: float = 30.0,
 ) -> KernelConnection:
     """Connect to a remote kernel over a transport. Clean external entry.
@@ -329,4 +329,7 @@ def connect_to_kernel(
     if transport == "tcp":
         from llm_client.transport.tcp import connect as _tcp_connect
         return _tcp_connect(bind=bind, token=token, timeout=timeout)
+    if transport == "jupyter":
+        from llm_client.transport.jupyter import connect as _jupyter_connect
+        return _jupyter_connect(connection_file=bind, timeout=timeout)
     raise ValueError(f"unsupported transport for connect_to_kernel: {transport!r}")

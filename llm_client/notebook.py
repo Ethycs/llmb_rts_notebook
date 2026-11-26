@@ -19,8 +19,15 @@ directly.
 from __future__ import annotations
 
 from llm_kernel.notebook.notebook_format import (  # noqa: F401  (re-exports)
+    LLMNB_DISPLAY_NAME,
+    LLMNB_FILE_EXTENSION,
+    LLMNB_KERNEL_NAME,
+    LLMNB_LANGUAGE,
+    LLMNB_MIMETYPE,
     detect_format,
     ipynb_to_llmnb,
+    llmnb_kernelspec_metadata,
+    llmnb_language_info_metadata,
     llmnb_to_ipynb,
     llmnb_to_magic,
     magic_to_llmnb,
@@ -31,7 +38,14 @@ from llm_kernel.notebook.notebook_format import _layout_walk_ids  # noqa: F401
 
 
 __all__ = [
+    "LLMNB_DISPLAY_NAME",
+    "LLMNB_FILE_EXTENSION",
+    "LLMNB_KERNEL_NAME",
+    "LLMNB_LANGUAGE",
+    "LLMNB_MIMETYPE",
     "detect_format",
+    "llmnb_kernelspec_metadata",
+    "llmnb_language_info_metadata",
     "llmnb_to_magic",
     "magic_to_llmnb",
     "ipynb_to_llmnb",

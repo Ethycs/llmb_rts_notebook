@@ -15,6 +15,7 @@ A **transport mode** is the connection mechanism between a [driver](driver.md) a
 | **PTY** | Kernel spawned by extension/CLI as a child process | Implicit parent-child trust | V1 shipped (RFC-008) | `python -m llm_kernel pty-mode` |
 | **Unix socket** | Local same-user IPC; advertised at `~/.llmnb/runtime/<pid>.sock` (mode 0600); token in `<pid>.token` (mode 0600) | Filesystem perms + bearer token | V1.5 (PLAN-S5.0.3b/c) | `llmnb execute notebook.llmnb --connect unix:///tmp/llmnb-1234.sock` |
 | **TCP** | Remote or container-to-container | Bearer token via `LLMNB_AUTH_TOKEN` env (never argv); constant-time compare (`hmac.compare_digest`); default-bind `127.0.0.1`; one-connection-at-a-time | V1.5 shipped (PLAN-S5.0.3d) | `python -m llm_kernel serve --transport tcp --bind 127.0.0.1:7474 --auth-token-env LLMNB_AUTH_TOKEN` |
+| **Jupyter (ZMQ)** | Standard Jupyter frontends (JupyterLab, Notebook, Console, `jupyter_client`) and external driver attach | Connection-file HMAC-SHA256 session signing; multi-client IOPub + `llmnb.rts.v2` Comm fan-out | V2 shipped (`jupyter_kernel.py` + `llm_client/transport/jupyter.py`) | `python -m llm_kernel jupyter -f <connection_file>` / `llmnb execute nb.llmnb --connect jupyter://<connection_file>` |
 
 ## What's transport-specific vs envelope-invariant
 

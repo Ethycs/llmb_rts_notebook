@@ -20,6 +20,7 @@ SMOKE_TARGETS = {
     "supervisor": "run_supervisor",
     "metadata-writer": "run_metadata_writer",
     "pty": "run_pty",
+    "jupyter": "run_jupyter",
 }
 
 
@@ -39,12 +40,14 @@ def run(args: argparse.Namespace) -> int:
         run_paper_telephone,
         run_metadata_writer,
         run_pty,
+        run_jupyter,
     )
     fn_map = {
         "run_supervisor": run_supervisor,
         "run_paper_telephone": run_paper_telephone,
         "run_metadata_writer": run_metadata_writer,
         "run_pty": run_pty,
+        "run_jupyter": run_jupyter,
     }
     fn = fn_map[fn_name]
     return int(fn())
